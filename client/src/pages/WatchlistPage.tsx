@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useUserContext } from '@/components/UserSelector';
 import WatchlistEntry from '@/components/WatchlistEntry';
@@ -11,7 +11,7 @@ import { queryClient } from '@/lib/queryClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Film, Tv2, Menu, BadgePlus, Inbox } from 'lucide-react';
+import { AlertCircle, Film, Tv2, Menu, BadgePlus, Inbox, Search, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Label } from '@/components/ui/label';
@@ -33,6 +33,7 @@ const WatchlistPage = () => {
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [mediaTypeFilter, setMediaTypeFilter] = useState<MediaFilterType>('all');
   const [sortOrder, setSortOrder] = useState<string>('date_desc');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -42,7 +43,30 @@ const WatchlistPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<WatchlistEntryWithMovie | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  // Keyboard shortcut for search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+F or Cmd+F (Mac) to focus search input
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+        }
+      }
+      
+      // Escape key to clear search
+      if (e.key === 'Escape' && document.activeElement === searchInputRef.current && searchQuery) {
+        e.preventDefault();
+        setSearchQuery('');
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [searchQuery]);
 
   // Fetch watchlist
   const { data: watchlist, isLoading } = useQuery<WatchlistEntryWithMovie[]>({ 
@@ -54,7 +78,7 @@ const WatchlistPage = () => {
   const filteredAndSortedWatchlist = () => {
     if (!watchlist) return [];
 
-    // First filter by media type and genre
+    // First filter by media type, genre, and search query
     let filtered = watchlist;
     
     // Filter by media type
@@ -68,6 +92,16 @@ const WatchlistPage = () => {
     if (selectedGenre && selectedGenre !== 'all') {
       filtered = filtered.filter(entry => 
         entry.movie.genres?.includes(selectedGenre)
+      );
+    }
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(entry => 
+        entry.movie.title.toLowerCase().includes(query) || 
+        (entry.movie.overview && entry.movie.overview.toLowerCase().includes(query)) ||
+        (entry.notes && entry.notes.toLowerCase().includes(query))
       );
     }
 
@@ -309,6 +343,31 @@ const WatchlistPage = () => {
           </div>
         </div>
         
+        {/* Search Bar */}
+        <div className="mb-3 px-3">
+          <div className="relative">
+            <div className="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+              <Search className="h-4 w-4 text-gray-400" />
+            </div>
+            <Input
+              type="search"
+              placeholder="Search your watchlist..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-[#292929] border-gray-700 ps-10 pe-10 focus:ring-[#E50914] focus:border-[#E50914] h-11"
+            />
+            {searchQuery && (
+              <button 
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 end-0 flex items-center pe-3"
+              >
+                <X className="h-4 w-4 text-gray-400 hover:text-white" />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Filter and Sort Controls */}
         <div className="flex flex-col sm:flex-row justify-center space-y-2 sm:space-y-0 sm:space-x-2 px-3">
           <Select value={selectedGenre} onValueChange={setSelectedGenre}>
@@ -353,17 +412,58 @@ const WatchlistPage = () => {
           ))}
         </div>
       ) : watchlist && watchlist.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-3">
-          {filteredAndSortedWatchlist().map(entry => (
-            <WatchlistEntry 
-              key={entry.id} 
-              entry={entry} 
-              onEdit={handleEditEntry}
-              onDelete={handleDeleteEntry}
-              onShowDetails={handleShowDetails}
-            />
-          ))}
-        </div>
+        <>
+          {searchQuery.trim() && (
+            <div className="flex items-center justify-between px-4 py-2 bg-gray-800/50 mb-3 mx-3 rounded-md">
+              <div className="flex items-center text-sm">
+                <Search className="h-4 w-4 text-gray-400 mr-2" />
+                <span>Search results for "<span className="text-white font-medium">{searchQuery}</span>"</span>
+              </div>
+              <Badge variant="secondary" className="h-6 bg-gray-700">
+                {filteredAndSortedWatchlist().length} {filteredAndSortedWatchlist().length === 1 ? 'result' : 'results'}
+              </Badge>
+            </div>
+          )}
+          
+          {filteredAndSortedWatchlist().length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-3">
+              {filteredAndSortedWatchlist().map(entry => (
+                <WatchlistEntry 
+                  key={entry.id} 
+                  entry={entry} 
+                  onEdit={handleEditEntry}
+                  onDelete={handleDeleteEntry}
+                  onShowDetails={handleShowDetails}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-10 px-5 mx-auto max-w-md">
+              <div className="bg-[#292929]/50 rounded-xl p-6 shadow-md">
+                <div className="text-gray-400 mb-4 flex justify-center">
+                  <Search className="h-12 w-12 opacity-50" />
+                </div>
+                <p className="text-gray-300 font-medium">
+                  No matches found
+                </p>
+                <p className="text-gray-400 text-sm mt-1">
+                  Try adjusting your search or filters to find what you're looking for
+                </p>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedGenre('all');
+                    setMediaTypeFilter('all');
+                  }}
+                  className="mt-4"
+                >
+                  Clear all filters
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       ) : (
         <div className="text-center py-10 px-5 mx-auto max-w-md">
           <div className="bg-[#292929]/50 rounded-xl p-6 shadow-md">
