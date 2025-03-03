@@ -2,13 +2,46 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { config } from "dotenv";
+import session from "express-session";
+import passport from "passport";
+import { configurePassport } from "./auth";
+import authRoutes from "./authRoutes";
+import MemoryStore from "memorystore";
+import path from "path";
 
 // Load environment variables from .env file
 config();
 
+// Initialize Express app
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Setup session store
+const MemoryStoreSession = MemoryStore(session);
+
+// Configure sessions
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'watchlist-app-secret',
+  resave: false,
+  saveUninitialized: false,
+  store: new MemoryStoreSession({
+    checkPeriod: 86400000 // prune expired entries every 24h
+  }),
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+  }
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+configurePassport();
+
+// Register auth routes
+app.use('/api/auth', authRoutes);
 
 app.use((req, res, next) => {
   const start = Date.now();

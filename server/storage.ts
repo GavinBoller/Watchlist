@@ -58,9 +58,31 @@ export class SQLiteStorage implements IStorage {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT NOT NULL UNIQUE
+        username TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL DEFAULT '',
+        display_name TEXT,
+        is_private INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    
+    // Add new columns for authentication if they don't exist (for existing databases)
+    try {
+      const hasPasswordColumn = this.db.prepare("PRAGMA table_info(users)").all()
+        .some((col: any) => col.name === 'password');
+      
+      if (!hasPasswordColumn) {
+        this.db.exec(`
+          ALTER TABLE users ADD COLUMN password TEXT NOT NULL DEFAULT '';
+          ALTER TABLE users ADD COLUMN display_name TEXT;
+          ALTER TABLE users ADD COLUMN is_private INTEGER NOT NULL DEFAULT 1;
+          ALTER TABLE users ADD COLUMN created_at TEXT DEFAULT CURRENT_TIMESTAMP;
+        `);
+        console.log("Added authentication columns to users table");
+      }
+    } catch (error) {
+      console.error("Failed to check or add auth columns:", error);
+    }
 
     // Movies table
     this.db.exec(`
@@ -112,35 +134,69 @@ export class SQLiteStorage implements IStorage {
     const result = stmt.get() as { count: number };
     
     if (result.count === 0) {
-      await this.createUser({ username: 'Guest' });
+      // Create default guest user with a hashed password
+      const bcrypt = await import('bcryptjs');
+      const passwordHash = await bcrypt.hash('guest', 10);
+      
+      await this.createUser({ 
+        username: 'Guest', 
+        password: passwordHash,
+        displayName: 'Guest User',
+        isPrivate: false
+      });
     }
   }
 
   // User operations
   async getUser(id: number): Promise<User | undefined> {
-    const stmt = this.db.prepare('SELECT * FROM users WHERE id = ?');
+    const stmt = this.db.prepare(`
+      SELECT id, username, password, display_name as displayName, 
+             is_private as isPrivate, created_at as createdAt 
+      FROM users WHERE id = ?
+    `);
     const user = stmt.get(id) as User | undefined;
     return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const stmt = this.db.prepare('SELECT * FROM users WHERE LOWER(username) = LOWER(?)');
+    const stmt = this.db.prepare(`
+      SELECT id, username, password, display_name as displayName, 
+             is_private as isPrivate, created_at as createdAt
+      FROM users WHERE LOWER(username) = LOWER(?)
+    `);
     const user = stmt.get(username) as User | undefined;
     return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const stmt = this.db.prepare('INSERT INTO users (username) VALUES (?)');
-    const result = stmt.run(insertUser.username);
+    const stmt = this.db.prepare(`
+      INSERT INTO users (username, password, display_name, is_private) 
+      VALUES (?, ?, ?, ?)
+    `);
+    
+    const result = stmt.run(
+      insertUser.username,
+      insertUser.password,
+      insertUser.displayName || null,
+      insertUser.isPrivate !== undefined ? Number(insertUser.isPrivate) : 1
+    );
     
     return {
       id: Number(result.lastInsertRowid),
-      username: insertUser.username
+      username: insertUser.username,
+      password: insertUser.password,
+      displayName: insertUser.displayName || null,
+      isPrivate: insertUser.isPrivate !== undefined ? insertUser.isPrivate : true,
+      createdAt: new Date()
     };
   }
 
   async getAllUsers(): Promise<User[]> {
-    const stmt = this.db.prepare('SELECT * FROM users');
+    const stmt = this.db.prepare(`
+      SELECT id, username, password, display_name as displayName, 
+             is_private as isPrivate, created_at as createdAt
+      FROM users
+    `);
     const users = stmt.all() as User[];
     return users;
   }
@@ -375,8 +431,16 @@ export class MemStorage implements IStorage {
     this.movieCurrentId = 1;
     this.watchlistEntryCurrentId = 1;
     
-    // Add a default user
-    this.createUser({ username: "Guest" });
+    // Add a default user with a password
+    const bcrypt = require('bcryptjs');
+    const passwordHash = bcrypt.hashSync('guest', 10);
+    
+    this.createUser({
+      username: "Guest",
+      password: passwordHash,
+      displayName: "Guest User",
+      isPrivate: false
+    });
   }
 
   // User operations
