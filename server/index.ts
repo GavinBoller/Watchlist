@@ -29,9 +29,11 @@ app.use(session({
     checkPeriod: 86400000 // prune expired entries every 24h
   }),
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    // Only use secure cookies in production with HTTPS
+    secure: process.env.NODE_ENV === 'production' && process.env.ENFORCE_SECURE_COOKIES === 'true',
     httpOnly: true,
-    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    sameSite: 'lax' // This helps with CSRF protection and improves cookie security
   }
 }));
 
@@ -79,9 +81,24 @@ app.use((req, res, next) => {
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
+    
+    // Log all server errors
+    console.error('Server error:', err);
+    
+    // Send detailed error information in development
+    if (app.get('env') === 'development') {
+      res.status(status).json({
+        message,
+        error: err.toString(),
+        stack: err.stack
+      });
+    } else {
+      // Send limited information in production
+      res.status(status).json({ message });
+    }
+    
+    // Don't throw the error after handling it - this could crash the server
+    // if there's no further error handler
   });
 
   // importantly only setup vite in development and after
