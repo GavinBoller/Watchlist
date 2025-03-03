@@ -5,11 +5,29 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  displayName: text("display_name"),
+  isPrivate: boolean("is_private").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
+// For app use (includes password)
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
+  password: true,
+  displayName: true,
+  isPrivate: true,
 });
+
+// For API response (excludes password)
+export const userResponseSchema = createInsertSchema(users)
+  .pick({
+    id: true,
+    username: true,
+    displayName: true,
+    isPrivate: true,
+    createdAt: true,
+  });
 
 export const movies = pgTable("movies", {
   id: serial("id").primaryKey(),
@@ -58,6 +76,7 @@ export const insertWatchlistEntrySchema = z.object({
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UserResponse = Omit<User, 'password'>;
 
 export type Movie = typeof movies.$inferSelect;
 export type InsertMovie = z.infer<typeof insertMovieSchema>;
