@@ -181,11 +181,10 @@ const WatchlistPage = () => {
     
     const genreSet = new Set<string>();
     watchlist.forEach(entry => {
-      if (entry.movie.genres) {
-        entry.movie.genres.split(',').forEach(genre => {
-          if (genre.trim()) genreSet.add(genre.trim());
-        });
-      }
+      const genres = entry.movie.genres || '';
+      genres.split(',').forEach(genre => {
+        if (genre.trim()) genreSet.add(genre.trim());
+      });
     });
     
     return Array.from(genreSet).sort();

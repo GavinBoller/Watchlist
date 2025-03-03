@@ -14,6 +14,54 @@ import {
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "79d177894334dec45f251ff671833a50";
 const TMDB_API_BASE_URL = "https://api.themoviedb.org/3";
 
+// Genre maps for converting ids to names
+const movieGenreMap: Record<number, string> = {
+  28: 'Action',
+  12: 'Adventure',
+  16: 'Animation',
+  35: 'Comedy',
+  80: 'Crime',
+  99: 'Documentary',
+  18: 'Drama',
+  10751: 'Family',
+  14: 'Fantasy',
+  36: 'History',
+  27: 'Horror',
+  10402: 'Music',
+  9648: 'Mystery',
+  10749: 'Romance',
+  878: 'Science Fiction',
+  10770: 'TV Movie',
+  53: 'Thriller',
+  10752: 'War',
+  37: 'Western'
+};
+
+const tvGenreMap: Record<number, string> = {
+  10759: 'Action & Adventure',
+  16: 'Animation',
+  35: 'Comedy',
+  80: 'Crime',
+  99: 'Documentary',
+  18: 'Drama',
+  10751: 'Family',
+  10762: 'Kids',
+  9648: 'Mystery',
+  10763: 'News',
+  10764: 'Reality',
+  10765: 'Sci-Fi & Fantasy',
+  10766: 'Soap',
+  10767: 'Talk',
+  10768: 'War & Politics',
+  37: 'Western'
+};
+
+// Helper function to convert genre IDs to names
+async function convertGenreIdsToNames(genreIds: number[] = [], mediaType: string = 'movie'): Promise<string[]> {
+  const genreMap = mediaType === 'tv' ? tvGenreMap : movieGenreMap;
+  return genreIds.map(id => genreMap[id] || '').filter(Boolean);
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // User routes
   app.get("/api/users", async (req: Request, res: Response) => {
@@ -148,7 +196,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let movie = await storage.getMovieByTmdbId(tmdbMovie.id);
       
       if (!movie) {
-        const genres = tmdbMovie.genre_ids?.join(",") || "";
+        // Convert genre IDs to genre names
+        const genreNames = await convertGenreIdsToNames(tmdbMovie.genre_ids, tmdbMovie.media_type || "movie");
+        const genres = genreNames.join(",");
+        
         const mediaType = tmdbMovie.media_type || "movie";
         const title = tmdbMovie.title || tmdbMovie.name || "Unknown Title";
         const releaseDate = tmdbMovie.release_date || tmdbMovie.first_air_date || null;

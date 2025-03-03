@@ -15,7 +15,8 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
   
   const posterUrl = getImageUrl(movie.posterPath, 'w200');
   const year = movie.releaseDate ? new Date(movie.releaseDate).getFullYear().toString() : '';
-  const genres = getGenreNames(movie.genres, movie.mediaType);
+  // For stored entries, the genres are already comma-separated strings of genre names
+  const genres = movie.genres || '';
   const mediaType = movie.mediaType || 'movie';
   
   // Format the watched date
