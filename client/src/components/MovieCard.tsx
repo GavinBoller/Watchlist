@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { TMDBMovie } from '@shared/schema';
-import { getImageUrl, getTitle, getReleaseDate, getMediaType, formatMovieDisplay } from '@/api/tmdb';
-import { Star, Info } from 'lucide-react';
+import { getImageUrl, getTitle, getReleaseDate, getMediaType, formatMovieDisplay, getIMDbUrl } from '@/api/tmdb';
+import { Star, Info, ExternalLink } from 'lucide-react';
 
 interface MovieCardProps {
   movie: TMDBMovie;
@@ -78,6 +78,17 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
               Details
             </button>
           )}
+          <a 
+            href={getIMDbUrl(movie.id, mediaType)} 
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-[#F5C518] text-black text-xs rounded-full py-1 px-3 hover:bg-yellow-400 transition flex items-center"
+            onClick={(e) => e.stopPropagation()}
+            aria-label="View on IMDb"
+          >
+            <ExternalLink className="h-3 w-3 mr-1" />
+            IMDb
+          </a>
           <button 
             className="bg-[#E50914] text-white text-xs rounded-full py-1 px-3 hover:bg-red-700 transition flex-grow"
             onClick={handleAddClick}

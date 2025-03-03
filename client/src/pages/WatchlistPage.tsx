@@ -45,7 +45,7 @@ const WatchlistPage = () => {
   const { toast } = useToast();
 
   // Fetch watchlist
-  const { data: watchlist, isLoading } = useQuery({ 
+  const { data: watchlist, isLoading } = useQuery<WatchlistEntryWithMovie[]>({ 
     queryKey: currentUser ? [`/api/watchlist/${currentUser.id}`] : [],
     enabled: !!currentUser,
   });
