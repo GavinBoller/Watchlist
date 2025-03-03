@@ -541,4 +541,153 @@ export class MemStorage implements IStorage {
 }
 
 // Switch from MemStorage to SQLiteStorage
-export const storage = new SQLiteStorage();
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
+
+// DatabaseStorage implementation for PostgreSQL
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
+  async getMovie(id: number): Promise<Movie | undefined> {
+    const [movie] = await db.select().from(movies).where(eq(movies.id, id));
+    return movie || undefined;
+  }
+
+  async getMovieByTmdbId(tmdbId: number): Promise<Movie | undefined> {
+    const [movie] = await db.select().from(movies).where(eq(movies.tmdbId, tmdbId));
+    return movie || undefined;
+  }
+
+  async createMovie(insertMovie: InsertMovie): Promise<Movie> {
+    const [movie] = await db
+      .insert(movies)
+      .values(insertMovie)
+      .returning();
+    return movie;
+  }
+
+  async getWatchlistEntry(id: number): Promise<WatchlistEntry | undefined> {
+    const [entry] = await db.select().from(watchlistEntries).where(eq(watchlistEntries.id, id));
+    return entry || undefined;
+  }
+
+  async getWatchlistEntries(userId: number): Promise<WatchlistEntryWithMovie[]> {
+    const entries = await db
+      .select()
+      .from(watchlistEntries)
+      .where(eq(watchlistEntries.userId, userId));
+    
+    const result: WatchlistEntryWithMovie[] = [];
+    
+    for (const entry of entries) {
+      const [movie] = await db.select().from(movies).where(eq(movies.id, entry.movieId));
+      if (movie) {
+        result.push({
+          ...entry,
+          movie
+        });
+      }
+    }
+    
+    return result;
+  }
+
+  async hasWatchlistEntry(userId: number, movieId: number): Promise<boolean> {
+    const [count] = await db
+      .select({ count: db.fn.count() })
+      .from(watchlistEntries)
+      .where(
+        and(
+          eq(watchlistEntries.userId, userId),
+          eq(watchlistEntries.movieId, movieId)
+        )
+      );
+    
+    return Number(count.count) > 0;
+  }
+
+  async createWatchlistEntry(insertEntry: InsertWatchlistEntry): Promise<WatchlistEntry> {
+    const [entry] = await db
+      .insert(watchlistEntries)
+      .values(insertEntry)
+      .returning();
+    
+    return entry;
+  }
+
+  async updateWatchlistEntry(id: number, updates: Partial<InsertWatchlistEntry>): Promise<WatchlistEntry | undefined> {
+    // Check if entry exists
+    const entry = await this.getWatchlistEntry(id);
+    if (!entry) return undefined;
+    
+    // Update only provided fields
+    const [updatedEntry] = await db
+      .update(watchlistEntries)
+      .set(updates)
+      .where(eq(watchlistEntries.id, id))
+      .returning();
+    
+    return updatedEntry;
+  }
+
+  async deleteWatchlistEntry(id: number): Promise<boolean> {
+    const result = await db
+      .delete(watchlistEntries)
+      .where(eq(watchlistEntries.id, id))
+      .returning({ id: watchlistEntries.id });
+    
+    return result.length > 0;
+  }
+}
+
+// Initialize default user in the database
+async function initializeDatabase() {
+  try {
+    // Check if we need to create a default user
+    const existingUsers = await db.select().from(users);
+    
+    if (existingUsers.length === 0) {
+      // Create a default user
+      const bcrypt = await import('bcryptjs');
+      const passwordHash = await bcrypt.hash('guest', 10);
+      
+      await db.insert(users).values({
+        username: 'Guest',
+        password: passwordHash,
+        displayName: 'Guest User'
+      });
+      
+      console.log('Created default user');
+    }
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+  }
+}
+
+// Initialize the database
+initializeDatabase();
+
+export const storage = new DatabaseStorage();
