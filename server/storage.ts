@@ -7,6 +7,8 @@ import {
 import Database from 'better-sqlite3';
 import { join } from 'path';
 import fs from 'fs';
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
 
 // Ensure data directory exists
 const dataDir = join('.', 'data');
