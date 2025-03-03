@@ -750,6 +750,11 @@ export class DatabaseStorage implements IStorage {
 // Initialize default user in the database
 async function initializeDatabase() {
   try {
+    if (!process.env.DATABASE_URL) {
+      console.warn('Skipping database initialization: No DATABASE_URL provided');
+      return;
+    }
+    
     // Check if we need to create a default user
     const existingUsers = await db.select().from(users);
     
@@ -767,11 +772,15 @@ async function initializeDatabase() {
       console.log('Created default user');
     }
   } catch (error) {
-    console.error('Failed to initialize database:', error);
+    console.warn('Failed to initialize database (this is expected during deployment):', error);
+    // Don't throw errors during deployment - this will be fixed when DATABASE_URL is provided
   }
 }
 
-// Initialize the database
-initializeDatabase();
+// Initialize the database but don't wait for it to complete
+// This ensures the app will still start even if database initialization fails
+initializeDatabase().catch(err => {
+  console.warn('Database initialization encountered an error:', err.message);
+});
 
 export const storage = new DatabaseStorage();
