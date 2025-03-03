@@ -74,13 +74,23 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
       
       // Close the modal and reset form
       handleClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding to watched list:', error);
-      toast({
-        title: "Failed to add to watched list",
-        description: "There was an error adding the item to your watched list",
-        variant: "destructive",
-      });
+      
+      // Check for 409 conflict (already in watchlist)
+      if (error.status === 409) {
+        toast({
+          title: "Already in your watched list",
+          description: "This title is already in your watched list",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Failed to add to watched list",
+          description: "There was an error adding the item to your watched list",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }

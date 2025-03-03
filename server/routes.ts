@@ -244,6 +244,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         movie = await storage.createMovie(movieData);
       }
       
+      // Check if this movie is already in the user's watchlist
+      const alreadyInWatchlist = await storage.hasWatchlistEntry(userId, movie.id);
+      if (alreadyInWatchlist) {
+        return res.status(409).json({ 
+          message: "Movie already in watchlist", 
+          details: "This movie is already in your watched list" 
+        });
+      }
+      
       // Create watchlist entry
       const entryData = insertWatchlistEntrySchema.parse({
         userId,

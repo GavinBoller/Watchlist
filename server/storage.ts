@@ -29,6 +29,7 @@ export interface IStorage {
   // Watchlist operations
   getWatchlistEntry(id: number): Promise<WatchlistEntry | undefined>;
   getWatchlistEntries(userId: number): Promise<WatchlistEntryWithMovie[]>;
+  hasWatchlistEntry(userId: number, movieId: number): Promise<boolean>;
   createWatchlistEntry(entry: InsertWatchlistEntry): Promise<WatchlistEntry>;
   updateWatchlistEntry(id: number, entry: Partial<InsertWatchlistEntry>): Promise<WatchlistEntry | undefined>;
   deleteWatchlistEntry(id: number): Promise<boolean>;
@@ -218,6 +219,17 @@ export class SQLiteStorage implements IStorage {
         mediaType: row.mediaType
       }
     }));
+  }
+  
+  async hasWatchlistEntry(userId: number, movieId: number): Promise<boolean> {
+    const stmt = this.db.prepare(`
+      SELECT COUNT(*) as count
+      FROM watchlist_entries
+      WHERE userId = ? AND movieId = ?
+    `);
+    
+    const result = stmt.get(userId, movieId) as { count: number };
+    return result.count > 0;
   }
 
   async createWatchlistEntry(insertEntry: InsertWatchlistEntry): Promise<WatchlistEntry> {
@@ -412,6 +424,12 @@ export class MemStorage implements IStorage {
       }
       return { ...entry, movie };
     });
+  }
+  
+  async hasWatchlistEntry(userId: number, movieId: number): Promise<boolean> {
+    return Array.from(this.watchlistEntries.values()).some(
+      entry => entry.userId === userId && entry.movieId === movieId
+    );
   }
 
   async createWatchlistEntry(insertEntry: InsertWatchlistEntry): Promise<WatchlistEntry> {
