@@ -19,6 +19,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, updates: Partial<InsertUser>): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
 
   // Movie operations
@@ -569,6 +570,21 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users);
+  }
+  
+  async updateUser(id: number, updates: Partial<InsertUser>): Promise<User | undefined> {
+    // Check if user exists
+    const user = await this.getUser(id);
+    if (!user) return undefined;
+    
+    // Update only provided fields
+    const [updatedUser] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
+    
+    return updatedUser;
   }
 
   async getMovie(id: number): Promise<Movie | undefined> {
