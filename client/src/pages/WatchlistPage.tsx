@@ -11,7 +11,7 @@ import { queryClient } from '@/lib/queryClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Film, Tv2, Menu, BadgePlus, Inbox, Search, X, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Film, Tv2, Menu, BadgePlus, Inbox, PlayCircle, Search, X, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Label } from '@/components/ui/label';
@@ -92,6 +92,13 @@ const WatchlistPage = () => {
     if (mediaTypeFilter !== 'all') {
       filtered = filtered.filter(entry => 
         entry.movie.mediaType === mediaTypeFilter
+      );
+    }
+    
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(entry => 
+        entry.status === statusFilter
       );
     }
     
@@ -253,6 +260,13 @@ const WatchlistPage = () => {
     { value: 'movie', label: 'Movies', icon: Film },
     { value: 'tv', label: 'TV Shows', icon: Tv2 },
   ];
+  
+  const statusFilters = [
+    { value: 'all', label: 'All', icon: Menu },
+    { value: 'to_watch', label: 'Plan to Watch', icon: Clock },
+    { value: 'watching', label: 'Watching', icon: PlayCircle },
+    { value: 'watched', label: 'Watched', icon: CheckCircle },
+  ];
 
   // Add media type entries to TMDBMovie from watchlist entry
   const createTMDBMovieFromEntry = (entry: WatchlistEntryWithMovie): TMDBMovie => {
@@ -304,6 +318,29 @@ const WatchlistPage = () => {
           </div>
         </div>
         
+        {/* Status Filter Tabs (Desktop) */}
+        <div className="hidden md:flex justify-center mb-4">
+          <div className="inline-flex items-center rounded-lg bg-[#292929] p-1 mb-3">
+            {statusFilters.map((filter) => {
+              const Icon = filter.icon;
+              return (
+                <button
+                  key={filter.value}
+                  className={`flex items-center px-3 py-2 text-sm rounded-md transition ${
+                    statusFilter === filter.value 
+                      ? 'bg-[#E50914] text-white' 
+                      : 'text-gray-300 hover:text-white'
+                  }`}
+                  onClick={() => setStatusFilter(filter.value as StatusFilterType)}
+                >
+                  <Icon className="h-4 w-4 mr-2" />
+                  {filter.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Media Type Filter Tabs (Desktop) */}
         <div className="hidden md:flex justify-center mb-4">
           <div className="inline-flex items-center rounded-lg bg-[#292929] p-1">
@@ -324,6 +361,31 @@ const WatchlistPage = () => {
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* Status Filter - iOS-friendly segmented control (Mobile) */}
+        <div className="md:hidden mb-4 px-3">
+          <div className="overflow-x-auto pb-2">
+            <div className="inline-flex items-center rounded-lg bg-[#292929] p-1 shadow-inner space-x-1 min-w-[350px]">
+              {statusFilters.map((filter) => {
+                const Icon = filter.icon;
+                return (
+                  <button
+                    key={filter.value}
+                    className={`flex items-center justify-center px-3 py-2.5 rounded-md text-sm transition ${
+                      statusFilter === filter.value 
+                        ? 'bg-[#3d3d3d] text-white font-medium shadow-sm' 
+                        : 'text-gray-300 hover:bg-[#3d3d3d]/50'
+                    }`}
+                    onClick={() => setStatusFilter(filter.value as StatusFilterType)}
+                  >
+                    <Icon className={`h-4 w-4 mr-1.5 ${statusFilter === filter.value ? 'text-[#E50914]' : ''}`} />
+                    <span>{filter.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
