@@ -77,8 +77,12 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
         {/* Add to watchlist quick button for mobile */}
         {isMobile && !showInfo && (
           <button 
-            className="absolute bottom-2 right-2 bg-[#E50914] text-white rounded-full p-2 shadow-lg"
-            onClick={handleAddClick}
+            className="absolute bottom-2 right-2 bg-[#E50914] text-white rounded-full p-2 shadow-lg touch-manipulation"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onAddToWatchlist(movie);
+            }}
             aria-label="Add to watchlist"
           >
             <PlusCircle className="h-6 w-6" />
@@ -136,8 +140,12 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
         {isMobile && (
           <div className="flex flex-col mt-3 space-y-2">
             <button 
-              className="bg-[#E50914] text-white text-sm font-medium rounded-lg py-2 px-3 hover:bg-red-700 transition flex items-center justify-center"
-              onClick={handleAddClick}
+              className="bg-[#E50914] text-white text-sm font-medium rounded-lg py-2 px-3 hover:bg-red-700 transition flex items-center justify-center touch-manipulation"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onAddToWatchlist(movie);
+              }}
             >
               <PlusCircle className="h-4 w-4 mr-2" />
               Add to Watchlist
@@ -146,8 +154,14 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
             <div className="flex space-x-2">
               {onShowDetails && (
                 <button 
-                  className="bg-gray-700 text-white text-sm rounded-lg py-2 flex-1 hover:bg-gray-600 transition flex items-center justify-center"
-                  onClick={handleInfoClick}
+                  className="bg-gray-700 text-white text-sm rounded-lg py-2 flex-1 hover:bg-gray-600 transition flex items-center justify-center touch-manipulation"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    if (onShowDetails) {
+                      onShowDetails(movie);
+                    }
+                  }}
                   aria-label="Show details"
                 >
                   <Info className="h-4 w-4 mr-1" />
