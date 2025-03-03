@@ -46,8 +46,13 @@ const WatchlistPage = () => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
-  // Keyboard shortcut for search
+  // Keyboard shortcut for search (desktop only)
   useEffect(() => {
+    // Skip keyboard shortcuts on mobile devices
+    if (typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      return;
+    }
+    
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl+F or Cmd+F (Mac) to focus search input
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
@@ -343,7 +348,7 @@ const WatchlistPage = () => {
           </div>
         </div>
         
-        {/* Search Bar */}
+        {/* Search Bar - iOS optimized */}
         <div className="mb-3 px-3">
           <div className="relative">
             <div className="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
@@ -355,15 +360,21 @@ const WatchlistPage = () => {
               placeholder="Search your watchlist..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-[#292929] border-gray-700 ps-10 pe-10 focus:ring-[#E50914] focus:border-[#E50914] h-11"
+              className="bg-[#292929] border-gray-700 ps-10 pe-10 focus:ring-[#E50914] focus:border-[#E50914] h-11 rounded-lg"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck="false"
             />
             {searchQuery && (
               <button 
                 type="button"
                 onClick={() => setSearchQuery('')}
                 className="absolute inset-y-0 end-0 flex items-center pe-3"
+                aria-label="Clear search"
               >
-                <X className="h-4 w-4 text-gray-400 hover:text-white" />
+                <div className="bg-gray-700 rounded-full p-1.5">
+                  <X className="h-3 w-3 text-gray-300" />
+                </div>
               </button>
             )}
           </div>
@@ -444,23 +455,36 @@ const WatchlistPage = () => {
                 <div className="text-gray-400 mb-4 flex justify-center">
                   <Search className="h-12 w-12 opacity-50" />
                 </div>
-                <p className="text-gray-300 font-medium">
+                <p className="text-gray-300 font-medium text-lg">
                   No matches found
                 </p>
-                <p className="text-gray-400 text-sm mt-1">
+                <p className="text-gray-400 text-sm mt-1 mb-4">
                   Try adjusting your search or filters to find what you're looking for
                 </p>
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedGenre('all');
-                    setMediaTypeFilter('all');
-                  }}
-                  className="mt-4"
-                >
-                  Clear all filters
-                </Button>
+                {/* iOS-optimized clear button */}
+                <div className="space-y-3">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setSearchQuery('')}
+                    className="w-full py-2.5 h-12 text-base border-gray-600"
+                    disabled={!searchQuery}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear search
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedGenre('all');
+                      setMediaTypeFilter('all');
+                    }}
+                    className="w-full py-2.5 h-12 text-base bg-gray-800 border-gray-600"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Reset all filters
+                  </Button>
+                </div>
               </div>
             </div>
           )}
