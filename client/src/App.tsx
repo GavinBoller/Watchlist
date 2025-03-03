@@ -25,6 +25,7 @@ function App() {
         const response = await fetch("/api/auth/session");
         if (response.ok) {
           const data = await response.json();
+          console.log("Session check response:", data);
           if (data.authenticated && data.user) {
             setCurrentUser(data.user);
             setIsAuthenticated(true);
@@ -47,21 +48,17 @@ function App() {
   // Logout function
   const logout = async () => {
     try {
-      const response = await fetch("/api/auth/logout", { 
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        }
-      });
-      
-      if (response.ok) {
-        setCurrentUser(null);
-        setIsAuthenticated(false);
-      } else {
-        throw new Error("Logout failed");
-      }
+      const response = await apiRequest("POST", "/api/auth/logout");
+      console.log("Logout successful");
+      setCurrentUser(null);
+      setIsAuthenticated(false);
     } catch (error) {
       console.error("Failed to logout:", error);
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive",
+      });
       throw error;
     }
   };

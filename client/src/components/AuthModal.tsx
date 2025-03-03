@@ -41,23 +41,29 @@ export const AuthModal = ({ isOpen, onClose, onAuthSuccess }: AuthModalProps) =>
     setView("passwordReset");
   };
 
+  // Determine the title based on current view
+  const title = view === "login" 
+    ? "Welcome Back" 
+    : view === "register" 
+    ? "Join MovieTracker" 
+    : "Reset Password";
+    
+  // Determine the description based on current view
+  const description = view === "login"
+    ? "Log in to access your watchlist and track your movies"
+    : view === "register"
+    ? "Create an account to start tracking your movies and shows"
+    : "Reset your password to regain access to your account";
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-center text-2xl">
-            {view === "login" 
-              ? "Welcome Back" 
-              : view === "register" 
-              ? "Join MovieTracker" 
-              : "Reset Password"}
+          <DialogTitle id="auth-dialog-title" className="text-center text-2xl">
+            {title}
           </DialogTitle>
-          <DialogDescription className="text-center">
-            {view === "login"
-              ? "Log in to access your watchlist and track your movies"
-              : view === "register"
-              ? "Create an account to start tracking your movies and shows"
-              : "Reset your password to regain access to your account"}
+          <DialogDescription id="auth-dialog-description" className="text-center">
+            {description}
           </DialogDescription>
         </DialogHeader>
         

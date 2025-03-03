@@ -34,20 +34,15 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword
     setIsLoading(true);
     
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }),
+      // Use apiRequest instead of fetch for better error handling and consistency
+      const response = await apiRequest("POST", "/api/auth/login", { 
+        username, 
+        password 
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Login failed");
-      }
-      
       const data = await response.json();
+      
+      console.log("Login successful:", data);
       
       toast({
         title: "Success",
@@ -56,6 +51,7 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword
       
       onLoginSuccess(data.user);
     } catch (error: any) {
+      console.error("Login error:", error);
       toast({
         title: "Error",
         description: error.message || "Login failed",
