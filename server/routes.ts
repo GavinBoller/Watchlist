@@ -205,7 +205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/watchlist", async (req: Request, res: Response) => {
     try {
-      const { userId, tmdbMovie, watchedDate, notes } = req.body;
+      const { userId, tmdbMovie, watchedDate, notes, status } = req.body;
       
       if (!userId || !tmdbMovie) {
         return res.status(400).json({ message: "User ID and movie data are required" });
@@ -249,10 +249,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (alreadyInWatchlist) {
         const movieTitle = movie.title || "this title";
         return res.status(409).json({ 
-          message: "Already watched", 
-          details: `You've already added "${movieTitle}" to your watched list` 
+          message: "Already in watchlist", 
+          details: `You've already added "${movieTitle}" to your watchlist` 
         });
       }
+      
+      // Validate the status
+      const validStatus = status === 'to_watch' || status === 'watching' || status === 'watched' 
+        ? status 
+        : 'watched'; // Default to 'watched' if not specified or invalid
       
       // Create watchlist entry
       const entryData = insertWatchlistEntrySchema.parse({
@@ -260,6 +265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         movieId: movie.id,
         watchedDate: watchedDate ? watchedDate : null, // Keep as string for SQLite
         notes: notes || null,
+        status: validStatus,
       });
       
       const watchlistEntry = await storage.createWatchlistEntry(entryData);
@@ -284,7 +290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/watchlist/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id, 10);
-      const { watchedDate, notes } = req.body;
+      const { watchedDate, notes, status } = req.body;
       
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid watchlist entry ID" });
@@ -295,9 +301,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Watchlist entry not found" });
       }
       
+      // Validate the status if provided
+      let validStatus = undefined;
+      if (status !== undefined) {
+        validStatus = status === 'to_watch' || status === 'watching' || status === 'watched' 
+          ? status 
+          : 'watched'; // Default to 'watched' if invalid value
+      }
+      
       const updates = {
         ...(watchedDate !== undefined && { watchedDate }), // Keep as string for SQLite
         ...(notes !== undefined && { notes }),
+        ...(validStatus !== undefined && { status: validStatus }),
       };
       
       const updatedEntry = await storage.updateWatchlistEntry(id, updates);
