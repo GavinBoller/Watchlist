@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { LoginForm } from "./LoginForm";
 import { RegisterForm } from "./RegisterForm";
+import { PasswordResetForm } from "./PasswordResetForm";
 import { UserResponse } from "@shared/schema";
 import { useUserContext } from "./UserSelector";
 
@@ -17,7 +18,7 @@ interface AuthModalProps {
   onAuthSuccess: (user: UserResponse) => void;
 }
 
-type AuthView = "login" | "register";
+type AuthView = "login" | "register" | "passwordReset";
 
 export const AuthModal = ({ isOpen, onClose, onAuthSuccess }: AuthModalProps) => {
   const [view, setView] = useState<AuthView>("login");
@@ -28,8 +29,16 @@ export const AuthModal = ({ isOpen, onClose, onAuthSuccess }: AuthModalProps) =>
     onClose();
   };
 
-  const handleSwitchView = () => {
-    setView(view === "login" ? "register" : "login");
+  const handleSwitchToRegister = () => {
+    setView("register");
+  };
+
+  const handleSwitchToLogin = () => {
+    setView("login");
+  };
+
+  const handleSwitchToPasswordReset = () => {
+    setView("passwordReset");
   };
 
   return (
@@ -37,24 +46,39 @@ export const AuthModal = ({ isOpen, onClose, onAuthSuccess }: AuthModalProps) =>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl">
-            {view === "login" ? "Welcome Back" : "Join MovieTracker"}
+            {view === "login" 
+              ? "Welcome Back" 
+              : view === "register" 
+              ? "Join MovieTracker" 
+              : "Reset Password"}
           </DialogTitle>
           <DialogDescription className="text-center">
             {view === "login"
               ? "Log in to access your watchlist and track your movies"
-              : "Create an account to start tracking your movies and shows"}
+              : view === "register"
+              ? "Create an account to start tracking your movies and shows"
+              : "Reset your password to regain access to your account"}
           </DialogDescription>
         </DialogHeader>
         
-        {view === "login" ? (
+        {view === "login" && (
           <LoginForm
             onLoginSuccess={handleAuthSuccess}
-            onSwitchToRegister={handleSwitchView}
+            onSwitchToRegister={handleSwitchToRegister}
+            onForgotPassword={handleSwitchToPasswordReset}
           />
-        ) : (
+        )}
+        
+        {view === "register" && (
           <RegisterForm
             onRegisterSuccess={handleAuthSuccess}
-            onSwitchToLogin={handleSwitchView}
+            onSwitchToLogin={handleSwitchToLogin}
+          />
+        )}
+        
+        {view === "passwordReset" && (
+          <PasswordResetForm
+            onBack={handleSwitchToLogin}
           />
         )}
       </DialogContent>

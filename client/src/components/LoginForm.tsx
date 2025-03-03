@@ -10,9 +10,10 @@ import { UserResponse } from "@shared/schema";
 interface LoginFormProps {
   onLoginSuccess: (user: UserResponse) => void;
   onSwitchToRegister: () => void;
+  onForgotPassword: () => void;
 }
 
-export const LoginForm = ({ onLoginSuccess, onSwitchToRegister }: LoginFormProps) => {
+export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword }: LoginFormProps) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -96,7 +97,7 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister }: LoginFormProps
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? "Logging in..." : "Log In"}
           </Button>
-          <div className="text-center mt-4">
+          <div className="flex flex-col items-center gap-2 mt-4">
             <p className="text-sm text-muted-foreground">
               Don't have an account?{" "}
               <Button
@@ -108,6 +109,15 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister }: LoginFormProps
                 Register
               </Button>
             </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onForgotPassword}
+              type="button"
+              className="text-xs"
+            >
+              Forgot your password?
+            </Button>
           </div>
         </form>
       </CardContent>
