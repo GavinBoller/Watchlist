@@ -118,7 +118,7 @@ const WatchlistPage = () => {
       
       toast({
         title: "Entry updated",
-        description: `${entryToEdit.movie.title} has been updated in your watchlist`,
+        description: `${entryToEdit.movie.title} has been updated in your watched list`,
       });
       
       // Invalidate the watchlist cache
@@ -155,7 +155,7 @@ const WatchlistPage = () => {
       
       toast({
         title: "Entry removed",
-        description: "The item has been removed from your watchlist",
+        description: "The item has been removed from your watched list",
       });
       
       // Invalidate the watchlist cache
@@ -233,7 +233,7 @@ const WatchlistPage = () => {
       <Alert className="bg-[#292929] text-white border-yellow-600">
         <AlertCircle className="h-4 w-4 text-yellow-600" />
         <AlertDescription>
-          Please select a user to view the watchlist
+          Please select a user to view your watched items
         </AlertDescription>
       </Alert>
     );
@@ -244,7 +244,7 @@ const WatchlistPage = () => {
       <div className="flex flex-col mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-3">
           <h2 className="text-xl font-bold mb-2 md:mb-0 font-heading">
-            My Watchlist 
+            Watched
             <span className="ml-2 text-sm font-normal text-gray-400">
               ({stats.total} {stats.total === 1 ? 'item' : 'items'})
             </span>
@@ -378,8 +378,8 @@ const WatchlistPage = () => {
       ) : (
         <div className="text-center py-10 text-gray-400">
           {mediaTypeFilter === 'all' 
-            ? "Your watchlist is empty. Search for movies and TV shows to add them to your watchlist."
-            : `Your ${mediaTypeFilter === 'movie' ? 'movie' : 'TV show'} watchlist is empty.`
+            ? "You haven't watched anything yet. Search for movies and TV shows to add what you've watched."
+            : `You haven't watched any ${mediaTypeFilter === 'movie' ? 'movies' : 'TV shows'} yet.`
           }
         </div>
       )}
@@ -391,7 +391,7 @@ const WatchlistPage = () => {
             <DialogTitle>Confirm Removal</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            Are you sure you want to remove this item from your watchlist?
+            Are you sure you want to remove this item from your watched list?
           </div>
           <DialogFooter className="flex justify-end space-x-2">
             <Button 
@@ -414,7 +414,7 @@ const WatchlistPage = () => {
       <Dialog open={isEditModalOpen} onOpenChange={(open) => !isSubmitting && setIsEditModalOpen(open)}>
         <DialogContent className="bg-[#292929] text-white border-gray-700 sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Watchlist Entry</DialogTitle>
+            <DialogTitle>Edit Watched Entry</DialogTitle>
           </DialogHeader>
           
           {entryToEdit && (
