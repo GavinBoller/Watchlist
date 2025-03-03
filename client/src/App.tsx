@@ -15,7 +15,7 @@ function App() {
   const [users, setUsers] = useState<User[]>([]);
   const [location, setLocation] = useLocation();
 
-  // Fetch users on mount
+  // Fetch users on mount and load last selected user
   useEffect(() => {
     async function fetchUsers() {
       try {
@@ -23,8 +23,21 @@ function App() {
         if (response.ok) {
           const users = await response.json();
           setUsers(users);
-          // Set the first user as current if there are users and no current user
-          if (users.length > 0 && !currentUser) {
+          
+          // Try to load last selected user from localStorage
+          const lastUserId = localStorage.getItem('lastUserId');
+          
+          if (lastUserId && users.length > 0) {
+            // Find the user with the stored ID
+            const lastUser = users.find((user: User) => user.id === parseInt(lastUserId, 10));
+            if (lastUser) {
+              setCurrentUser(lastUser);
+            } else {
+              // Fall back to first user if saved user not found
+              setCurrentUser(users[0]);
+            }
+          } else if (users.length > 0) {
+            // Default to first user if no saved user
             setCurrentUser(users[0]);
           }
         }
@@ -50,6 +63,8 @@ function App() {
       if (response.ok) {
         const newUser = await response.json();
         setUsers(prevUsers => [...prevUsers, newUser]);
+        // Save to localStorage and set as current user
+        localStorage.setItem('lastUserId', newUser.id.toString());
         setCurrentUser(newUser);
         return true;
       } else {
@@ -61,9 +76,17 @@ function App() {
     }
   };
 
+  // Create a wrapper for setCurrentUser that also saves to localStorage
+  const setCurrentUserWithStorage = (user: User): void => {
+    // Save user ID to localStorage for persistence
+    localStorage.setItem('lastUserId', user.id.toString());
+    // Update the state
+    setCurrentUser(user);
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
-      <UserContext.Provider value={{ currentUser, setCurrentUser, users, addUser }}>
+      <UserContext.Provider value={{ currentUser, setCurrentUser: setCurrentUserWithStorage, users, addUser }}>
         <div className="flex flex-col min-h-screen">
           <Header 
             onTabChange={(tab) => {
