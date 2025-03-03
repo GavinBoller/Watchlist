@@ -7,12 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { getImageUrl, getTitle, getMediaType, getReleaseDate, formatMovieDisplay } from '@/api/tmdb';
-import { Star, Film, Tv2, X, CalendarIcon } from 'lucide-react';
+import { Star, Film, Tv2, X, CalendarIcon, Clock, PlayCircle, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { queryClient } from '@/lib/queryClient';
 import { format } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface AddToWatchlistModalProps {
   item: TMDBMovie | null;
@@ -24,6 +25,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
   const { currentUser } = useUserContext();
   const [watchedDate, setWatchedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState<string>('');
+  const [status, setStatus] = useState<string>('watched');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -48,7 +50,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
     if (!currentUser) {
       toast({
         title: "No user selected",
-        description: "Please select a user before adding to your watched list",
+        description: "Please select a user first",
         variant: "destructive",
       });
       return;
@@ -60,34 +62,41 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
       await apiRequest('POST', '/api/watchlist', {
         userId: currentUser.id,
         tmdbMovie: item,
-        watchedDate: watchedDate || null,
+        watchedDate: status === 'watched' ? watchedDate || null : null,
         notes: notes || null,
+        status: status,
       });
+      
+      const statusLabel = status === 'to_watch' 
+        ? 'plan to watch list' 
+        : status === 'watching' 
+          ? 'currently watching list'
+          : 'watched list';
       
       toast({
         title: `${mediaTypeLabel} added`,
-        description: `${title} has been added to your watched list`,
+        description: `${title} has been added to your ${statusLabel}`,
       });
       
-      // Invalidate the watched list cache
+      // Invalidate the watchlist cache
       queryClient.invalidateQueries({ queryKey: [`/api/watchlist/${currentUser.id}`] });
       
       // Close the modal and reset form
       handleClose();
     } catch (error: any) {
-      console.error('Error adding to watched list:', error);
+      console.error('Error adding to watchlist:', error);
       
       // Check for 409 conflict (already in watchlist)
       if (error.status === 409) {
         toast({
-          title: "Already Watched",
-          description: error.data?.details || `You've already added "${title}" to your watched list`,
+          title: "Already Added",
+          description: error.data?.details || `You've already added "${title}" to your list`,
           variant: "default",
         });
       } else {
         toast({
-          title: "Failed to add to watched list",
-          description: "There was an error adding the item to your watched list",
+          title: "Failed to add item",
+          description: "There was an error adding the item to your list",
           variant: "destructive",
         });
       }
@@ -116,9 +125,21 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
         </DialogClose>
         
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold pr-6" id="dialog-title">Add to Watched</DialogTitle>
+          <DialogTitle className="text-lg font-bold pr-6" id="dialog-title">
+            {status === 'to_watch' 
+              ? 'Add to Plan to Watch' 
+              : status === 'watching' 
+                ? 'Add to Currently Watching'
+                : 'Add to Watched'}
+          </DialogTitle>
           <DialogDescription className="text-gray-400" id="dialog-description">
-            Add this {mediaTypeLabel.toLowerCase()} to your watched list
+            Add this {mediaTypeLabel.toLowerCase()} to your {
+              status === 'to_watch' 
+                ? 'plan to watch' 
+                : status === 'watching' 
+                  ? 'currently watching'
+                  : 'watched'
+            } list
           </DialogDescription>
         </DialogHeader>
         
@@ -161,18 +182,62 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
         
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <Label htmlFor="watch-date" className="text-sm font-medium block mb-2">When did you watch it?</Label>
-            <div className="relative">
-              <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input 
-                type="date" 
-                id="watch-date" 
-                className={`w-full bg-gray-700 text-white rounded-lg pl-10 pr-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600 ${isMobile ? 'text-base' : ''}`}
-                value={watchedDate}
-                onChange={(e) => setWatchedDate(e.target.value)}
-              />
-            </div>
+            <Label className="text-sm font-medium block mb-2">Watch Status</Label>
+            <RadioGroup 
+              value={status} 
+              onValueChange={setStatus}
+              className="space-y-2"
+            >
+              <div className="flex items-center space-x-2 bg-gray-800 rounded-lg p-3 hover:bg-gray-700 transition cursor-pointer">
+                <RadioGroupItem value="to_watch" id="status-to-watch" />
+                <Label htmlFor="status-to-watch" className="flex items-center gap-2 cursor-pointer">
+                  <Clock className="h-4 w-4 text-blue-400" />
+                  <div>
+                    <div className="font-medium">Plan to Watch</div>
+                    <div className="text-xs text-gray-400">Save for later</div>
+                  </div>
+                </Label>
+              </div>
+              
+              <div className="flex items-center space-x-2 bg-gray-800 rounded-lg p-3 hover:bg-gray-700 transition cursor-pointer">
+                <RadioGroupItem value="watching" id="status-watching" />
+                <Label htmlFor="status-watching" className="flex items-center gap-2 cursor-pointer">
+                  <PlayCircle className="h-4 w-4 text-green-400" />
+                  <div>
+                    <div className="font-medium">Currently Watching</div>
+                    <div className="text-xs text-gray-400">Started but not finished</div>
+                  </div>
+                </Label>
+              </div>
+              
+              <div className="flex items-center space-x-2 bg-gray-800 rounded-lg p-3 hover:bg-gray-700 transition cursor-pointer">
+                <RadioGroupItem value="watched" id="status-watched" />
+                <Label htmlFor="status-watched" className="flex items-center gap-2 cursor-pointer">
+                  <CheckCircle className="h-4 w-4 text-[#E50914]" />
+                  <div>
+                    <div className="font-medium">Watched</div>
+                    <div className="text-xs text-gray-400">Already completed</div>
+                  </div>
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
+          
+          {status === 'watched' && (
+            <div className="mb-4">
+              <Label htmlFor="watch-date" className="text-sm font-medium block mb-2">When did you watch it?</Label>
+              <div className="relative">
+                <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input 
+                  type="date" 
+                  id="watch-date" 
+                  className={`w-full bg-gray-700 text-white rounded-lg pl-10 pr-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600 ${isMobile ? 'text-base' : ''}`}
+                  value={watchedDate}
+                  onChange={(e) => setWatchedDate(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
           
           <div className="mb-6">
             <Label htmlFor="watch-notes" className="text-sm font-medium block mb-2">Notes (optional)</Label>
@@ -194,7 +259,18 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
                   className="bg-[#E50914] text-white hover:bg-red-700 w-full py-3 text-base font-medium"
                   disabled={isSubmitting}
                 >
-                  Add to Watched
+                  {isSubmitting ? (
+                    <div className="flex items-center justify-center">
+                      <span className="mr-2">Adding</span>
+                      <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                    </div>
+                  ) : (
+                    status === 'to_watch' 
+                      ? 'Add to Plan to Watch' 
+                      : status === 'watching' 
+                        ? 'Add to Currently Watching'
+                        : 'Add to Watched'
+                  )}
                 </Button>
                 <Button 
                   type="button" 
@@ -221,7 +297,18 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
                   className="bg-[#E50914] text-white hover:bg-red-700"
                   disabled={isSubmitting}
                 >
-                  Add to Watched
+                  {isSubmitting ? (
+                    <div className="flex items-center justify-center">
+                      <span className="mr-2">Adding</span>
+                      <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                    </div>
+                  ) : (
+                    status === 'to_watch' 
+                      ? 'Add to Plan to Watch' 
+                      : status === 'watching' 
+                        ? 'Add to Currently Watching'
+                        : 'Add to Watched'
+                  )}
                 </Button>
               </>
             )}
