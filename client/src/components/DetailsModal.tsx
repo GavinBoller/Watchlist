@@ -31,7 +31,11 @@ export const DetailsModal = ({ item, isOpen, onClose, onAddToWatchlist }: Detail
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`bg-[#292929] text-white border-gray-700 ${isMobile ? 'max-w-[90vw] p-4' : 'sm:max-w-xl'}`}>
+      <DialogContent 
+        className={`bg-[#292929] text-white border-gray-700 ${isMobile ? 'max-w-[90vw] p-4' : 'sm:max-w-xl'}`}
+        aria-labelledby="details-dialog-title"
+        aria-describedby="details-dialog-description"
+      >
         {/* Custom close button for better mobile visibility */}
         <DialogClose className="absolute right-4 top-4 rounded-full hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600 p-1">
           <X className="h-5 w-5" />
@@ -39,8 +43,8 @@ export const DetailsModal = ({ item, isOpen, onClose, onAddToWatchlist }: Detail
         </DialogClose>
         
         <DialogHeader>
-          <DialogTitle className="text-lg sm:text-xl pr-6">{title}</DialogTitle>
-          <DialogDescription className="text-gray-300">
+          <DialogTitle className="text-lg sm:text-xl pr-6" id="details-dialog-title">{title}</DialogTitle>
+          <DialogDescription className="text-gray-300" id="details-dialog-description">
             {displayInfo}
           </DialogDescription>
         </DialogHeader>

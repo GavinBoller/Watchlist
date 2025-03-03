@@ -104,7 +104,11 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className={`bg-[#292929] text-white border-gray-700 ${isMobile ? 'max-w-[95vw] p-4' : 'sm:max-w-md'}`}>
+      <DialogContent 
+        className={`bg-[#292929] text-white border-gray-700 ${isMobile ? 'max-w-[95vw] p-4' : 'sm:max-w-md'}`}
+        aria-labelledby="dialog-title"
+        aria-describedby="dialog-description"
+      >
         {/* Custom close button for better mobile visibility */}
         <DialogClose className="absolute right-4 top-4 rounded-full hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600 p-1">
           <X className="h-5 w-5" />
@@ -112,8 +116,8 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
         </DialogClose>
         
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold pr-6">Add to Watched</DialogTitle>
-          <DialogDescription className="text-gray-400">
+          <DialogTitle className="text-lg font-bold pr-6" id="dialog-title">Add to Watched</DialogTitle>
+          <DialogDescription className="text-gray-400" id="dialog-description">
             Add this {mediaTypeLabel.toLowerCase()} to your watched list
           </DialogDescription>
         </DialogHeader>
