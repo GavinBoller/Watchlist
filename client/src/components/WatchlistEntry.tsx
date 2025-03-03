@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { WatchlistEntryWithMovie } from '@shared/schema';
-import { getImageUrl, getGenreNames } from '@/api/tmdb';
-import { Star, Trash2, Edit, Info, Calendar, Tv2, Film } from 'lucide-react';
+import { getImageUrl, getGenreNames, getIMDbUrl } from '@/api/tmdb';
+import { Star, Trash2, Edit, Info, Calendar, Tv2, Film, ExternalLink } from 'lucide-react';
 
 interface WatchlistEntryProps {
   entry: WatchlistEntryWithMovie;
@@ -77,7 +77,16 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
             "{notes}"
           </div>
         )}
-        <div className="mt-auto pt-2 flex justify-end">
+        <div className="mt-auto pt-2 flex justify-end items-center">
+          <a 
+            href={getIMDbUrl(movie.tmdbId, mediaType)} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-xs text-[#F5C518] hover:text-yellow-400 mr-3"
+            aria-label="View on IMDb"
+          >
+            <ExternalLink className="h-4 w-4" />
+          </a>
           <button 
             className="text-xs text-gray-300 hover:text-white mr-3"
             onClick={() => onEdit(entry)}

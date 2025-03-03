@@ -1,7 +1,7 @@
 import { TMDBMovie } from '@shared/schema';
-import { getImageUrl, getTitle, getMediaType, formatMovieDisplay } from '@/api/tmdb';
+import { getImageUrl, getTitle, getMediaType, formatMovieDisplay, getIMDbUrl } from '@/api/tmdb';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Star, Calendar, Tag } from 'lucide-react';
+import { Star, Calendar, Tag, ExternalLink } from 'lucide-react';
 
 interface DetailsModalProps {
   item: TMDBMovie | null;
@@ -74,12 +74,24 @@ export const DetailsModal = ({ item, isOpen, onClose, onAddToWatchlist }: Detail
                 </p>
               </div>
               
-              <button 
-                className="mt-4 bg-[#E50914] text-white py-2 px-4 rounded-lg hover:bg-red-700 transition w-full sm:w-auto"
-                onClick={handleAddToWatchlist}
-              >
-                Add to Watchlist
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button 
+                  className="mt-4 bg-[#E50914] text-white py-2 px-4 rounded-lg hover:bg-red-700 transition w-full sm:w-auto"
+                  onClick={handleAddToWatchlist}
+                >
+                  Add to Watchlist
+                </button>
+                
+                <a 
+                  href={getIMDbUrl(item.id, mediaType)} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="mt-4 bg-[#F5C518] text-black py-2 px-4 rounded-lg hover:bg-yellow-400 transition flex items-center justify-center w-full sm:w-auto"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View on IMDb
+                </a>
+              </div>
             </div>
           </div>
         </div>

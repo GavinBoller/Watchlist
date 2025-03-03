@@ -1,6 +1,7 @@
 import { TMDBSearchResponse, TMDBMovie } from '@shared/schema';
 
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
+const IMDB_BASE_URL = 'https://www.imdb.com/title/';
 
 // Helper function to get image URLs of different sizes
 export const getImageUrl = (path: string | null, size: 'w500' | 'original' | 'w200' = 'w500') => {
@@ -96,6 +97,12 @@ export const formatMovieDisplay = (item: TMDBMovie): string => {
   const year = getReleaseYear(getReleaseDate(item));
   const genres = getGenreNames(item.genre_ids, mediaType);
   return `${year}${genres ? ' • ' + genres : ''}${mediaType === 'tv' ? ' • TV Series' : ''}`;
+};
+
+// Get IMDb URL for the movie or TV show
+export const getIMDbUrl = (tmdbId: number, mediaType: string = 'movie'): string => {
+  // Since we don't have direct access to IMDb IDs, we'll create a URL that redirects from TMDb to IMDb
+  return `https://www.themoviedb.org/${mediaType}/${tmdbId}?toImdb=true`;
 };
 
 // Search TMDB for movies and TV shows
