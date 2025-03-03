@@ -121,7 +121,7 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
               </button>
             )}
             <a 
-              href={getIMDbUrl(movie.id, mediaType)} 
+              href={getIMDbUrl(movie.id, mediaType, title)} 
               target="_blank"
               rel="noopener noreferrer"
               className="bg-[#F5C518] text-black text-xs rounded-full py-1 px-3 hover:bg-yellow-400 transition flex items-center"
@@ -179,7 +179,7 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
                 onClick={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
-                  window.open(getIMDbUrl(movie.id, mediaType), '_blank', 'noopener');
+                  window.open(getIMDbUrl(movie.id, mediaType, title), '_blank', 'noopener');
                 }}
                 aria-label="View on IMDb"
               >

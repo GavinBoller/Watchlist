@@ -100,14 +100,14 @@ export const formatMovieDisplay = (item: TMDBMovie): string => {
 };
 
 // Get IMDb URL for the movie or TV show
-export const getIMDbUrl = (tmdbId: number, mediaType: string = 'movie'): string => {
-  // For movies, we use a different format than for TV shows
-  if (mediaType === 'movie') {
-    // Use TMDb ID with tt prefix (this isn't a real IMDb ID, but provides a recognizable experience for users)
-    return `https://www.imdb.com/title/tt${tmdbId.toString().padStart(7, '0')}/`;
+export const getIMDbUrl = (tmdbId: number, mediaType: string = 'movie', title?: string): string => {
+  // Since we don't have direct IMDb IDs, let's create a search URL that will likely find the correct content
+  // We'll try to use the title if available for more accurate results
+  if (title) {
+    return `https://www.imdb.com/find/?q=${encodeURIComponent(title)}&s=tt`;
   } else {
-    // For TV shows, we use a slightly different approach
-    return `https://www.imdb.com/find/?q=${encodeURIComponent(`tmdb:${tmdbId}`)}&s=tt&exact=true`;
+    // Fallback to the original TMDB page
+    return `https://www.themoviedb.org/${mediaType}/${tmdbId}`;
   }
 };
 

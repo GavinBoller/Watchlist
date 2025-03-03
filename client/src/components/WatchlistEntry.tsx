@@ -96,7 +96,7 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
           // Mobile layout - larger buttons with text labels for better touch targets
           <div className="mt-3 grid grid-cols-3 gap-2">
             <a 
-              href={getIMDbUrl(movie.tmdbId, mediaType)} 
+              href={getIMDbUrl(movie.tmdbId, mediaType, movie.title)} 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center justify-center bg-[#F5C518] text-black py-2 px-3 rounded-lg"
@@ -126,7 +126,7 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
           // Desktop layout
           <div className="mt-auto pt-2 flex justify-end items-center">
             <a 
-              href={getIMDbUrl(movie.tmdbId, mediaType)} 
+              href={getIMDbUrl(movie.tmdbId, mediaType, movie.title)} 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-xs text-[#F5C518] hover:text-yellow-400 mr-3"

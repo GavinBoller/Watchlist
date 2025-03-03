@@ -97,7 +97,7 @@ export const DetailsModal = ({ item, isOpen, onClose, onAddToWatchlist }: Detail
                 </button>
                 
                 <a 
-                  href={getIMDbUrl(item.id, mediaType)} 
+                  href={getIMDbUrl(item.id, mediaType, title)} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className={`bg-[#F5C518] text-black ${isMobile ? 'py-3' : 'py-2'} px-4 rounded-lg hover:bg-yellow-400 transition flex items-center justify-center w-full font-medium`}
