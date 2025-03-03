@@ -221,6 +221,19 @@ export class SQLiteStorage implements IStorage {
   }
 
   async createWatchlistEntry(insertEntry: InsertWatchlistEntry): Promise<WatchlistEntry> {
+    // Convert Date objects to ISO strings for SQLite
+    let watchedDate = null;
+    if (insertEntry.watchedDate) {
+      // If it's already a string, use it as is
+      if (typeof insertEntry.watchedDate === 'string') {
+        watchedDate = insertEntry.watchedDate;
+      } 
+      // If it's a Date object, convert to ISO string
+      else if (insertEntry.watchedDate instanceof Date) {
+        watchedDate = insertEntry.watchedDate.toISOString();
+      }
+    }
+    
     const stmt = this.db.prepare(`
       INSERT INTO watchlist_entries (userId, movieId, watchedDate, notes)
       VALUES (?, ?, ?, ?)
@@ -229,7 +242,7 @@ export class SQLiteStorage implements IStorage {
     const result = stmt.run(
       insertEntry.userId,
       insertEntry.movieId,
-      insertEntry.watchedDate || null,
+      watchedDate,
       insertEntry.notes || null
     );
     
@@ -266,7 +279,12 @@ export class SQLiteStorage implements IStorage {
     
     if (updates.watchedDate !== undefined) {
       setClauses.push('watchedDate = ?');
-      params.push(updates.watchedDate);
+      // Convert Date objects to ISO strings for SQLite
+      if (updates.watchedDate instanceof Date) {
+        params.push(updates.watchedDate.toISOString());
+      } else {
+        params.push(updates.watchedDate);
+      }
     }
     
     if (updates.notes !== undefined) {

@@ -223,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const entryData = insertWatchlistEntrySchema.parse({
         userId,
         movieId: movie.id,
-        watchedDate: watchedDate ? new Date(watchedDate) : null,
+        watchedDate: watchedDate ? watchedDate : null, // Keep as string for SQLite
         notes: notes || null,
       });
       
@@ -261,7 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updates = {
-        ...(watchedDate !== undefined && { watchedDate: new Date(watchedDate) }),
+        ...(watchedDate !== undefined && { watchedDate }), // Keep as string for SQLite
         ...(notes !== undefined && { notes }),
       };
       
