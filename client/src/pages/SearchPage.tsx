@@ -79,7 +79,7 @@ const SearchPage = () => {
   return (
     <div>
       {/* Search Bar */}
-      <div className="max-w-2xl mx-auto mb-6">
+      <div className="max-w-2xl mx-auto mb-4 px-3">
         <form className="relative" onSubmit={handleSearch}>
           <Input
             type="text"
@@ -87,6 +87,7 @@ const SearchPage = () => {
             className="w-full bg-[#292929] text-white border border-gray-700 rounded-lg py-3 px-4 pl-10 focus:outline-none focus:ring-2 focus:ring-[#E50914]"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            autoComplete="off"
           />
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search className="h-5 w-5 text-gray-400" />
@@ -95,13 +96,14 @@ const SearchPage = () => {
             type="submit"
             className="absolute inset-y-0 right-0 flex items-center px-4 text-white bg-[#E50914] rounded-r-lg hover:bg-red-700 focus:outline-none"
           >
-            Search
+            <span className="hidden sm:inline">Search</span>
+            <Search className="h-5 w-5 sm:hidden" />
           </Button>
         </form>
       </div>
 
-      {/* Media Type Filter */}
-      <div className="flex justify-center mb-6">
+      {/* Desktop Media Type Filter */}
+      <div className="hidden md:flex justify-center mb-6">
         <div className="inline-flex items-center rounded-lg bg-[#292929] p-1">
           {mediaTypeFilters.map((filter) => {
             const Icon = filter.icon;
@@ -123,50 +125,40 @@ const SearchPage = () => {
         </div>
       </div>
 
-      {/* Mobile Media Type Filter */}
-      <div className="md:hidden flex justify-center mb-6">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="bg-[#292929] border-gray-700">
-              <span className="mr-2">
-                {mediaTypeFilters.find(f => f.value === mediaFilter)?.label || 'Filter'}
-              </span>
-              {(() => {
-                const Icon = mediaTypeFilters.find(f => f.value === mediaFilter)?.icon || Menu;
-                return <Icon className="h-4 w-4" />;
-              })()}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="bg-[#292929] text-white border-gray-700">
-            {mediaTypeFilters.map((filter) => {
-              const Icon = filter.icon;
-              return (
-                <DropdownMenuItem 
-                  key={filter.value}
-                  className={`flex items-center cursor-pointer ${
-                    mediaFilter === filter.value ? 'bg-[#E50914] text-white' : ''
-                  }`}
-                  onClick={() => setMediaFilter(filter.value as MediaFilterType)}
-                >
-                  <Icon className="h-4 w-4 mr-2" />
-                  {filter.label}
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+      {/* Mobile Media Type Filter - iOS-friendly segmented control */}
+      <div className="md:hidden mb-4 px-3">
+        <div className="grid grid-cols-3 gap-1 bg-[#292929] rounded-lg p-1 shadow-inner">
+          {mediaTypeFilters.map((filter) => {
+            const Icon = filter.icon;
+            return (
+              <button
+                key={filter.value}
+                className={`flex items-center justify-center px-2 py-2.5 rounded-md text-sm transition ${
+                  mediaFilter === filter.value 
+                    ? 'bg-[#3d3d3d] text-white font-medium shadow-sm' 
+                    : 'text-gray-300 hover:bg-[#3d3d3d]/50'
+                }`}
+                onClick={() => setMediaFilter(filter.value as MediaFilterType)}
+              >
+                <Icon className={`h-4 w-4 mr-1.5 ${mediaFilter === filter.value ? 'text-[#E50914]' : ''}`} />
+                <span>{filter.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Search Results */}
-      <div className="mt-4">
-        <h2 className={`text-xl font-bold mb-4 ${searchQuery ? '' : 'opacity-50'}`}>
+      <div className="mt-4 px-3">
+        <h2 className={`text-lg sm:text-xl font-bold mb-4 ${searchQuery ? '' : 'opacity-50'}`}>
           {searchQuery 
             ? `${filteredResults?.length || 0} Results for "${searchQuery}"` 
             : 'Search for movies and TV shows to get started'}
         </h2>
         
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          // Skeleton loading state - optimized for mobile
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
             {[...Array(10)].map((_, index) => (
               <div key={index} className="rounded-lg overflow-hidden">
                 <Skeleton className="w-full aspect-[2/3]" />
@@ -174,7 +166,8 @@ const SearchPage = () => {
             ))}
           </div>
         ) : filteredResults && filteredResults.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          // Search results
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
             {filteredResults.map((item) => (
               <MovieCard 
                 key={item.id} 
@@ -185,13 +178,72 @@ const SearchPage = () => {
             ))}
           </div>
         ) : searchQuery ? (
-          <div className="text-center py-10 text-gray-400">
-            {mediaFilter === 'all' 
-              ? `No results found for "${searchQuery}"`
-              : `No ${mediaFilter === 'movie' ? 'movies' : 'TV shows'} found for "${searchQuery}"`
-            }
+          // No results message
+          <div className="text-center py-10 text-gray-400 flex flex-col items-center">
+            <Search className="h-10 w-10 mb-3 text-gray-600" />
+            <p>
+              {mediaFilter === 'all' 
+                ? `No results found for "${searchQuery}"`
+                : `No ${mediaFilter === 'movie' ? 'movies' : 'TV shows'} found for "${searchQuery}"`
+              }
+            </p>
+            <p className="text-sm mt-2 max-w-md">
+              Try different keywords or check your spelling
+            </p>
           </div>
-        ) : null}
+        ) : (
+          // Initial state - suggestions
+          <div className="text-center py-8">
+            <div className="max-w-md mx-auto bg-[#292929] rounded-lg p-4">
+              <Film className="h-8 w-8 mx-auto mb-3 text-[#E50914]" />
+              <p className="text-gray-300 mb-4">
+                Enter a movie or TV show title in the search box to begin exploring
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <Button 
+                  variant="outline" 
+                  className="bg-[#1a1a1a] hover:bg-[#3d3d3d] border-gray-700"
+                  onClick={() => {
+                    setSearchTerm("Marvel");
+                    setSearchQuery("Marvel");
+                  }}
+                >
+                  Try "Marvel"
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="bg-[#1a1a1a] hover:bg-[#3d3d3d] border-gray-700"
+                  onClick={() => {
+                    setSearchTerm("Star Wars");
+                    setSearchQuery("Star Wars");
+                  }}
+                >
+                  Try "Star Wars"
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="bg-[#1a1a1a] hover:bg-[#3d3d3d] border-gray-700"
+                  onClick={() => {
+                    setSearchTerm("Breaking Bad");
+                    setSearchQuery("Breaking Bad");
+                  }}
+                >
+                  Try "Breaking Bad"
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="bg-[#1a1a1a] hover:bg-[#3d3d3d] border-gray-700"
+                  onClick={() => {
+                    setSearchTerm("Stranger Things");
+                    setSearchQuery("Stranger Things");
+                  }}
+                >
+                  Try "Stranger Things"
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add to Watched Modal */}
