@@ -72,12 +72,14 @@ export class SQLiteStorage implements IStorage {
         .some((col: any) => col.name === 'password');
       
       if (!hasPasswordColumn) {
-        this.db.exec(`
-          ALTER TABLE users ADD COLUMN password TEXT NOT NULL DEFAULT '';
-          ALTER TABLE users ADD COLUMN display_name TEXT;
-          ALTER TABLE users ADD COLUMN is_private INTEGER NOT NULL DEFAULT 1;
-          ALTER TABLE users ADD COLUMN created_at TEXT DEFAULT CURRENT_TIMESTAMP;
-        `);
+        // Add columns one by one (SQLite limits ALTER TABLE functionality)
+        this.db.exec(`ALTER TABLE users ADD COLUMN password TEXT NOT NULL DEFAULT ''`);
+        this.db.exec(`ALTER TABLE users ADD COLUMN display_name TEXT`);
+        this.db.exec(`ALTER TABLE users ADD COLUMN created_at TEXT`);
+        
+        // Update existing rows to set created_at value
+        this.db.exec(`UPDATE users SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL`);
+        
         console.log("Added authentication columns to users table");
       }
     } catch (error) {
@@ -141,8 +143,7 @@ export class SQLiteStorage implements IStorage {
       await this.createUser({ 
         username: 'Guest', 
         password: passwordHash,
-        displayName: 'Guest User',
-        isPrivate: false
+        displayName: 'Guest User'
       });
     }
   }
@@ -151,7 +152,7 @@ export class SQLiteStorage implements IStorage {
   async getUser(id: number): Promise<User | undefined> {
     const stmt = this.db.prepare(`
       SELECT id, username, password, display_name as displayName, 
-             is_private as isPrivate, created_at as createdAt 
+             created_at as createdAt 
       FROM users WHERE id = ?
     `);
     const user = stmt.get(id) as User | undefined;
@@ -161,7 +162,7 @@ export class SQLiteStorage implements IStorage {
   async getUserByUsername(username: string): Promise<User | undefined> {
     const stmt = this.db.prepare(`
       SELECT id, username, password, display_name as displayName, 
-             is_private as isPrivate, created_at as createdAt
+             created_at as createdAt
       FROM users WHERE LOWER(username) = LOWER(?)
     `);
     const user = stmt.get(username) as User | undefined;
@@ -170,15 +171,14 @@ export class SQLiteStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const stmt = this.db.prepare(`
-      INSERT INTO users (username, password, display_name, is_private) 
-      VALUES (?, ?, ?, ?)
+      INSERT INTO users (username, password, display_name) 
+      VALUES (?, ?, ?)
     `);
     
     const result = stmt.run(
       insertUser.username,
       insertUser.password,
-      insertUser.displayName || null,
-      insertUser.isPrivate !== undefined ? Number(insertUser.isPrivate) : 1
+      insertUser.displayName || null
     );
     
     return {
@@ -186,7 +186,6 @@ export class SQLiteStorage implements IStorage {
       username: insertUser.username,
       password: insertUser.password,
       displayName: insertUser.displayName || null,
-      isPrivate: insertUser.isPrivate !== undefined ? insertUser.isPrivate : true,
       createdAt: new Date()
     };
   }
@@ -194,7 +193,7 @@ export class SQLiteStorage implements IStorage {
   async getAllUsers(): Promise<User[]> {
     const stmt = this.db.prepare(`
       SELECT id, username, password, display_name as displayName, 
-             is_private as isPrivate, created_at as createdAt
+             created_at as createdAt
       FROM users
     `);
     const users = stmt.all() as User[];
