@@ -45,11 +45,13 @@ export const watchlistEntries = pgTable("watchlist_entries", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertWatchlistEntrySchema = createInsertSchema(watchlistEntries).pick({
-  userId: true,
-  movieId: true,
-  watchedDate: true,
-  notes: true,
+// Create a modified schema for watchlist entry inserts that accepts strings for dates
+// This is necessary for SQLite compatibility
+export const insertWatchlistEntrySchema = z.object({
+  userId: z.number(),
+  movieId: z.number(),
+  watchedDate: z.string().nullable(),
+  notes: z.string().nullable(),
 });
 
 export type User = typeof users.$inferSelect;
