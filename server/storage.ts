@@ -616,8 +616,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async hasWatchlistEntry(userId: number, movieId: number): Promise<boolean> {
-    const [count] = await db
-      .select({ count: db.fn.count() })
+    const entries = await db
+      .select()
       .from(watchlistEntries)
       .where(
         and(
@@ -626,7 +626,7 @@ export class DatabaseStorage implements IStorage {
         )
       );
     
-    return Number(count.count) > 0;
+    return entries.length > 0;
   }
 
   async createWatchlistEntry(insertEntry: InsertWatchlistEntry): Promise<WatchlistEntry> {
