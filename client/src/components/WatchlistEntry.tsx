@@ -3,6 +3,7 @@ import { WatchlistEntryWithMovie } from '@shared/schema';
 import { getImageUrl, getGenreNames, getIMDbUrl } from '@/api/tmdb';
 import { Star, Trash2, Edit, Info, Calendar, Tv2, Film, ExternalLink } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useState, useEffect } from 'react';
 
 interface WatchlistEntryProps {
   entry: WatchlistEntryWithMovie;
@@ -14,6 +15,8 @@ interface WatchlistEntryProps {
 const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEntryProps) => {
   const { movie, watchedDate, id, notes } = entry;
   const isMobile = useIsMobile();
+  const [imdbUrl, setImdbUrl] = useState<string>('');
+  const [isLoadingUrl, setIsLoadingUrl] = useState<boolean>(false);
   
   const posterUrl = getImageUrl(movie.posterPath, 'w200');
   const year = movie.releaseDate ? new Date(movie.releaseDate).getFullYear().toString() : '';
@@ -31,6 +34,25 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
   
   // Media type icon
   const MediaTypeIcon = mediaType === 'tv' ? Tv2 : Film;
+  
+  // Fetch IMDb URL when component mounts
+  useEffect(() => {
+    const fetchImdbUrl = async () => {
+      setIsLoadingUrl(true);
+      try {
+        const url = await getIMDbUrl(movie.tmdbId, mediaType, movie.title);
+        setImdbUrl(url);
+      } catch (error) {
+        console.error('Error fetching IMDb URL:', error);
+        // Fallback to search URL
+        setImdbUrl(`https://www.imdb.com/find/?q=${encodeURIComponent(movie.title)}&s=tt`);
+      } finally {
+        setIsLoadingUrl(false);
+      }
+    };
+    
+    fetchImdbUrl();
+  }, [movie.tmdbId, mediaType, movie.title]);
 
   return (
     <div className={`bg-[#292929] rounded-lg overflow-hidden ${isMobile ? 'flex flex-col' : 'flex'}`}>
@@ -96,7 +118,7 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
           // Mobile layout - larger buttons with text labels for better touch targets
           <div className="mt-3 grid grid-cols-3 gap-2">
             <a 
-              href={getIMDbUrl(movie.tmdbId, mediaType, movie.title)} 
+              href={imdbUrl || `https://www.imdb.com/find/?q=${encodeURIComponent(movie.title)}&s=tt`} 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center justify-center bg-[#F5C518] text-black py-2 px-3 rounded-lg"
@@ -126,7 +148,7 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
           // Desktop layout
           <div className="mt-auto pt-2 flex justify-end items-center">
             <a 
-              href={getIMDbUrl(movie.tmdbId, mediaType, movie.title)} 
+              href={imdbUrl || `https://www.imdb.com/find/?q=${encodeURIComponent(movie.title)}&s=tt`} 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-xs text-[#F5C518] hover:text-yellow-400 mr-3"

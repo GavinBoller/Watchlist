@@ -99,15 +99,62 @@ export const formatMovieDisplay = (item: TMDBMovie): string => {
   return `${year}${genres ? ' • ' + genres : ''}${mediaType === 'tv' ? ' • TV Series' : ''}`;
 };
 
+// Cache for IMDb IDs to avoid repeated API calls
+const imdbIdCache: Record<string, string> = {};
+
+// Get external IDs including IMDb ID
+export const getExternalIds = async (tmdbId: number, mediaType: string = 'movie'): Promise<{imdb_id?: string}> => {
+  try {
+    const cacheKey = `${mediaType}_${tmdbId}`;
+    
+    // First check the cache
+    if (imdbIdCache[cacheKey]) {
+      return { imdb_id: imdbIdCache[cacheKey] };
+    }
+    
+    const response = await fetch(`/api/movies/external-ids/${tmdbId}?mediaType=${mediaType}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch external IDs');
+    }
+    
+    const data = await response.json();
+    
+    // Save to cache
+    if (data.imdb_id) {
+      imdbIdCache[cacheKey] = data.imdb_id;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error fetching external IDs:', error);
+    return {};
+  }
+};
+
 // Get IMDb URL for the movie or TV show
-export const getIMDbUrl = (tmdbId: number, mediaType: string = 'movie', title?: string): string => {
-  // Since we don't have direct IMDb IDs, let's create a search URL that will likely find the correct content
-  // We'll try to use the title if available for more accurate results
-  if (title) {
-    return `https://www.imdb.com/find/?q=${encodeURIComponent(title)}&s=tt`;
-  } else {
-    // Fallback to the original TMDB page
+export const getIMDbUrl = async (tmdbId: number, mediaType: string = 'movie', title?: string): Promise<string> => {
+  try {
+    // Try to get the IMDb ID first
+    const externalIds = await getExternalIds(tmdbId, mediaType);
+    
+    if (externalIds.imdb_id) {
+      return `${IMDB_BASE_URL}${externalIds.imdb_id}`;
+    } 
+    
+    // If we couldn't get the IMDb ID, fall back to search
+    if (title) {
+      return `https://www.imdb.com/find/?q=${encodeURIComponent(title)}&s=tt`;
+    } 
+    
+    // Last resort fallback
     return `https://www.themoviedb.org/${mediaType}/${tmdbId}`;
+  } catch (error) {
+    // If anything fails, use the search URL
+    if (title) {
+      return `https://www.imdb.com/find/?q=${encodeURIComponent(title)}&s=tt`;
+    } else {
+      return `https://www.themoviedb.org/${mediaType}/${tmdbId}`;
+    }
   }
 };
 

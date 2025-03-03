@@ -94,6 +94,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get external IDs (including IMDb ID) for a movie or TV show
+  app.get("/api/movies/external-ids/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { mediaType } = req.query;
+      
+      if (!id) {
+        return res.status(400).json({ message: "ID parameter is required" });
+      }
+      
+      const type = typeof mediaType === "string" ? mediaType : "movie";
+      
+      const response = await axios.get(`${TMDB_API_BASE_URL}/${type}/${id}/external_ids`, {
+        params: {
+          api_key: TMDB_API_KEY,
+        },
+      });
+      
+      res.json(response.data);
+    } catch (error) {
+      console.error("Error fetching external IDs:", error);
+      res.status(500).json({ message: "Failed to fetch external IDs" });
+    }
+  });
+
   // Movie and TV show search route (TMDB API)
   app.get("/api/movies/search", async (req: Request, res: Response) => {
     try {
