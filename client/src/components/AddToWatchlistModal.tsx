@@ -80,9 +80,9 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
       // Check for 409 conflict (already in watchlist)
       if (error.status === 409) {
         toast({
-          title: "Already in your watched list",
-          description: "This title is already in your watched list",
-          variant: "destructive",
+          title: "Already Watched",
+          description: error.data?.details || `You've already added "${title}" to your watched list`,
+          variant: "default",
         });
       } else {
         toast({
