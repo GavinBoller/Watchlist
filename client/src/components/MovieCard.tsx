@@ -76,17 +76,21 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
         </div>
         {/* Add to watchlist quick button for mobile */}
         {isMobile && !showInfo && (
-          <button 
-            className="absolute bottom-2 right-2 bg-[#E50914] text-white rounded-full p-2 shadow-lg touch-manipulation"
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              onAddToWatchlist(movie);
-            }}
-            aria-label="Add to watchlist"
-          >
-            <PlusCircle className="h-6 w-6" />
-          </button>
+          <div className="absolute bottom-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
+            <button 
+              type="button"
+              className="bg-[#E50914] text-white rounded-full p-2 shadow-lg touch-manipulation"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onAddToWatchlist(movie);
+                return false;
+              }}
+              aria-label="Add to watchlist"
+            >
+              <PlusCircle className="h-6 w-6" />
+            </button>
+          </div>
         )}
       </div>
       <div 
@@ -163,22 +167,25 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
                     }
                   }}
                   aria-label="Show details"
+                  type="button"
                 >
                   <Info className="h-4 w-4 mr-1" />
                   Details
                 </button>
               )}
-              <a 
-                href={getIMDbUrl(movie.id, mediaType)} 
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-[#F5C518] text-black text-sm rounded-lg py-2 flex-1 hover:bg-yellow-400 transition flex items-center justify-center"
-                onClick={(e) => e.stopPropagation()}
+              <button 
+                type="button"
+                className="bg-[#F5C518] text-black text-sm rounded-lg py-2 flex-1 hover:bg-yellow-400 transition flex items-center justify-center touch-manipulation"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  window.open(getIMDbUrl(movie.id, mediaType), '_blank', 'noopener');
+                }}
                 aria-label="View on IMDb"
               >
                 <ExternalLink className="h-4 w-4 mr-1" />
                 IMDb
-              </a>
+              </button>
             </div>
           </div>
         )}
