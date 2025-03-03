@@ -7,7 +7,8 @@ import {
   insertUserSchema, 
   insertMovieSchema, 
   insertWatchlistEntrySchema,
-  type TMDBSearchResponse
+  type TMDBSearchResponse,
+  type TMDBMovie
 } from "@shared/schema";
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "79d177894334dec45f251ff671833a50";
@@ -45,26 +46,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Movie search route (TMDB API)
+  // Movie and TV show search route (TMDB API)
   app.get("/api/movies/search", async (req: Request, res: Response) => {
     try {
-      const { query } = req.query;
+      const { query, mediaType } = req.query;
       
       if (!query || typeof query !== "string") {
         return res.status(400).json({ message: "Query parameter is required" });
       }
       
-      const response = await axios.get<TMDBSearchResponse>(`${TMDB_API_BASE_URL}/search/movie`, {
-        params: {
-          api_key: TMDB_API_KEY,
-          query,
-          include_adult: false,
-        },
-      });
+      const type = typeof mediaType === "string" ? mediaType : "all";
+      let results: TMDBMovie[] = [];
       
-      res.json(response.data);
+      // Search for movies if mediaType is "all" or "movie"
+      if (type === "all" || type === "movie") {
+        const movieResponse = await axios.get<TMDBSearchResponse>(`${TMDB_API_BASE_URL}/search/movie`, {
+          params: {
+            api_key: TMDB_API_KEY,
+            query,
+            include_adult: false,
+          },
+        });
+        
+        // Add media_type to each result
+        results = [
+          ...results, 
+          ...movieResponse.data.results.map(item => ({ ...item, media_type: "movie" }))
+        ];
+      }
+      
+      // Search for TV shows if mediaType is "all" or "tv"
+      if (type === "all" || type === "tv") {
+        const tvResponse = await axios.get<TMDBSearchResponse>(`${TMDB_API_BASE_URL}/search/tv`, {
+          params: {
+            api_key: TMDB_API_KEY,
+            query,
+            include_adult: false,
+          },
+        });
+        
+        // Add media_type to each result
+        results = [
+          ...results, 
+          ...tvResponse.data.results.map(item => ({ ...item, media_type: "tv" }))
+        ];
+      }
+      
+      // Sort results by popularity (using vote_average as a proxy)
+      results.sort((a, b) => b.vote_average - a.vote_average);
+      
+      const response: TMDBSearchResponse = {
+        page: 1,
+        results,
+        total_results: results.length,
+        total_pages: 1
+      };
+      
+      res.json(response);
     } catch (error) {
-      res.status(500).json({ message: "Failed to search movies" });
+      console.error("Error searching movies/TV:", error);
+      res.status(500).json({ message: "Failed to search movies and TV shows" });
     }
   });
 
@@ -108,16 +149,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!movie) {
         const genres = tmdbMovie.genre_ids?.join(",") || "";
+        const mediaType = tmdbMovie.media_type || "movie";
+        const title = tmdbMovie.title || tmdbMovie.name || "Unknown Title";
+        const releaseDate = tmdbMovie.release_date || tmdbMovie.first_air_date || null;
         
         const movieData = insertMovieSchema.parse({
           tmdbId: tmdbMovie.id,
-          title: tmdbMovie.title,
+          title,
           overview: tmdbMovie.overview,
           posterPath: tmdbMovie.poster_path,
           backdropPath: tmdbMovie.backdrop_path,
-          releaseDate: tmdbMovie.release_date,
+          releaseDate,
           voteAverage: tmdbMovie.vote_average.toString(),
           genres,
+          mediaType,
         });
         
         movie = await storage.createMovie(movieData);

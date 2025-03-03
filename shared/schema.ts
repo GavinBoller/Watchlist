@@ -21,6 +21,7 @@ export const movies = pgTable("movies", {
   releaseDate: text("release_date"),
   voteAverage: text("vote_average"),
   genres: text("genres"),
+  mediaType: text("media_type").notNull().default("movie"), // "movie" or "tv"
 });
 
 export const insertMovieSchema = createInsertSchema(movies).pick({
@@ -32,6 +33,7 @@ export const insertMovieSchema = createInsertSchema(movies).pick({
   releaseDate: true,
   voteAverage: true,
   genres: true,
+  mediaType: true,
 });
 
 export const watchlistEntries = pgTable("watchlist_entries", {
@@ -62,13 +64,16 @@ export type InsertWatchlistEntry = z.infer<typeof insertWatchlistEntrySchema>;
 // TMDb API related types
 export interface TMDBMovie {
   id: number;
-  title: string;
+  title?: string;
+  name?: string;  // For TV shows
   overview: string;
   poster_path: string;
   backdrop_path: string;
-  release_date: string;
+  release_date?: string;
+  first_air_date?: string;  // For TV shows
   vote_average: number;
   genre_ids: number[];
+  media_type?: string;  // 'movie' or 'tv'
 }
 
 export interface TMDBSearchResponse {

@@ -9,7 +9,7 @@ export const getImageUrl = (path: string | null, size: 'w500' | 'original' | 'w2
 };
 
 // Genre mapping (TMDB genre IDs to names)
-export const genreMap: Record<number, string> = {
+export const movieGenreMap: Record<number, string> = {
   28: 'Action',
   12: 'Adventure',
   16: 'Animation',
@@ -31,8 +31,30 @@ export const genreMap: Record<number, string> = {
   37: 'Western'
 };
 
+// TV show genre mapping
+export const tvGenreMap: Record<number, string> = {
+  10759: 'Action & Adventure',
+  16: 'Animation',
+  35: 'Comedy',
+  80: 'Crime',
+  99: 'Documentary',
+  18: 'Drama',
+  10751: 'Family',
+  10762: 'Kids',
+  9648: 'Mystery',
+  10763: 'News',
+  10764: 'Reality',
+  10765: 'Sci-Fi & Fantasy',
+  10766: 'Soap',
+  10767: 'Talk',
+  10768: 'War & Politics',
+  37: 'Western'
+};
+
 // Convert genre IDs to genre names
-export const getGenreNames = (genreIds: number[] | string): string => {
+export const getGenreNames = (genreIds: number[] | string, mediaType: string = 'movie'): string => {
+  const genreMap = mediaType === 'tv' ? tvGenreMap : movieGenreMap;
+  
   if (typeof genreIds === 'string') {
     if (!genreIds) return '';
     return genreIds.split(',')
@@ -47,29 +69,45 @@ export const getGenreNames = (genreIds: number[] | string): string => {
     .join(', ');
 };
 
+// Get title of the movie or TV show
+export const getTitle = (item: TMDBMovie): string => {
+  return item.title || item.name || 'Unknown Title';
+};
+
+// Get the release date of the movie or TV show
+export const getReleaseDate = (item: TMDBMovie): string | undefined => {
+  return item.release_date || item.first_air_date;
+};
+
 // Get the release year from a date string
 export const getReleaseYear = (releaseDate: string | undefined | null): string => {
   if (!releaseDate) return '';
   return new Date(releaseDate).getFullYear().toString();
 };
 
-// Format for display with genres
-export const formatMovieDisplay = (movie: TMDBMovie): string => {
-  const year = getReleaseYear(movie.release_date);
-  const genres = getGenreNames(movie.genre_ids);
-  return `${year}${genres ? ' • ' + genres : ''}`;
+// Get the media type (movie or tv)
+export const getMediaType = (item: TMDBMovie): string => {
+  return item.media_type || 'movie';
 };
 
-// Search TMDB for movies
-export const searchMovies = async (query: string): Promise<TMDBSearchResponse> => {
+// Format for display with genres
+export const formatMovieDisplay = (item: TMDBMovie): string => {
+  const mediaType = getMediaType(item);
+  const year = getReleaseYear(getReleaseDate(item));
+  const genres = getGenreNames(item.genre_ids, mediaType);
+  return `${year}${genres ? ' • ' + genres : ''}${mediaType === 'tv' ? ' • TV Series' : ''}`;
+};
+
+// Search TMDB for movies and TV shows
+export const searchMovies = async (query: string, mediaType: string = 'all'): Promise<TMDBSearchResponse> => {
   try {
-    const response = await fetch(`/api/movies/search?query=${encodeURIComponent(query)}`);
+    const response = await fetch(`/api/movies/search?query=${encodeURIComponent(query)}&mediaType=${mediaType}`);
     if (!response.ok) {
-      throw new Error('Failed to search movies');
+      throw new Error('Failed to search movies and TV shows');
     }
     return await response.json();
   } catch (error) {
-    console.error('Error searching movies:', error);
+    console.error('Error searching media:', error);
     throw error;
   }
 };
