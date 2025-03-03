@@ -33,7 +33,7 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister }: LoginFormProps
     setIsLoading(true);
     
     try {
-      const response = await apiRequest<{ user: UserResponse }>("/auth/login", {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -41,12 +41,19 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister }: LoginFormProps
         body: JSON.stringify({ username, password }),
       });
       
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Login failed");
+      }
+      
+      const data = await response.json();
+      
       toast({
         title: "Success",
         description: "Logged in successfully",
       });
       
-      onLoginSuccess(response.user);
+      onLoginSuccess(data.user);
     } catch (error: any) {
       toast({
         title: "Error",

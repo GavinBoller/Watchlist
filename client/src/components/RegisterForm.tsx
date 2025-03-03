@@ -53,7 +53,7 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
     setIsLoading(true);
     
     try {
-      const response = await apiRequest<{ user: UserResponse }>("/auth/register", {
+      const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -66,12 +66,19 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
         }),
       });
       
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Registration failed");
+      }
+      
+      const data = await response.json();
+      
       toast({
         title: "Success",
         description: "Account created successfully",
       });
       
-      onRegisterSuccess(response.user);
+      onRegisterSuccess(data.user);
     } catch (error: any) {
       toast({
         title: "Error",

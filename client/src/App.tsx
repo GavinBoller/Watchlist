@@ -22,10 +22,13 @@ function App() {
   useEffect(() => {
     async function checkSession() {
       try {
-        const response = await apiRequest<{ user: UserResponse | null }>("/auth/session");
-        if (response.user) {
-          setCurrentUser(response.user);
-          setIsAuthenticated(true);
+        const response = await fetch("/api/auth/session");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.authenticated && data.user) {
+            setCurrentUser(data.user);
+            setIsAuthenticated(true);
+          }
         }
       } catch (error) {
         console.error("Failed to check session:", error);
@@ -44,9 +47,19 @@ function App() {
   // Logout function
   const logout = async () => {
     try {
-      await apiRequest("/auth/logout", { method: "POST" });
-      setCurrentUser(null);
-      setIsAuthenticated(false);
+      const response = await fetch("/api/auth/logout", { 
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+      
+      if (response.ok) {
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+      } else {
+        throw new Error("Logout failed");
+      }
     } catch (error) {
       console.error("Failed to logout:", error);
       throw error;

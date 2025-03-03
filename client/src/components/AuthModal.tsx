@@ -9,6 +9,7 @@ import {
 import { LoginForm } from "./LoginForm";
 import { RegisterForm } from "./RegisterForm";
 import { UserResponse } from "@shared/schema";
+import { useUserContext } from "./UserSelector";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -20,9 +21,10 @@ type AuthView = "login" | "register";
 
 export const AuthModal = ({ isOpen, onClose, onAuthSuccess }: AuthModalProps) => {
   const [view, setView] = useState<AuthView>("login");
+  const { login } = useUserContext();
 
   const handleAuthSuccess = (user: UserResponse) => {
-    onAuthSuccess(user);
+    login(user);
     onClose();
   };
 
