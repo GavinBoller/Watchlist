@@ -200,6 +200,59 @@ export class SQLiteStorage implements IStorage {
     const users = stmt.all() as User[];
     return users;
   }
+  
+  async updateUser(id: number, updates: Partial<InsertUser>): Promise<User | undefined> {
+    // First, check if the user exists
+    const user = await this.getUser(id);
+    if (!user) {
+      return undefined;
+    }
+    
+    // Build the SET clause dynamically based on provided updates
+    const setClauses = [];
+    const params = [];
+    
+    if (updates.username !== undefined) {
+      setClauses.push('username = ?');
+      params.push(updates.username);
+    }
+    
+    if (updates.password !== undefined) {
+      setClauses.push('password = ?');
+      params.push(updates.password);
+    }
+    
+    if (updates.displayName !== undefined) {
+      setClauses.push('display_name = ?');
+      params.push(updates.displayName);
+    }
+    
+    if (setClauses.length === 0) {
+      // No updates provided
+      return user;
+    }
+    
+    // Add the ID parameter
+    params.push(id);
+    
+    // Execute the update
+    const query = `
+      UPDATE users 
+      SET ${setClauses.join(', ')} 
+      WHERE id = ?
+    `;
+    
+    const stmt = this.db.prepare(query);
+    stmt.run(...params);
+    
+    // Return the updated user
+    return {
+      ...user,
+      ...updates,
+      // Make sure we use the correct field names when merging
+      displayName: updates.displayName !== undefined ? updates.displayName : user.displayName
+    };
+  }
 
   // Movie operations
   async getMovie(id: number): Promise<Movie | undefined> {
@@ -452,6 +505,21 @@ export class MemStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     return Array.from(this.users.values());
+  }
+  
+  async updateUser(id: number, updates: Partial<InsertUser>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updatedUser: User = {
+      ...user,
+      ...updates,
+      // Make sure we use the correct field names when merging
+      displayName: updates.displayName !== undefined ? updates.displayName : user.displayName
+    };
+    
+    this.users.set(id, updatedUser);
+    return updatedUser;
   }
 
   // Movie operations
