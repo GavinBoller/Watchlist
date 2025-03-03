@@ -612,8 +612,6 @@ export class MemStorage implements IStorage {
 }
 
 // Switch from MemStorage to SQLiteStorage
-import { db } from "./db";
-import { eq, and } from "drizzle-orm";
 
 // DatabaseStorage implementation for PostgreSQL
 export class DatabaseStorage implements IStorage {
