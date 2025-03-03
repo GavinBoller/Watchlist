@@ -14,6 +14,24 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
   const [isHovered, setIsHovered] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const isMobile = useIsMobile();
+  const [imdbUrl, setImdbUrl] = useState('');
+  const [isLoadingUrl, setIsLoadingUrl] = useState(false);
+  
+  // Extract movie data
+  const posterUrl = getImageUrl(movie.poster_path);
+  const title = getTitle(movie);
+  const mediaType = getMediaType(movie);
+  const displayInfo = formatMovieDisplay(movie);
+  
+  // Format vote average to one decimal place
+  const voteAverage = movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A';
+
+  // Get media type badge text and color
+  const typeBadge = mediaType === 'tv' ? 'TV' : 'Movie';
+  const badgeClass = mediaType === 'tv' ? 'bg-blue-600' : 'bg-[#E50914]';
+  
+  // Determine if info should be shown (hover on desktop, tap on mobile)
+  const shouldShowInfo = isMobile ? showInfo : isHovered;
 
   // For mobile devices, use touch events instead of hover
   useEffect(() => {
@@ -22,6 +40,25 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
       setShowInfo(false);
     }
   }, [isMobile, movie.id]);
+  
+  // Fetch IMDb URL when component mounts or movie changes
+  useEffect(() => {
+    const fetchImdbUrl = async () => {
+      setIsLoadingUrl(true);
+      try {
+        const url = await getIMDbUrl(movie.id, mediaType, title);
+        setImdbUrl(url);
+      } catch (error) {
+        console.error('Error fetching IMDb URL:', error);
+        // Fallback to search URL
+        setImdbUrl(`https://www.imdb.com/find/?q=${encodeURIComponent(title)}&s=tt`);
+      } finally {
+        setIsLoadingUrl(false);
+      }
+    };
+    
+    fetchImdbUrl();
+  }, [movie.id, mediaType, title]);
 
   const handleAddClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -40,21 +77,17 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
       setShowInfo(!showInfo);
     }
   };
-
-  const posterUrl = getImageUrl(movie.poster_path);
-  const title = getTitle(movie);
-  const mediaType = getMediaType(movie);
-  const displayInfo = formatMovieDisplay(movie);
   
-  // Format vote average to one decimal place
-  const voteAverage = movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A';
-
-  // Get media type badge text and color
-  const typeBadge = mediaType === 'tv' ? 'TV' : 'Movie';
-  const badgeClass = mediaType === 'tv' ? 'bg-blue-600' : 'bg-[#E50914]';
-
-  // Determine if info should be shown (hover on desktop, tap on mobile)
-  const shouldShowInfo = isMobile ? showInfo : isHovered;
+  // Handle IMDb button click for mobile
+  const handleImdbClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (imdbUrl) {
+      window.open(imdbUrl, '_blank', 'noopener');
+    } else {
+      window.open(`https://www.imdb.com/find/?q=${encodeURIComponent(title)}&s=tt`, '_blank', 'noopener');
+    }
+  };
 
   return (
     <div 
@@ -121,7 +154,7 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
               </button>
             )}
             <a 
-              href={getIMDbUrl(movie.id, mediaType, title)} 
+              href={imdbUrl || `https://www.imdb.com/find/?q=${encodeURIComponent(title)}&s=tt`} 
               target="_blank"
               rel="noopener noreferrer"
               className="bg-[#F5C518] text-black text-xs rounded-full py-1 px-3 hover:bg-yellow-400 transition flex items-center"
@@ -176,11 +209,7 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
               <button 
                 type="button"
                 className="bg-[#F5C518] text-black text-sm rounded-lg py-2 flex-1 hover:bg-yellow-400 transition flex items-center justify-center touch-manipulation"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  window.open(getIMDbUrl(movie.id, mediaType, title), '_blank', 'noopener');
-                }}
+                onClick={handleImdbClick}
                 aria-label="View on IMDb"
               >
                 <ExternalLink className="h-4 w-4 mr-1" />
