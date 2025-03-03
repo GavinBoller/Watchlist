@@ -472,8 +472,8 @@ const WatchlistPage = () => {
           onClose={() => setIsDetailsModalOpen(false)}
           onAddToWatchlist={() => {
             toast({
-              title: "Already in watchlist",
-              description: "This item is already in your watchlist",
+              title: "Already in watched list",
+              description: "This item is already in your watched list",
             });
           }}
         />

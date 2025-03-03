@@ -55,7 +55,7 @@ const SearchPage = () => {
     if (!currentUser) {
       toast({
         title: "No user selected",
-        description: "Please select a user before adding to watchlist",
+        description: "Please select a user before adding to your watched list",
         variant: "destructive",
       });
       return;
@@ -194,7 +194,7 @@ const SearchPage = () => {
         ) : null}
       </div>
 
-      {/* Add to Watchlist Modal */}
+      {/* Add to Watched Modal */}
       <AddToWatchlistModal 
         item={selectedItem} 
         isOpen={isWatchlistModalOpen} 

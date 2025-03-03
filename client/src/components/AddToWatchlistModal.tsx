@@ -46,7 +46,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
     if (!currentUser) {
       toast({
         title: "No user selected",
-        description: "Please select a user before adding to watchlist",
+        description: "Please select a user before adding to your watched list",
         variant: "destructive",
       });
       return;
@@ -64,7 +64,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
       
       toast({
         title: `${mediaTypeLabel} added`,
-        description: `${title} has been added to your watchlist`,
+        description: `${title} has been added to your watched list`,
       });
       
       // Invalidate the watchlist cache
@@ -94,9 +94,9 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="bg-[#292929] text-white border-gray-700 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add to Watchlist</DialogTitle>
+          <DialogTitle>Add to Watched</DialogTitle>
           <DialogDescription className="text-gray-400">
-            Add this {mediaTypeLabel.toLowerCase()} to your personal watchlist
+            Add this {mediaTypeLabel.toLowerCase()} to your watched list
           </DialogDescription>
         </DialogHeader>
         
@@ -174,7 +174,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
               className="bg-[#E50914] text-white hover:bg-red-700"
               disabled={isSubmitting}
             >
-              Add to Watchlist
+              Add to Watched
             </Button>
           </DialogFooter>
         </form>
