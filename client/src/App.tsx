@@ -70,7 +70,7 @@ function App() {
               if (tab === "search") {
                 setLocation("/");
               } else if (tab === "watchlist") {
-                setLocation("/watchlist");
+                setLocation("/watched");
               }
             }}
             activeTab={location === "/" ? "search" : "watchlist"}
@@ -79,7 +79,7 @@ function App() {
           <main className="flex-grow container mx-auto px-4 py-6">
             <Switch>
               <Route path="/" component={SearchPage} />
-              <Route path="/watchlist" component={WatchlistPage} />
+              <Route path="/watched" component={WatchlistPage} />
               <Route component={NotFound} />
             </Switch>
           </main>

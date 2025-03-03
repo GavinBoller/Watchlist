@@ -67,16 +67,16 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
         description: `${title} has been added to your watched list`,
       });
       
-      // Invalidate the watchlist cache
+      // Invalidate the watched list cache
       queryClient.invalidateQueries({ queryKey: [`/api/watchlist/${currentUser.id}`] });
       
       // Close the modal and reset form
       handleClose();
     } catch (error) {
-      console.error('Error adding to watchlist:', error);
+      console.error('Error adding to watched list:', error);
       toast({
-        title: "Failed to add to watchlist",
-        description: "There was an error adding the item to your watchlist",
+        title: "Failed to add to watched list",
+        description: "There was an error adding the item to your watched list",
         variant: "destructive",
       });
     } finally {

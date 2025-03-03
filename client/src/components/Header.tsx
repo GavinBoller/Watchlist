@@ -50,7 +50,7 @@ const Header = ({ onTabChange, activeTab }: HeaderProps) => {
                   }`}
                   onClick={() => onTabChange("watchlist")}
                 >
-                  My Watchlist
+                  Watched
                 </button>
               </li>
             </ul>
