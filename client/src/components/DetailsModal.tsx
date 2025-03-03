@@ -96,15 +96,18 @@ export const DetailsModal = ({ item, isOpen, onClose, onAddToWatchlist }: Detail
                   Add to Watchlist
                 </button>
                 
-                <a 
-                  href={getIMDbUrl(item.id, mediaType, title)} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    const url = await getIMDbUrl(item.id, mediaType, title);
+                    window.open(url, '_blank', 'noopener');
+                  }}
                   className={`bg-[#F5C518] text-black ${isMobile ? 'py-3' : 'py-2'} px-4 rounded-lg hover:bg-yellow-400 transition flex items-center justify-center w-full font-medium`}
                 >
                   <ExternalLink className="h-5 w-5 mr-2" />
                   View on IMDb
-                </a>
+                </button>
               </div>
             </div>
           </div>
