@@ -40,22 +40,53 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword
         password 
       });
       
+      // Check HTTP status before parsing JSON to handle non-JSON responses
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Invalid username or password");
+        } else if (response.status === 503) {
+          throw new Error("Server is temporarily unavailable. Please try again later.");
+        } else {
+          const errorText = await response.text();
+          throw new Error(errorText || `Login failed with status ${response.status}`);
+        }
+      }
+      
       const data = await response.json();
+      
+      if (!data.user) {
+        throw new Error("Login successful but user data is missing");
+      }
       
       console.log("Login successful:", data);
       
       toast({
-        title: "Success",
-        description: "Logged in successfully",
+        title: "Welcome Back!",
+        description: "You've successfully logged in",
       });
       
       onLoginSuccess(data.user);
     } catch (error: any) {
       console.error("Login error:", error);
+      
+      // Provide more specific error messages based on error types
+      const errorMessage = (() => {
+        if (error.message.includes("ECONNREFUSED") || error.message.includes("Failed to fetch")) {
+          return "Unable to connect to the server. Please check your internet connection and try again.";
+        } else if (error.message.includes("timeout")) {
+          return "Request timed out. The server might be busy, please try again later.";
+        } else if (error.message.includes("Invalid username or password")) {
+          return "Invalid username or password. Please try again.";
+        } else {
+          return error.message || "Login failed. Please try again.";
+        }
+      })();
+      
       toast({
-        title: "Error",
-        description: error.message || "Login failed",
+        title: "Login Failed",
+        description: errorMessage,
         variant: "destructive",
+        duration: 5000,
       });
     } finally {
       setIsLoading(false);

@@ -81,23 +81,48 @@ router.post('/register', async (req: Request, res: Response) => {
     
     const validatedData = registerSchema.parse(req.body);
     
-    // Check if username already exists
-    const existingUser = await storage.getUserByUsername(validatedData.username);
+    // Check if username already exists - catch and log database connection issues
+    let existingUser;
+    try {
+      existingUser = await storage.getUserByUsername(validatedData.username);
+    } catch (dbError) {
+      console.error('Database error checking user existence:', dbError);
+      return res.status(503).json({ 
+        message: 'Service temporarily unavailable. Please try again later.',
+        error: 'database_error'
+      });
+    }
+    
     if (existingUser) {
       return res.status(409).json({ message: 'Username already exists' });
     }
     
     // Hash the password
-    const passwordHash = await bcrypt.hash(validatedData.password, 10);
+    let passwordHash;
+    try {
+      passwordHash = await bcrypt.hash(validatedData.password, 10);
+    } catch (hashError) {
+      console.error('Password hashing error:', hashError);
+      return res.status(500).json({ message: 'Registration failed during password processing' });
+    }
     
     // Create user without confirmPassword
     const { confirmPassword, ...userData } = validatedData;
     
-    const newUser = await storage.createUser({
-      ...userData,
-      password: passwordHash,
-      displayName: userData.displayName || userData.username
-    });
+    let newUser;
+    try {
+      newUser = await storage.createUser({
+        ...userData,
+        password: passwordHash,
+        displayName: userData.displayName || userData.username
+      });
+    } catch (createError) {
+      console.error('User creation error:', createError);
+      return res.status(503).json({ 
+        message: 'Unable to create user account. Please try again later.',
+        error: 'create_user_error'
+      });
+    }
     
     // Return user without password
     const { password, ...userWithoutPassword } = newUser;
@@ -105,12 +130,19 @@ router.post('/register', async (req: Request, res: Response) => {
     // Automatically log the user in after registration
     req.login(userWithoutPassword, (err) => {
       if (err) {
-        return res.status(500).json({ message: 'Login failed after registration' });
+        console.error('Login after registration error:', err);
+        // Still return success since user was created, but with a note
+        return res.status(201).json({
+          message: 'Account created successfully, but automatic login failed. Please log in manually.',
+          user: userWithoutPassword,
+          loginSuccessful: false
+        });
       }
       
       return res.status(201).json({
         message: 'Registration successful',
-        user: userWithoutPassword
+        user: userWithoutPassword,
+        loginSuccessful: true
       });
     });
   } catch (error) {
@@ -122,7 +154,10 @@ router.post('/register', async (req: Request, res: Response) => {
     }
     
     console.error('Registration error:', error);
-    return res.status(500).json({ message: 'Registration failed' });
+    return res.status(500).json({ 
+      message: 'Registration failed',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
 
