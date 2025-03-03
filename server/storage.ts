@@ -86,11 +86,25 @@ export class SQLiteStorage implements IStorage {
         movieId INTEGER NOT NULL,
         watchedDate TEXT,
         notes TEXT,
+        status TEXT NOT NULL DEFAULT 'to_watch',
         createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (movieId) REFERENCES movies(id) ON DELETE CASCADE
       )
     `);
+    
+    // Add status column if it doesn't exist (for existing databases)
+    try {
+      const hasStatusColumn = this.db.prepare("PRAGMA table_info(watchlist_entries)").all()
+        .some((col: any) => col.name === 'status');
+      
+      if (!hasStatusColumn) {
+        this.db.exec("ALTER TABLE watchlist_entries ADD COLUMN status TEXT NOT NULL DEFAULT 'to_watch'");
+        console.log("Added status column to watchlist_entries table");
+      }
+    } catch (error) {
+      console.error("Failed to check or add status column:", error);
+    }
   }
 
   private async ensureDefaultUser() {

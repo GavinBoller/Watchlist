@@ -42,6 +42,7 @@ export const watchlistEntries = pgTable("watchlist_entries", {
   movieId: integer("movie_id").notNull(),
   watchedDate: timestamp("watched_date"),
   notes: text("notes"),
+  status: text("status").notNull().default("to_watch"), // Options: "to_watch", "watching", "watched"
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -52,6 +53,7 @@ export const insertWatchlistEntrySchema = z.object({
   movieId: z.number(),
   watchedDate: z.string().nullable(),
   notes: z.string().nullable(),
+  status: z.enum(["to_watch", "watching", "watched"]).default("to_watch"),
 });
 
 export type User = typeof users.$inferSelect;
