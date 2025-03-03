@@ -20,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 
 const WatchlistPage = () => {
   const { currentUser } = useUserContext();
-  const [selectedGenre, setSelectedGenre] = useState<string>('');
+  const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<string>('date_desc');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
@@ -43,7 +43,7 @@ const WatchlistPage = () => {
 
     // First filter by genre if selected
     let filtered = watchlist;
-    if (selectedGenre) {
+    if (selectedGenre && selectedGenre !== 'all') {
       filtered = watchlist.filter(entry => 
         entry.movie.genres?.includes(selectedGenre)
       );
@@ -188,7 +188,7 @@ const WatchlistPage = () => {
               <SelectValue placeholder="All Genres" />
             </SelectTrigger>
             <SelectContent className="bg-[#292929] text-white border-gray-700">
-              <SelectItem value="">All Genres</SelectItem>
+              <SelectItem value="all">All Genres</SelectItem>
               {genres.map((genre) => (
                 <SelectItem key={genre} value={genre}>{genre}</SelectItem>
               ))}
