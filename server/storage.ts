@@ -80,7 +80,17 @@ export class MemStorage implements IStorage {
 
   async createMovie(insertMovie: InsertMovie): Promise<Movie> {
     const id = this.movieCurrentId++;
-    const movie: Movie = { ...insertMovie, id };
+    const movie: Movie = { 
+      ...insertMovie, 
+      id,
+      mediaType: insertMovie.mediaType || 'movie',
+      overview: insertMovie.overview || null,
+      posterPath: insertMovie.posterPath || null,
+      backdropPath: insertMovie.backdropPath || null,
+      releaseDate: insertMovie.releaseDate || null,
+      voteAverage: insertMovie.voteAverage || null,
+      genres: insertMovie.genres || null
+    };
     this.movies.set(id, movie);
     return movie;
   }
@@ -107,9 +117,12 @@ export class MemStorage implements IStorage {
   async createWatchlistEntry(insertEntry: InsertWatchlistEntry): Promise<WatchlistEntry> {
     const id = this.watchlistEntryCurrentId++;
     const entry: WatchlistEntry = {
-      ...insertEntry,
+      userId: insertEntry.userId,
+      movieId: insertEntry.movieId,
+      watchedDate: insertEntry.watchedDate || null,
+      notes: insertEntry.notes || null,
       id,
-      createdAt: insertEntry.createdAt || new Date()
+      createdAt: new Date()
     };
     this.watchlistEntries.set(id, entry);
     return entry;
