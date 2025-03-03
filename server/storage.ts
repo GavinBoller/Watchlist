@@ -203,7 +203,7 @@ export class SQLiteStorage implements IStorage {
   async getWatchlistEntries(userId: number): Promise<WatchlistEntryWithMovie[]> {
     const stmt = this.db.prepare(`
       SELECT 
-        we.id, we.userId, we.movieId, we.watchedDate, we.notes, we.createdAt,
+        we.id, we.userId, we.movieId, we.watchedDate, we.notes, we.status, we.createdAt,
         m.id as movie_id, m.tmdbId, m.title, m.overview, m.posterPath, m.backdropPath, 
         m.releaseDate, m.voteAverage, m.genres, m.mediaType
       FROM watchlist_entries we
@@ -219,6 +219,7 @@ export class SQLiteStorage implements IStorage {
       movieId: row.movieId,
       watchedDate: row.watchedDate,
       notes: row.notes,
+      status: row.status || 'to_watch', // Default to 'to_watch' if not set
       createdAt: new Date(row.createdAt),
       movie: {
         id: row.movie_id,
@@ -261,15 +262,16 @@ export class SQLiteStorage implements IStorage {
     }
     
     const stmt = this.db.prepare(`
-      INSERT INTO watchlist_entries (userId, movieId, watchedDate, notes)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO watchlist_entries (userId, movieId, watchedDate, notes, status)
+      VALUES (?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
       insertEntry.userId,
       insertEntry.movieId,
       watchedDate,
-      insertEntry.notes || null
+      insertEntry.notes || null,
+      insertEntry.status || 'to_watch'
     );
     
     return {
@@ -278,6 +280,7 @@ export class SQLiteStorage implements IStorage {
       movieId: insertEntry.movieId,
       watchedDate: insertEntry.watchedDate || null,
       notes: insertEntry.notes || null,
+      status: insertEntry.status || 'to_watch',
       createdAt: new Date()
     };
   }
@@ -316,6 +319,11 @@ export class SQLiteStorage implements IStorage {
     if (updates.notes !== undefined) {
       setClauses.push('notes = ?');
       params.push(updates.notes);
+    }
+    
+    if (updates.status !== undefined) {
+      setClauses.push('status = ?');
+      params.push(updates.status);
     }
     
     if (setClauses.length === 0) {
@@ -453,6 +461,7 @@ export class MemStorage implements IStorage {
       movieId: insertEntry.movieId,
       watchedDate: insertEntry.watchedDate || null,
       notes: insertEntry.notes || null,
+      status: insertEntry.status || 'to_watch',
       id,
       createdAt: new Date()
     };

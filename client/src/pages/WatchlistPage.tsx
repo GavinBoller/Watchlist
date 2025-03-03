@@ -27,11 +27,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type MediaFilterType = 'all' | 'movie' | 'tv';
+type StatusFilterType = 'all' | 'to_watch' | 'watching' | 'watched';
 
 const WatchlistPage = () => {
   const { currentUser } = useUserContext();
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [mediaTypeFilter, setMediaTypeFilter] = useState<MediaFilterType>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilterType>('all');
   const [sortOrder, setSortOrder] = useState<string>('date_desc');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
