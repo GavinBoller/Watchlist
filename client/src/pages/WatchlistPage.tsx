@@ -11,7 +11,7 @@ import { queryClient } from '@/lib/queryClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Film, Tv2, Menu, BadgePlus, Inbox, Search, X } from 'lucide-react';
+import { AlertCircle, Film, Tv2, Menu, BadgePlus, Inbox, Search, X, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Label } from '@/components/ui/label';
