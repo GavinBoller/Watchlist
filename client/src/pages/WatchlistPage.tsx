@@ -392,25 +392,29 @@ const WatchlistPage = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation Dialog - iOS optimized */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="bg-[#292929] text-white border-gray-700">
+        <DialogContent className="bg-[#292929] text-white border-gray-700 max-w-[90vw] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Confirm Removal</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Confirm Removal</DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            Are you sure you want to remove this item from your watched list?
+          <div className="py-4 text-center sm:text-left">
+            <p className="text-gray-200">
+              Are you sure you want to remove this item from your watched list?
+            </p>
           </div>
-          <DialogFooter className="flex justify-end space-x-2">
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-end mt-2">
             <Button 
-              variant="ghost" 
+              variant="outline"
               onClick={() => setIsDeleteDialogOpen(false)}
+              className="w-full sm:w-auto py-2 h-12 sm:h-10 text-base sm:text-sm border-gray-600"
             >
               Cancel
             </Button>
             <Button 
               variant="destructive" 
               onClick={confirmDelete}
+              className="w-full sm:w-auto py-2 h-12 sm:h-10 text-base sm:text-sm"
             >
               Remove
             </Button>
