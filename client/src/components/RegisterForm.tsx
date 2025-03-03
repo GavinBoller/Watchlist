@@ -118,7 +118,7 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
               disabled={isLoading}
             />
             <p className="text-xs text-muted-foreground">
-              This will be visible to others. If left empty, your username will be used.
+              This will be displayed in your profile. If left empty, your username will be used.
             </p>
           </div>
           <div className="space-y-2">
