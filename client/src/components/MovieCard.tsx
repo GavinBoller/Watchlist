@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TMDBMovie } from '@shared/schema';
 import { getImageUrl, getTitle, getReleaseDate, getMediaType, formatMovieDisplay, getIMDbUrl } from '@/api/tmdb';
-import { Star, Info, ExternalLink } from 'lucide-react';
+import { Star, Info, ExternalLink, PlusCircle } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MovieCardProps {
   movie: TMDBMovie;
@@ -11,6 +12,16 @@ interface MovieCardProps {
 
 const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+  const isMobile = useIsMobile();
+
+  // For mobile devices, use touch events instead of hover
+  useEffect(() => {
+    if (isMobile) {
+      // Reset info visibility when component re-renders
+      setShowInfo(false);
+    }
+  }, [isMobile, movie.id]);
 
   const handleAddClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -21,6 +32,12 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
     e.stopPropagation();
     if (onShowDetails) {
       onShowDetails(movie);
+    }
+  };
+
+  const handleTap = () => {
+    if (isMobile) {
+      setShowInfo(!showInfo);
     }
   };
 
@@ -36,11 +53,15 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
   const typeBadge = mediaType === 'tv' ? 'TV' : 'Movie';
   const badgeClass = mediaType === 'tv' ? 'bg-blue-600' : 'bg-[#E50914]';
 
+  // Determine if info should be shown (hover on desktop, tap on mobile)
+  const shouldShowInfo = isMobile ? showInfo : isHovered;
+
   return (
     <div 
-      className="movie-card relative rounded-lg overflow-hidden group cursor-pointer"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      className="movie-card relative rounded-lg overflow-hidden group cursor-pointer touch-manipulation"
+      onMouseEnter={() => !isMobile && setIsHovered(true)}
+      onMouseLeave={() => !isMobile && setIsHovered(false)}
+      onClick={handleTap}
       data-movie-id={movie.id}
     >
       <div className="relative">
@@ -53,49 +74,100 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
         <div className={`absolute top-2 right-2 ${badgeClass} text-white text-xs font-bold py-1 px-2 rounded-full`}>
           {typeBadge}
         </div>
+        {/* Add to watchlist quick button for mobile */}
+        {isMobile && !showInfo && (
+          <button 
+            className="absolute bottom-2 right-2 bg-[#E50914] text-white rounded-full p-2 shadow-lg"
+            onClick={handleAddClick}
+            aria-label="Add to watchlist"
+          >
+            <PlusCircle className="h-6 w-6" />
+          </button>
+        )}
       </div>
       <div 
-        className={`movie-info absolute inset-0 bg-black bg-opacity-75 flex flex-col justify-end p-3 transition-opacity duration-300 ${
-          isHovered ? 'opacity-100' : 'opacity-0'
-        }`}
+        className={`movie-info absolute inset-0 bg-black bg-opacity-85 flex flex-col justify-end p-3 transition-opacity duration-300 ${
+          shouldShowInfo ? 'opacity-100' : 'opacity-0'
+        } ${isMobile ? 'touch-auto' : ''}`}
       >
-        <h3 className="font-bold text-sm sm:text-base">{title}</h3>
-        <p className="text-xs text-gray-300">{displayInfo}</p>
+        <h3 className="font-bold text-sm sm:text-base md:text-lg">{title}</h3>
+        <p className="text-xs sm:text-sm text-gray-300">{displayInfo}</p>
         <div className="flex items-center mt-1">
-          <span className="text-[#F5C518] font-bold text-xs">{voteAverage}</span>
+          <span className="text-[#F5C518] font-bold text-xs sm:text-sm">{voteAverage}</span>
           <div className="ml-1">
-            <Star className="h-3 w-3 text-[#F5C518] fill-current" />
+            <Star className="h-3 w-3 sm:h-4 sm:w-4 text-[#F5C518] fill-current" />
           </div>
         </div>
-        <div className="flex mt-2 space-x-2">
-          {onShowDetails && (
-            <button 
-              className="bg-gray-700 text-white text-xs rounded-full py-1 px-3 hover:bg-gray-600 transition flex items-center"
-              onClick={handleInfoClick}
-              aria-label="Show details"
+        
+        {/* Desktop layout for buttons */}
+        {!isMobile && (
+          <div className="flex mt-2 space-x-2">
+            {onShowDetails && (
+              <button 
+                className="bg-gray-700 text-white text-xs rounded-full py-1 px-3 hover:bg-gray-600 transition flex items-center"
+                onClick={handleInfoClick}
+                aria-label="Show details"
+              >
+                <Info className="h-3 w-3 mr-1" />
+                Details
+              </button>
+            )}
+            <a 
+              href={getIMDbUrl(movie.id, mediaType)} 
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-[#F5C518] text-black text-xs rounded-full py-1 px-3 hover:bg-yellow-400 transition flex items-center"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="View on IMDb"
             >
-              <Info className="h-3 w-3 mr-1" />
-              Details
+              <ExternalLink className="h-3 w-3 mr-1" />
+              IMDb
+            </a>
+            <button 
+              className="bg-[#E50914] text-white text-xs rounded-full py-1 px-3 hover:bg-red-700 transition flex-grow"
+              onClick={handleAddClick}
+            >
+              + Add to Watchlist
             </button>
-          )}
-          <a 
-            href={getIMDbUrl(movie.id, mediaType)} 
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-[#F5C518] text-black text-xs rounded-full py-1 px-3 hover:bg-yellow-400 transition flex items-center"
-            onClick={(e) => e.stopPropagation()}
-            aria-label="View on IMDb"
-          >
-            <ExternalLink className="h-3 w-3 mr-1" />
-            IMDb
-          </a>
-          <button 
-            className="bg-[#E50914] text-white text-xs rounded-full py-1 px-3 hover:bg-red-700 transition flex-grow"
-            onClick={handleAddClick}
-          >
-            + Add to Watchlist
-          </button>
-        </div>
+          </div>
+        )}
+        
+        {/* Mobile layout with stacked buttons for better touch targets */}
+        {isMobile && (
+          <div className="flex flex-col mt-3 space-y-2">
+            <button 
+              className="bg-[#E50914] text-white text-sm font-medium rounded-lg py-2 px-3 hover:bg-red-700 transition flex items-center justify-center"
+              onClick={handleAddClick}
+            >
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Add to Watchlist
+            </button>
+            
+            <div className="flex space-x-2">
+              {onShowDetails && (
+                <button 
+                  className="bg-gray-700 text-white text-sm rounded-lg py-2 flex-1 hover:bg-gray-600 transition flex items-center justify-center"
+                  onClick={handleInfoClick}
+                  aria-label="Show details"
+                >
+                  <Info className="h-4 w-4 mr-1" />
+                  Details
+                </button>
+              )}
+              <a 
+                href={getIMDbUrl(movie.id, mediaType)} 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-[#F5C518] text-black text-sm rounded-lg py-2 flex-1 hover:bg-yellow-400 transition flex items-center justify-center"
+                onClick={(e) => e.stopPropagation()}
+                aria-label="View on IMDb"
+              >
+                <ExternalLink className="h-4 w-4 mr-1" />
+                IMDb
+              </a>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

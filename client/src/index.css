@@ -9,5 +9,65 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    /* Prevent iOS overscroll effect */
+    overscroll-behavior: none;
+  }
+
+  /* Improve tap target sizes on mobile */
+  button, a, input, select, textarea {
+    @apply touch-manipulation;
+  }
+
+  /* Improve input accessibility on mobile */
+  input, select, textarea {
+    @apply text-base;
+    /* Prevent iOS zoom on input focus */
+    font-size: 16px;
+  }
+
+  /* Make sure inputs don't overflow their containers */
+  input[type="date"] {
+    min-height: 2.5rem;
+  }
+}
+
+/* iOS-specific adjustments */
+@supports (-webkit-touch-callout: none) {
+  /* Safari/iOS specific styles */
+  .ios-touch-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Fix for iOS safe area */
+  .ios-safe-area-padding {
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  /* Fix for iOS button appearance */
+  button, .button {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Custom scrollbars for non-touch devices */
+@media (hover: hover) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
   }
 }

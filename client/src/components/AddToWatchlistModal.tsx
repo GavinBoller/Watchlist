@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { TMDBMovie } from '@shared/schema';
 import { useUserContext } from './UserSelector';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { getImageUrl, getTitle, getMediaType, getReleaseDate, formatMovieDisplay } from '@/api/tmdb';
-import { Star, Film, Tv2 } from 'lucide-react';
+import { Star, Film, Tv2, X, CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { queryClient } from '@/lib/queryClient';
 import { format } from 'date-fns';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface AddToWatchlistModalProps {
   item: TMDBMovie | null;
@@ -25,6 +26,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
   const [notes, setNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   if (!item) return null;
 
@@ -92,33 +94,40 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="bg-[#292929] text-white border-gray-700 sm:max-w-md">
+      <DialogContent className={`bg-[#292929] text-white border-gray-700 ${isMobile ? 'max-w-[95vw] p-4' : 'sm:max-w-md'}`}>
+        {/* Custom close button for better mobile visibility */}
+        <DialogClose className="absolute right-4 top-4 rounded-full hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600 p-1">
+          <X className="h-5 w-5" />
+          <span className="sr-only">Close</span>
+        </DialogClose>
+        
         <DialogHeader>
-          <DialogTitle>Add to Watched</DialogTitle>
+          <DialogTitle className="text-lg font-bold pr-6">Add to Watched</DialogTitle>
           <DialogDescription className="text-gray-400">
             Add this {mediaTypeLabel.toLowerCase()} to your watched list
           </DialogDescription>
         </DialogHeader>
         
         <div>
-          <div className="flex mb-4">
-            <div className="relative">
+          {/* Movie/Show info section - flex column on mobile */}
+          <div className={`${isMobile ? 'flex flex-col' : 'flex'} mb-4`}>
+            <div className={`relative ${isMobile ? 'mx-auto mb-3' : ''}`}>
               <img 
                 src={posterUrl || 'https://via.placeholder.com/100x150?text=No+Image'}
                 alt={title} 
-                className="w-24 rounded"
+                className={`rounded ${isMobile ? 'h-36' : 'w-24'}`}
               />
               <div className={`absolute top-2 right-2 ${mediaType === 'tv' ? 'bg-blue-600' : 'bg-[#E50914]'} text-white text-xs font-bold py-1 px-2 rounded-full`}>
                 {mediaType === 'tv' ? 'TV' : 'Movie'}
               </div>
             </div>
-            <div className="ml-4">
+            <div className={isMobile ? 'text-center' : 'ml-4'}>
               <h4 className="font-bold text-lg">{title}</h4>
-              <div className="flex items-center text-sm text-gray-300">
+              <div className={`flex items-center text-sm text-gray-300 ${isMobile ? 'justify-center' : ''}`}>
                 <MediaTypeIcon className="h-3 w-3 mr-1" />
                 <span>{displayInfo}</span>
               </div>
-              <div className="flex items-center mt-1">
+              <div className={`flex items-center mt-1 ${isMobile ? 'justify-center' : ''}`}>
                 <span className="text-[#F5C518] font-bold text-sm">{voteAverage}</span>
                 <div className="ml-1">
                   <Star className="h-4 w-4 text-[#F5C518] fill-current" />
@@ -127,10 +136,10 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
             </div>
           </div>
           
-          {/* Overview section */}
+          {/* Overview section - reduced size on mobile */}
           <div className="mb-4 bg-gray-800 rounded-lg p-3">
             <h5 className="text-sm font-medium mb-1">Overview</h5>
-            <p className="text-xs text-gray-300 max-h-20 overflow-y-auto">
+            <p className={`text-xs text-gray-300 ${isMobile ? 'max-h-16' : 'max-h-20'} overflow-y-auto`}>
               {item.overview || "No overview available."}
             </p>
           </div>
@@ -138,44 +147,70 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
         
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <Label htmlFor="watch-date" className="text-sm font-medium mb-2">When did you watch it?</Label>
-            <Input 
-              type="date" 
-              id="watch-date" 
-              className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600"
-              value={watchedDate}
-              onChange={(e) => setWatchedDate(e.target.value)}
-            />
+            <Label htmlFor="watch-date" className="text-sm font-medium block mb-2">When did you watch it?</Label>
+            <div className="relative">
+              <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input 
+                type="date" 
+                id="watch-date" 
+                className={`w-full bg-gray-700 text-white rounded-lg pl-10 pr-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600 ${isMobile ? 'text-base' : ''}`}
+                value={watchedDate}
+                onChange={(e) => setWatchedDate(e.target.value)}
+              />
+            </div>
           </div>
           
           <div className="mb-6">
-            <Label htmlFor="watch-notes" className="text-sm font-medium mb-2">Notes (optional)</Label>
+            <Label htmlFor="watch-notes" className="text-sm font-medium block mb-2">Notes (optional)</Label>
             <Textarea 
               id="watch-notes" 
               rows={3} 
-              className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600"
+              className={`w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600 ${isMobile ? 'text-base' : ''}`}
               placeholder={`Add your thoughts about the ${mediaType === 'tv' ? 'show' : 'movie'}...`}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
           </div>
           
-          <DialogFooter className="flex justify-end space-x-2">
-            <Button 
-              type="button" 
-              variant="ghost" 
-              onClick={handleClose}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              className="bg-[#E50914] text-white hover:bg-red-700"
-              disabled={isSubmitting}
-            >
-              Add to Watched
-            </Button>
+          <DialogFooter className={`${isMobile ? 'flex-col space-y-2' : 'flex justify-end space-x-2'}`}>
+            {isMobile ? (
+              <>
+                <Button 
+                  type="submit" 
+                  className="bg-[#E50914] text-white hover:bg-red-700 w-full py-3 text-base font-medium"
+                  disabled={isSubmitting}
+                >
+                  Add to Watched
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  onClick={handleClose}
+                  disabled={isSubmitting}
+                  className="w-full py-3 text-base"
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  onClick={handleClose}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="bg-[#E50914] text-white hover:bg-red-700"
+                  disabled={isSubmitting}
+                >
+                  Add to Watched
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>
