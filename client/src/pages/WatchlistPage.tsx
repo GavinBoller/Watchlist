@@ -143,6 +143,7 @@ const WatchlistPage = () => {
     setEntryToEdit(entry);
     setEditWatchedDate(entry.watchedDate ? format(new Date(entry.watchedDate), 'yyyy-MM-dd') : '');
     setEditNotes(entry.notes || '');
+    setEditStatus(entry.status || 'watched'); // Set the current status
     setIsEditModalOpen(true);
   };
 
