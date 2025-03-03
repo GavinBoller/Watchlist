@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -42,6 +43,7 @@ const WatchlistPage = () => {
   const [entryToEdit, setEntryToEdit] = useState<WatchlistEntryWithMovie | null>(null);
   const [editWatchedDate, setEditWatchedDate] = useState<string>('');
   const [editNotes, setEditNotes] = useState<string>('');
+  const [editStatus, setEditStatus] = useState<string>('watched');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<WatchlistEntryWithMovie | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -161,13 +163,20 @@ const WatchlistPage = () => {
     
     try {
       await apiRequest('PUT', `/api/watchlist/${entryToEdit.id}`, {
-        watchedDate: editWatchedDate || null,
+        watchedDate: editStatus === 'watched' ? editWatchedDate || null : null,
         notes: editNotes || null,
+        status: editStatus,
       });
       
+      const statusLabel = editStatus === 'to_watch' 
+        ? 'plan to watch list' 
+        : editStatus === 'watching' 
+          ? 'currently watching list'
+          : 'watched list';
+          
       toast({
         title: "Entry updated",
-        description: `${entryToEdit.movie.title} has been updated in your watched list`,
+        description: `${entryToEdit.movie.title} has been updated in your ${statusLabel}`,
       });
       
       // Invalidate the watchlist cache
@@ -616,7 +625,13 @@ const WatchlistPage = () => {
       <Dialog open={isEditModalOpen} onOpenChange={(open) => !isSubmitting && setIsEditModalOpen(open)}>
         <DialogContent className="bg-[#292929] text-white border-gray-700 sm:max-w-md max-h-[95vh] overflow-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold">Edit Watched Entry</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">
+              {editStatus === 'to_watch' 
+                ? 'Edit Plan to Watch' 
+                : editStatus === 'watching' 
+                  ? 'Edit Currently Watching'
+                  : 'Edit Watched'}
+            </DialogTitle>
             {entryToEdit && (
               <p className="text-sm text-gray-400 mt-1 line-clamp-1">{entryToEdit.movie.title}</p>
             )}
@@ -625,15 +640,59 @@ const WatchlistPage = () => {
           {entryToEdit && (
             <form onSubmit={(e) => { e.preventDefault(); handleUpdateEntry(); }}>
               <div className="mb-4">
-                <Label htmlFor="edit-watch-date" className="text-sm font-medium mb-2 block">When did you watch it?</Label>
-                <Input 
-                  type="date" 
-                  id="edit-watch-date" 
-                  className="w-full bg-gray-700 text-white rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600 h-12"
-                  value={editWatchedDate}
-                  onChange={(e) => setEditWatchedDate(e.target.value)}
-                />
+                <Label className="text-sm font-medium block mb-2">Watch Status</Label>
+                <RadioGroup 
+                  value={editStatus} 
+                  onValueChange={setEditStatus}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center space-x-2 bg-gray-800 rounded-lg p-3 hover:bg-gray-700 transition cursor-pointer">
+                    <RadioGroupItem value="to_watch" id="edit-status-to-watch" />
+                    <Label htmlFor="edit-status-to-watch" className="flex items-center gap-2 cursor-pointer">
+                      <Clock className="h-4 w-4 text-blue-400" />
+                      <div>
+                        <div className="font-medium">Plan to Watch</div>
+                        <div className="text-xs text-gray-400">Save for later</div>
+                      </div>
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 bg-gray-800 rounded-lg p-3 hover:bg-gray-700 transition cursor-pointer">
+                    <RadioGroupItem value="watching" id="edit-status-watching" />
+                    <Label htmlFor="edit-status-watching" className="flex items-center gap-2 cursor-pointer">
+                      <PlayCircle className="h-4 w-4 text-green-400" />
+                      <div>
+                        <div className="font-medium">Currently Watching</div>
+                        <div className="text-xs text-gray-400">Started but not finished</div>
+                      </div>
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 bg-gray-800 rounded-lg p-3 hover:bg-gray-700 transition cursor-pointer">
+                    <RadioGroupItem value="watched" id="edit-status-watched" />
+                    <Label htmlFor="edit-status-watched" className="flex items-center gap-2 cursor-pointer">
+                      <CheckCircle className="h-4 w-4 text-[#E50914]" />
+                      <div>
+                        <div className="font-medium">Watched</div>
+                        <div className="text-xs text-gray-400">Already completed</div>
+                      </div>
+                    </Label>
+                  </div>
+                </RadioGroup>
               </div>
+              
+              {editStatus === 'watched' && (
+                <div className="mb-4">
+                  <Label htmlFor="edit-watch-date" className="text-sm font-medium mb-2 block">When did you watch it?</Label>
+                  <Input 
+                    type="date" 
+                    id="edit-watch-date" 
+                    className="w-full bg-gray-700 text-white rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600 h-12"
+                    value={editWatchedDate}
+                    onChange={(e) => setEditWatchedDate(e.target.value)}
+                  />
+                </div>
+              )}
               
               <div className="mb-6">
                 <Label htmlFor="edit-watch-notes" className="text-sm font-medium mb-2 block">Notes (optional)</Label>
@@ -667,7 +726,13 @@ const WatchlistPage = () => {
                       <span className="mr-2">Updating</span>
                       <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
                     </div>
-                  ) : "Update Entry"}
+                  ) : (
+                    editStatus === 'to_watch' 
+                      ? 'Update Plan to Watch' 
+                      : editStatus === 'watching' 
+                        ? 'Update Currently Watching'
+                        : 'Update Watched'
+                  )}
                 </Button>
               </DialogFooter>
             </form>
