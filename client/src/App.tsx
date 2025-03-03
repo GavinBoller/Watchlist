@@ -22,7 +22,17 @@ function App() {
   useEffect(() => {
     async function checkSession() {
       try {
-        const response = await fetch("/api/auth/session");
+        // Use our improved apiRequest utility with retry capability
+        const response = await fetch("/api/auth/session", {
+          credentials: "include",
+          headers: {
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+          }
+        });
+        
+        console.log("Session check status:", response.status);
+        
         if (response.ok) {
           const data = await response.json();
           console.log("Session check response:", data);
@@ -30,9 +40,39 @@ function App() {
             setCurrentUser(data.user);
             setIsAuthenticated(true);
           }
+        } else {
+          console.log("Session check failed with status:", response.status);
+          // Try the fallback endpoint if the main one fails
+          checkSessionFallback();
         }
       } catch (error) {
         console.error("Failed to check session:", error);
+        // Try the fallback endpoint if the main one fails
+        checkSessionFallback();
+      }
+    }
+    
+    // Some applications use a different endpoint
+    async function checkSessionFallback() {
+      try {
+        const response = await fetch("/api/user", {
+          credentials: "include",
+          headers: {
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+          }
+        });
+        
+        if (response.ok) {
+          const user = await response.json();
+          console.log("Session fallback response:", user);
+          if (user && user.id) {
+            setCurrentUser(user);
+            setIsAuthenticated(true);
+          }
+        }
+      } catch (fallbackError) {
+        console.error("Failed fallback session check:", fallbackError);
       }
     }
     

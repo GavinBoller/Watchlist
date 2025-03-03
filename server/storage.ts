@@ -748,39 +748,52 @@ export class DatabaseStorage implements IStorage {
 }
 
 // Initialize default user in the database
-async function initializeDatabase() {
+async function initializeDefaultUser() {
   try {
     if (!process.env.DATABASE_URL) {
-      console.warn('Skipping database initialization: No DATABASE_URL provided');
+      console.warn('Skipping database user initialization: No DATABASE_URL provided');
+      return;
+    }
+    
+    // Check if db is properly initialized
+    if (!db) {
+      console.warn('Database not initialized yet, skipping default user creation');
       return;
     }
     
     // Check if we need to create a default user
-    const existingUsers = await db.select().from(users);
-    
-    if (existingUsers.length === 0) {
-      // Create a default user
-      const bcrypt = await import('bcryptjs');
-      const passwordHash = await bcrypt.hash('guest', 10);
+    try {
+      const existingUsers = await db.select().from(users);
       
-      await db.insert(users).values({
-        username: 'Guest',
-        password: passwordHash,
-        displayName: 'Guest User'
-      });
-      
-      console.log('Created default user');
+      if (existingUsers.length === 0) {
+        // Create a default user
+        const bcrypt = await import('bcryptjs');
+        const passwordHash = await bcrypt.hash('guest', 10);
+        
+        await db.insert(users).values({
+          username: 'Guest',
+          password: passwordHash,
+          displayName: 'Guest User'
+        });
+        
+        console.log('Created default user');
+      }
+    } catch (queryError) {
+      console.warn('Error checking or creating default user:', queryError);
     }
   } catch (error) {
-    console.warn('Failed to initialize database (this is expected during deployment):', error);
+    console.warn('Failed to initialize default user (this is expected during deployment):', error);
     // Don't throw errors during deployment - this will be fixed when DATABASE_URL is provided
   }
 }
 
-// Initialize the database but don't wait for it to complete
-// This ensures the app will still start even if database initialization fails
-initializeDatabase().catch(err => {
-  console.warn('Database initialization encountered an error:', err.message);
-});
-
+// Create database storage instance
 export const storage = new DatabaseStorage();
+
+// Initialize the default user after a short delay to ensure the database connection is ready
+// This ensures the app will still start even if database initialization fails
+setTimeout(() => {
+  initializeDefaultUser().catch(err => {
+    console.warn('Default user initialization encountered an error:', err.message);
+  });
+}, 3000); // 3 second delay to ensure database is connected

@@ -54,6 +54,7 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
     
     try {
       // Use apiRequest instead of fetch for better error handling and consistency
+      console.log("Sending registration request to endpoint...");
       const response = await apiRequest("POST", "/api/auth/register", {
         username,
         displayName: displayName || username,
