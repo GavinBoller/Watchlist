@@ -14,29 +14,30 @@ import {
   SheetTrigger,
   SheetClose
 } from '@/components/ui/sheet';
-import { ChevronDown, UserCircle, Users, PlusCircle } from 'lucide-react';
-import { NewUserModal } from './NewUserModal';
+import { ChevronDown, UserCircle, Users, LogOut, LockKeyhole } from 'lucide-react';
+import { AuthModal } from './AuthModal';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
-
-export interface User {
-  id: number;
-  username: string;
-}
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
+import { useQueryClient } from '@tanstack/react-query';
+import { UserResponse } from '@shared/schema';
 
 interface UserContextType {
-  currentUser: User | null;
-  setCurrentUser: (user: User) => void;
-  users: User[];
-  addUser: (username: string) => Promise<boolean>;
+  currentUser: UserResponse | null;
+  setCurrentUser: (user: UserResponse | null) => void;
+  login: (user: UserResponse) => void;
+  logout: () => Promise<void>;
+  isAuthenticated: boolean;
 }
 
 // Create context with default values
 export const UserContext = createContext<UserContextType>({
   currentUser: null,
   setCurrentUser: () => {},
-  users: [],
-  addUser: async () => false,
+  login: () => {},
+  logout: async () => {},
+  isAuthenticated: false,
 });
 
 export const useUserContext = () => useContext(UserContext);
@@ -46,11 +47,13 @@ interface UserSelectorProps {
 }
 
 const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
-  const { currentUser, setCurrentUser, users } = useUserContext();
-  const [isNewUserModalOpen, setIsNewUserModalOpen] = useState(false);
+  const { currentUser, logout, isAuthenticated } = useUserContext();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const actualIsMobile = useIsMobile();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // Force close sheet if window resizes from mobile to desktop
   useEffect(() => {
@@ -59,19 +62,34 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     }
   }, [actualIsMobile]);
 
-  if (!currentUser) return null;
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out",
+      });
+      
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['/api/watchlist'] });
+      setSheetOpen(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to log out",
+        variant: "destructive",
+      });
+    }
+  };
 
-  // Handle selecting a user
-  const handleSelectUser = (user: User) => {
-    setCurrentUser(user);
+  // Handle login modal
+  const handleLoginModal = () => {
+    setIsAuthModalOpen(true);
     setSheetOpen(false);
   };
 
-  // Handle opening new user modal
-  const handleNewUser = () => {
-    setIsNewUserModalOpen(true);
-    setSheetOpen(false);
-  };
+  const displayName = currentUser?.displayName || currentUser?.username || "Guest";
 
   // Use a bottom sheet for mobile devices
   if (actualIsMobile && isMobile) {
@@ -81,7 +99,7 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
           <SheetTrigger asChild>
             <button className="flex items-center space-x-2 bg-[#292929] rounded-full px-3 py-1">
               <UserCircle className="h-5 w-5 text-[#E50914]" />
-              <span className="max-w-[100px] truncate">{currentUser.username}</span>
+              <span className="max-w-[100px] truncate">{isAuthenticated ? displayName : "Sign In"}</span>
               <ChevronDown className="h-4 w-4" />
             </button>
           </SheetTrigger>
@@ -89,41 +107,49 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
             <SheetHeader className="px-4">
               <SheetTitle className="text-center text-white flex items-center justify-center">
                 <Users className="h-5 w-5 mr-2 text-[#E50914]" />
-                Select User
+                {isAuthenticated ? "Account" : "Sign In"}
               </SheetTitle>
             </SheetHeader>
             <div className="mt-4 space-y-1">
-              {users.map(user => (
-                <SheetClose asChild key={user.id}>
-                  <Button
+              {isAuthenticated ? (
+                <>
+                  <SheetClose asChild>
+                    <Button
+                      variant="ghost" 
+                      className="w-full justify-start px-4 py-3 text-white"
+                      disabled
+                    >
+                      <UserCircle className="h-5 w-5 mr-3 text-[#E50914]" />
+                      {displayName}
+                    </Button>
+                  </SheetClose>
+                  <Button 
                     variant="ghost" 
-                    className={`w-full justify-start px-4 py-3 ${
-                      currentUser.id === user.id 
-                        ? 'bg-[#3d3d3d] text-white' 
-                        : 'text-gray-300 hover:bg-[#3d3d3d] hover:text-white'
-                    }`}
-                    onClick={() => handleSelectUser(user)}
+                    className="w-full justify-start px-4 py-3 text-red-400 hover:bg-red-900 hover:text-white"
+                    onClick={handleLogout}
                   >
-                    <UserCircle className={`h-5 w-5 mr-3 ${currentUser.id === user.id ? 'text-[#E50914]' : ''}`} />
-                    {user.username}
+                    <LogOut className="h-5 w-5 mr-3" />
+                    Sign Out
                   </Button>
-                </SheetClose>
-              ))}
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start px-4 py-3 text-[#44C8E8] hover:bg-[#E50914] hover:text-white"
-                onClick={handleNewUser}
-              >
-                <PlusCircle className="h-5 w-5 mr-3" />
-                Add New User
-              </Button>
+                </>
+              ) : (
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start px-4 py-3 text-[#44C8E8] hover:bg-[#E50914] hover:text-white"
+                  onClick={handleLoginModal}
+                >
+                  <LockKeyhole className="h-5 w-5 mr-3" />
+                  Sign In / Register
+                </Button>
+              )}
             </div>
           </SheetContent>
         </Sheet>
 
-        <NewUserModal 
-          isOpen={isNewUserModalOpen} 
-          onClose={() => setIsNewUserModalOpen(false)} 
+        <AuthModal 
+          isOpen={isAuthModalOpen} 
+          onClose={() => setIsAuthModalOpen(false)}
+          onAuthSuccess={() => {}} // Will be handled by the context
         />
       </div>
     );
@@ -138,36 +164,44 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
           className="flex items-center space-x-2 bg-[#292929] rounded-full px-3 py-1"
         >
           <UserCircle className="h-5 w-5 text-[#E50914]" />
-          <span>{currentUser.username}</span>
+          <span>{isAuthenticated ? displayName : "Sign In"}</span>
           <ChevronDown className="h-4 w-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="bg-[#292929] text-white border-gray-700">
-          {users.map(user => (
+          {isAuthenticated ? (
+            <>
+              <DropdownMenuItem
+                className="text-white cursor-default"
+                disabled
+              >
+                <UserCircle className="h-4 w-4 mr-2 text-[#E50914]" />
+                {displayName}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-gray-700" />
+              <DropdownMenuItem
+                className="text-red-400 hover:bg-red-900 hover:text-white cursor-pointer"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </DropdownMenuItem>
+            </>
+          ) : (
             <DropdownMenuItem
-              key={user.id}
-              className={`text-white hover:bg-[#E50914] cursor-pointer ${
-                currentUser.id === user.id ? 'bg-[#3d3d3d]' : ''
-              }`}
-              onClick={() => setCurrentUser(user)}
+              className="text-[#44C8E8] hover:bg-[#E50914] hover:text-white cursor-pointer"
+              onClick={handleLoginModal}
             >
-              <UserCircle className={`h-4 w-4 mr-2 ${currentUser.id === user.id ? 'text-[#E50914]' : ''}`} />
-              {user.username}
+              <LockKeyhole className="h-4 w-4 mr-2" />
+              Sign In / Register
             </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator className="bg-gray-700" />
-          <DropdownMenuItem
-            className="text-[#44C8E8] hover:bg-[#E50914] hover:text-white cursor-pointer"
-            onClick={() => setIsNewUserModalOpen(true)}
-          >
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Add New User
-          </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <NewUserModal 
-        isOpen={isNewUserModalOpen} 
-        onClose={() => setIsNewUserModalOpen(false)} 
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={() => {}} // Will be handled by the context
       />
     </div>
   );

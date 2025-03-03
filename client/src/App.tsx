@@ -1,92 +1,69 @@
 import { useState, useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "./lib/queryClient";
+import { queryClient, apiRequest } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Header from "@/components/Header";
 import SearchPage from "@/pages/SearchPage";
 import WatchlistPage from "@/pages/WatchlistPage";
-import { UserContext, User } from "@/components/UserSelector";
+import { UserContext } from "@/components/UserSelector";
+import { UserResponse } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 function App() {
-  // Current user state
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
+  // Authentication state
+  const [currentUser, setCurrentUser] = useState<UserResponse | null>(null);
   const [location, setLocation] = useLocation();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { toast } = useToast();
 
-  // Fetch users on mount and load last selected user
+  // Check for existing session on mount
   useEffect(() => {
-    async function fetchUsers() {
+    async function checkSession() {
       try {
-        const response = await fetch("/api/users");
-        if (response.ok) {
-          const users = await response.json();
-          setUsers(users);
-          
-          // Try to load last selected user from localStorage
-          const lastUserId = localStorage.getItem('lastUserId');
-          
-          if (lastUserId && users.length > 0) {
-            // Find the user with the stored ID
-            const lastUser = users.find((user: User) => user.id === parseInt(lastUserId, 10));
-            if (lastUser) {
-              setCurrentUser(lastUser);
-            } else {
-              // Fall back to first user if saved user not found
-              setCurrentUser(users[0]);
-            }
-          } else if (users.length > 0) {
-            // Default to first user if no saved user
-            setCurrentUser(users[0]);
-          }
+        const response = await apiRequest<{ user: UserResponse | null }>("/auth/session");
+        if (response.user) {
+          setCurrentUser(response.user);
+          setIsAuthenticated(true);
         }
       } catch (error) {
-        console.error("Failed to fetch users:", error);
+        console.error("Failed to check session:", error);
       }
     }
     
-    fetchUsers();
+    checkSession();
   }, []);
 
-  // Add a new user to the users list
-  const addUser = async (username: string) => {
-    try {
-      const response = await fetch("/api/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username }),
-      });
-      
-      if (response.ok) {
-        const newUser = await response.json();
-        setUsers(prevUsers => [...prevUsers, newUser]);
-        // Save to localStorage and set as current user
-        localStorage.setItem('lastUserId', newUser.id.toString());
-        setCurrentUser(newUser);
-        return true;
-      } else {
-        return false;
-      }
-    } catch (error) {
-      console.error("Failed to add user:", error);
-      return false;
-    }
+  // Login function
+  const login = (user: UserResponse) => {
+    setCurrentUser(user);
+    setIsAuthenticated(true);
   };
 
-  // Create a wrapper for setCurrentUser that also saves to localStorage
-  const setCurrentUserWithStorage = (user: User): void => {
-    // Save user ID to localStorage for persistence
-    localStorage.setItem('lastUserId', user.id.toString());
-    // Update the state
-    setCurrentUser(user);
+  // Logout function
+  const logout = async () => {
+    try {
+      await apiRequest("/auth/logout", { method: "POST" });
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+    } catch (error) {
+      console.error("Failed to logout:", error);
+      throw error;
+    }
   };
 
   return (
     <QueryClientProvider client={queryClient}>
-      <UserContext.Provider value={{ currentUser, setCurrentUser: setCurrentUserWithStorage, users, addUser }}>
+      <UserContext.Provider 
+        value={{ 
+          currentUser, 
+          setCurrentUser, 
+          login, 
+          logout,
+          isAuthenticated
+        }}
+      >
         <div className="flex flex-col min-h-screen">
           <Header 
             onTabChange={(tab) => {
