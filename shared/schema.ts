@@ -55,7 +55,7 @@ export const watchlistEntries = pgTable("watchlist_entries", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   movieId: integer("movie_id").notNull(),
-  watchedDate: timestamp("watched_date"),
+  watchedDate: text("watched_date"), // Using text for SQLite compatibility
   notes: text("notes"),
   status: text("status").notNull().default("to_watch"), // Options: "to_watch", "watching", "watched"
   createdAt: timestamp("created_at").defaultNow(),

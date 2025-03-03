@@ -303,18 +303,8 @@ export class SQLiteStorage implements IStorage {
   }
 
   async createWatchlistEntry(insertEntry: InsertWatchlistEntry): Promise<WatchlistEntry> {
-    // Convert Date objects to ISO strings for SQLite
-    let watchedDate = null;
-    if (insertEntry.watchedDate) {
-      // If it's already a string, use it as is
-      if (typeof insertEntry.watchedDate === 'string') {
-        watchedDate = insertEntry.watchedDate;
-      } 
-      // If it's a Date object, convert to ISO string
-      else if (insertEntry.watchedDate instanceof Date) {
-        watchedDate = insertEntry.watchedDate.toISOString();
-      }
-    }
+    // Get watchedDate value
+    let watchedDate = insertEntry.watchedDate || null;
     
     const stmt = this.db.prepare(`
       INSERT INTO watchlist_entries (userId, movieId, watchedDate, notes, status)
@@ -333,7 +323,7 @@ export class SQLiteStorage implements IStorage {
       id: Number(result.lastInsertRowid),
       userId: insertEntry.userId,
       movieId: insertEntry.movieId,
-      watchedDate: insertEntry.watchedDate || null,
+      watchedDate: watchedDate,
       notes: insertEntry.notes || null,
       status: insertEntry.status || 'to_watch',
       createdAt: new Date()
@@ -363,12 +353,7 @@ export class SQLiteStorage implements IStorage {
     
     if (updates.watchedDate !== undefined) {
       setClauses.push('watchedDate = ?');
-      // Convert Date objects to ISO strings for SQLite
-      if (updates.watchedDate instanceof Date) {
-        params.push(updates.watchedDate.toISOString());
-      } else {
-        params.push(updates.watchedDate);
-      }
+      params.push(updates.watchedDate);
     }
     
     if (updates.notes !== undefined) {
@@ -437,8 +422,7 @@ export class MemStorage implements IStorage {
     this.createUser({
       username: "Guest",
       password: passwordHash,
-      displayName: "Guest User",
-      isPrivate: false
+      displayName: "Guest User"
     });
   }
 
@@ -455,7 +439,12 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.userCurrentId++;
-    const user: User = { ...insertUser, id };
+    const user: User = { 
+      ...insertUser, 
+      id,
+      displayName: insertUser.displayName || null,
+      createdAt: new Date()
+    };
     this.users.set(id, user);
     return user;
   }

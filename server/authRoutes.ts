@@ -86,8 +86,7 @@ router.post('/register', async (req: Request, res: Response) => {
     const newUser = await storage.createUser({
       ...userData,
       password: passwordHash,
-      displayName: userData.displayName || userData.username,
-      isPrivate: userData.isPrivate !== undefined ? userData.isPrivate : true
+      displayName: userData.displayName || userData.username
     });
     
     // Return user without password
@@ -117,7 +116,7 @@ router.post('/register', async (req: Request, res: Response) => {
   }
 });
 
-// Update user settings (privacy, display name)
+// Update user settings (display name)
 router.put('/user', async (req: Request, res: Response) => {
   try {
     if (!req.isAuthenticated()) {
@@ -125,7 +124,7 @@ router.put('/user', async (req: Request, res: Response) => {
     }
     
     const user = req.user as UserResponse;
-    const { displayName, isPrivate } = req.body;
+    const { displayName } = req.body;
     
     // TODO: Implement storage.updateUser method
     
@@ -133,8 +132,7 @@ router.put('/user', async (req: Request, res: Response) => {
       message: 'User settings updated',
       user: {
         ...user,
-        displayName: displayName || user.displayName,
-        isPrivate: isPrivate !== undefined ? isPrivate : user.isPrivate
+        displayName: displayName || user.displayName
       }
     });
   } catch (error) {

@@ -85,30 +85,15 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
       return next();
     }
     
-    // Check if user is accessing their own watchlist or a non-private watchlist
+    // Check if user is accessing their own watchlist
     if (currentUser.id === pathUserId) {
       return next();
     }
     
-    // For other users' watchlists, check if they're private
-    storage.getUser(pathUserId)
-      .then(requestedUser => {
-        if (!requestedUser) {
-          return res.status(404).json({ message: 'User not found' });
-        }
-        
-        if (!requestedUser.isPrivate) {
-          return next();
-        }
-        
-        return res.status(403).json({ 
-          message: 'This user\'s watchlist is private' 
-        });
-      })
-      .catch(error => {
-        console.error('Error checking watchlist access:', error);
-        res.status(500).json({ message: 'Server error' });
-      });
+    // For this application, users can only access their own watchlists
+    return res.status(403).json({ 
+      message: 'You can only access your own watchlist' 
+    });
   } else {
     // For other endpoints
     next();
