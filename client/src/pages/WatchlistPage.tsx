@@ -350,6 +350,7 @@ const WatchlistPage = () => {
               <Search className="h-4 w-4 text-gray-400" />
             </div>
             <Input
+              ref={searchInputRef}
               type="search"
               placeholder="Search your watchlist..."
               value={searchQuery}
