@@ -11,7 +11,7 @@ import { queryClient } from '@/lib/queryClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Film, Tv2, Menu, BadgePlus } from 'lucide-react';
+import { AlertCircle, Film, Tv2, Menu, BadgePlus, Inbox } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Label } from '@/components/ui/label';
@@ -286,64 +286,53 @@ const WatchlistPage = () => {
           </div>
         </div>
 
-        {/* Media Type Filter Dropdown (Mobile) */}
-        <div className="md:hidden flex justify-center mb-4">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="bg-[#292929] border-gray-700">
-                <span className="mr-2">
-                  {mediaTypeFilters.find(f => f.value === mediaTypeFilter)?.label || 'Filter'}
-                </span>
-                {(() => {
-                  const Icon = mediaTypeFilters.find(f => f.value === mediaTypeFilter)?.icon || Menu;
-                  return <Icon className="h-4 w-4" />;
-                })()}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-[#292929] text-white border-gray-700">
-              {mediaTypeFilters.map((filter) => {
-                const Icon = filter.icon;
-                return (
-                  <DropdownMenuItem 
-                    key={filter.value}
-                    className={`flex items-center cursor-pointer ${
-                      mediaTypeFilter === filter.value ? 'bg-[#E50914] text-white' : ''
-                    }`}
-                    onClick={() => setMediaTypeFilter(filter.value as MediaFilterType)}
-                  >
-                    <Icon className="h-4 w-4 mr-2" />
-                    {filter.label}
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
+        {/* Media Type Filter - iOS-friendly segmented control (Mobile) */}
+        <div className="md:hidden mb-4 px-3">
+          <div className="grid grid-cols-3 gap-1 bg-[#292929] rounded-lg p-1 shadow-inner">
+            {mediaTypeFilters.map((filter) => {
+              const Icon = filter.icon;
+              return (
+                <button
+                  key={filter.value}
+                  className={`flex items-center justify-center px-2 py-2.5 rounded-md text-sm transition ${
+                    mediaTypeFilter === filter.value 
+                      ? 'bg-[#3d3d3d] text-white font-medium shadow-sm' 
+                      : 'text-gray-300 hover:bg-[#3d3d3d]/50'
+                  }`}
+                  onClick={() => setMediaTypeFilter(filter.value as MediaFilterType)}
+                >
+                  <Icon className={`h-4 w-4 mr-1.5 ${mediaTypeFilter === filter.value ? 'text-[#E50914]' : ''}`} />
+                  <span>{filter.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         
         {/* Filter and Sort Controls */}
-        <div className="flex flex-col sm:flex-row justify-center space-y-2 sm:space-y-0 sm:space-x-2">
+        <div className="flex flex-col sm:flex-row justify-center space-y-2 sm:space-y-0 sm:space-x-2 px-3">
           <Select value={selectedGenre} onValueChange={setSelectedGenre}>
-            <SelectTrigger className="bg-[#292929] text-white border-gray-700 focus:ring-[#E50914]">
+            <SelectTrigger className="bg-[#292929] text-white border-gray-700 focus:ring-[#E50914] h-10">
               <SelectValue placeholder="All Genres" />
             </SelectTrigger>
-            <SelectContent className="bg-[#292929] text-white border-gray-700">
-              <SelectItem value="all">All Genres</SelectItem>
+            <SelectContent className="bg-[#292929] text-white border-gray-700 max-h-[50vh]">
+              <SelectItem value="all" className="py-2.5">All Genres</SelectItem>
               {genres.map((genre) => (
-                <SelectItem key={genre} value={genre}>{genre}</SelectItem>
+                <SelectItem key={genre} value={genre} className="py-2.5">{genre}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           
           <Select value={sortOrder} onValueChange={setSortOrder}>
-            <SelectTrigger className="bg-[#292929] text-white border-gray-700 focus:ring-[#E50914]">
+            <SelectTrigger className="bg-[#292929] text-white border-gray-700 focus:ring-[#E50914] h-10">
               <SelectValue placeholder="Sort By" />
             </SelectTrigger>
             <SelectContent className="bg-[#292929] text-white border-gray-700">
-              <SelectItem value="date_desc">Recently Watched</SelectItem>
-              <SelectItem value="date_asc">Oldest First</SelectItem>
-              <SelectItem value="title_asc">Title (A-Z)</SelectItem>
-              <SelectItem value="title_desc">Title (Z-A)</SelectItem>
-              <SelectItem value="rating_desc">Rating (High-Low)</SelectItem>
+              <SelectItem value="date_desc" className="py-2.5">Recently Watched</SelectItem>
+              <SelectItem value="date_asc" className="py-2.5">Oldest First</SelectItem>
+              <SelectItem value="title_asc" className="py-2.5">Title (A-Z)</SelectItem>
+              <SelectItem value="title_desc" className="py-2.5">Title (Z-A)</SelectItem>
+              <SelectItem value="rating_desc" className="py-2.5">Rating (High-Low)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -351,9 +340,9 @@ const WatchlistPage = () => {
 
       {/* Watchlist Entries */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-3">
           {[...Array(6)].map((_, index) => (
-            <div key={index} className="bg-[#292929] rounded-lg overflow-hidden flex">
+            <div key={index} className="bg-[#292929] rounded-lg overflow-hidden flex shadow">
               <Skeleton className="w-24 md:w-28 h-auto" />
               <div className="p-3 flex-grow">
                 <Skeleton className="h-6 w-3/4 mb-2" />
@@ -364,7 +353,7 @@ const WatchlistPage = () => {
           ))}
         </div>
       ) : watchlist && watchlist.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-3">
           {filteredAndSortedWatchlist().map(entry => (
             <WatchlistEntry 
               key={entry.id} 
@@ -376,11 +365,30 @@ const WatchlistPage = () => {
           ))}
         </div>
       ) : (
-        <div className="text-center py-10 text-gray-400">
-          {mediaTypeFilter === 'all' 
-            ? "You haven't watched anything yet. Search for movies and TV shows to add what you've watched."
-            : `You haven't watched any ${mediaTypeFilter === 'movie' ? 'movies' : 'TV shows'} yet.`
-          }
+        <div className="text-center py-10 px-5 mx-auto max-w-md">
+          <div className="bg-[#292929]/50 rounded-xl p-6 shadow-md">
+            <div className="text-gray-400 mb-4 flex justify-center">
+              {mediaTypeFilter === 'all' ? (
+                <Inbox className="h-12 w-12 opacity-50" />
+              ) : mediaTypeFilter === 'movie' ? (
+                <Film className="h-12 w-12 opacity-50" />
+              ) : (
+                <Tv2 className="h-12 w-12 opacity-50" />
+              )}
+            </div>
+            <p className="text-gray-300 font-medium">
+              {mediaTypeFilter === 'all' 
+                ? "Your watched list is empty"
+                : `No ${mediaTypeFilter === 'movie' ? 'movies' : 'TV shows'} in your list`
+              }
+            </p>
+            <p className="text-gray-400 text-sm mt-1">
+              {mediaTypeFilter === 'all' 
+                ? "Search for movies and TV shows to add what you've watched."
+                : `Switch to the Search tab to add some ${mediaTypeFilter === 'movie' ? 'movies' : 'TV shows'}.`
+              }
+            </p>
+          </div>
         </div>
       )}
 
@@ -410,53 +418,62 @@ const WatchlistPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Entry Modal */}
+      {/* Edit Entry Modal - iOS optimized */}
       <Dialog open={isEditModalOpen} onOpenChange={(open) => !isSubmitting && setIsEditModalOpen(open)}>
-        <DialogContent className="bg-[#292929] text-white border-gray-700 sm:max-w-md">
+        <DialogContent className="bg-[#292929] text-white border-gray-700 sm:max-w-md max-h-[95vh] overflow-auto">
           <DialogHeader>
-            <DialogTitle>Edit Watched Entry</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Edit Watched Entry</DialogTitle>
+            {entryToEdit && (
+              <p className="text-sm text-gray-400 mt-1 line-clamp-1">{entryToEdit.movie.title}</p>
+            )}
           </DialogHeader>
           
           {entryToEdit && (
             <form onSubmit={(e) => { e.preventDefault(); handleUpdateEntry(); }}>
               <div className="mb-4">
-                <Label htmlFor="edit-watch-date" className="text-sm font-medium mb-2">When did you watch it?</Label>
+                <Label htmlFor="edit-watch-date" className="text-sm font-medium mb-2 block">When did you watch it?</Label>
                 <Input 
                   type="date" 
                   id="edit-watch-date" 
-                  className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600"
+                  className="w-full bg-gray-700 text-white rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600 h-12"
                   value={editWatchedDate}
                   onChange={(e) => setEditWatchedDate(e.target.value)}
                 />
               </div>
               
               <div className="mb-6">
-                <Label htmlFor="edit-watch-notes" className="text-sm font-medium mb-2">Notes (optional)</Label>
+                <Label htmlFor="edit-watch-notes" className="text-sm font-medium mb-2 block">Notes (optional)</Label>
                 <Textarea 
                   id="edit-watch-notes" 
-                  rows={3} 
-                  className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600"
+                  rows={4} 
+                  className="w-full bg-gray-700 text-white rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600"
                   placeholder={`Add your thoughts about the ${entryToEdit.movie.mediaType === 'tv' ? 'show' : 'movie'}...`}
                   value={editNotes}
                   onChange={(e) => setEditNotes(e.target.value)}
                 />
               </div>
               
-              <DialogFooter className="flex justify-end space-x-2">
+              <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-end">
                 <Button 
                   type="button" 
-                  variant="ghost" 
+                  variant="outline" 
                   onClick={() => setIsEditModalOpen(false)}
                   disabled={isSubmitting}
+                  className="w-full sm:w-auto py-2 h-12 sm:h-10 text-base sm:text-sm"
                 >
                   Cancel
                 </Button>
                 <Button 
                   type="submit" 
-                  className="bg-[#E50914] text-white hover:bg-red-700"
+                  className="bg-[#E50914] text-white hover:bg-red-700 w-full sm:w-auto py-2 h-12 sm:h-10 text-base sm:text-sm"
                   disabled={isSubmitting}
                 >
-                  Update Entry
+                  {isSubmitting ? (
+                    <div className="flex items-center justify-center">
+                      <span className="mr-2">Updating</span>
+                      <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                    </div>
+                  ) : "Update Entry"}
                 </Button>
               </DialogFooter>
             </form>
