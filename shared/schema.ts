@@ -15,6 +15,8 @@ export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
   displayName: true,
+}).extend({
+  confirmPassword: z.string().optional(),
 });
 
 // For API response (excludes password)
