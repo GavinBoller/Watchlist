@@ -22,12 +22,14 @@ async function initializeDatabase() {
 
     // Use a default connection string if DATABASE_URL is not set
     // This allows the application to start during deployment before environment variables are set
+    const isProd = process.env.NODE_ENV === 'production';
     pool = new Pool({ 
       connectionString: process.env.DATABASE_URL || 'postgresql://user:password@localhost:5432/dummy',
       // Add connection handling parameters
-      max: 10, // Maximum number of clients in the pool
+      max: isProd ? 5 : 10, // Fewer connections in production to avoid overwhelming the db
       idleTimeoutMillis: 30000, // How long a client is allowed to remain idle before being closed
-      connectionTimeoutMillis: 10000, // Increased timeout for production environments
+      connectionTimeoutMillis: isProd ? 15000 : 10000, // Increased timeout for production environments
+      ssl: isProd ? { rejectUnauthorized: false } : undefined, // Enable SSL in production
     });
 
     // Add error handler to prevent crashes on connection issues
@@ -37,12 +39,16 @@ async function initializeDatabase() {
     });
 
     // Test the connection before proceeding
-    const client = await pool.connect();
+    let client;
     try {
+      client = await pool.connect();
       await client.query('SELECT 1');
       console.log('Database connection test successful');
+    } catch (connErr) {
+      console.error('Connection test failed:', connErr);
+      throw connErr; // Re-throw to trigger the retry mechanism
     } finally {
-      client.release();
+      if (client) client.release();
     }
 
     // Initialize Drizzle with the pool

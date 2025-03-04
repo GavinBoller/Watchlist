@@ -616,24 +616,51 @@ export class MemStorage implements IStorage {
 // DatabaseStorage implementation for PostgreSQL
 export class DatabaseStorage implements IStorage {
   async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user || undefined;
+    try {
+      const [user] = await db.select().from(users).where(eq(users.id, id));
+      return user || undefined;
+    } catch (error) {
+      console.error("Database error in getUser:", error);
+      throw new Error(`Failed to retrieve user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.username, username));
-    return user || undefined;
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username));
+      return user || undefined;
+    } catch (error) {
+      console.error("Database error in getUserByUsername:", error);
+      throw new Error(`Failed to retrieve user by username: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(insertUser)
-      .returning();
-    return user;
+    try {
+      const [user] = await db
+        .insert(users)
+        .values(insertUser)
+        .returning();
+      return user;
+    } catch (error) {
+      console.error("Database error in createUser:", error);
+      
+      // Check for common error types
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('duplicate key') || errorMessage.includes('unique constraint')) {
+        throw new Error('Username already exists');
+      }
+      
+      if (errorMessage.includes('connection') || errorMessage.includes('timeout')) {
+        throw new Error('Database connection issue. Please try again later.');
+      }
+      
+      throw new Error(`Failed to create user: ${errorMessage}`);
+    }
   }
 
   async getAllUsers(): Promise<User[]> {
