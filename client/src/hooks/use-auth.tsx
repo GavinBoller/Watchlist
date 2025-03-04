@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      const res = await apiRequest("POST", "/api/auth/login", credentials);
+      const res = await apiRequest("POST", "/api/login", credentials);
       
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: "Login failed" }));
@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (userData: InsertUser) => {
-      const res = await apiRequest("POST", "/api/auth/register", userData);
+      const res = await apiRequest("POST", "/api/register", userData);
       
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: "Registration failed" }));
@@ -126,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/auth/logout");
+      const res = await apiRequest("POST", "/api/logout");
       
       if (!res.ok) {
         throw new Error("Logout failed");
