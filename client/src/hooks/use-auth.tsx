@@ -8,13 +8,18 @@ import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+// Extended User type with confirmPassword for registration
+type RegisterData = Omit<InsertUser, 'confirmPassword'> & {
+  confirmPassword: string;
+};
+
 type AuthContextType = {
   user: SelectUser | null;
   isLoading: boolean;
   error: Error | null;
   loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
-  registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
+  registerMutation: UseMutationResult<SelectUser, Error, RegisterData>;
 };
 
 type LoginData = Pick<InsertUser, "username" | "password">;
@@ -97,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (userData: InsertUser) => {
+    mutationFn: async (userData: RegisterData) => {
       const res = await apiRequest("POST", "/api/auth/register", userData);
       
       if (!res.ok) {
