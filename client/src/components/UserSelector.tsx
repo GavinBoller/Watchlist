@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -19,35 +19,45 @@ import { AuthModal } from './AuthModal';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
 import { useQueryClient } from '@tanstack/react-query';
 import { UserResponse } from '@shared/schema';
+import { useContext } from 'react';
+import { AuthContext } from '../hooks/use-auth';
 
-interface UserContextType {
-  currentUser: UserResponse | null;
-  setCurrentUser: (user: UserResponse | null) => void;
-  login: (user: UserResponse) => void;
-  logout: () => Promise<void>;
-  isAuthenticated: boolean;
-}
+// Keep this line to maintain compatibility with other components
+export const useUserContext = () => {
+  const auth = useContext(AuthContext);
+  if (!auth) {
+    throw new Error("useUserContext must be used within an AuthProvider");
+  }
+  
+  return {
+    currentUser: auth.user,
+    setCurrentUser: () => {}, // Deprecated
+    login: () => {}, // Deprecated
+    logout: auth.logoutMutation.mutateAsync,
+    isAuthenticated: !!auth.user
+  };
+};
 
-// Create context with default values
-export const UserContext = createContext<UserContextType>({
-  currentUser: null,
-  setCurrentUser: () => {},
-  login: () => {},
-  logout: async () => {},
-  isAuthenticated: false,
-});
-
-export const useUserContext = () => useContext(UserContext);
+// Re-export UserContext for other components that use it
+import { createContext } from 'react';
+export const UserContext = createContext<any>(null);
 
 interface UserSelectorProps {
   isMobile?: boolean;
 }
 
 const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
-  const { currentUser, logout, isAuthenticated } = useUserContext();
+  // Use the auth context directly
+  const auth = useContext(AuthContext);
+  if (!auth) {
+    throw new Error("UserSelector must be used within an AuthProvider");
+  }
+  
+  const { user, logoutMutation } = auth;
+  const isAuthenticated = !!user;
+  
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -65,15 +75,10 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
   // Handle logout
   const handleLogout = async () => {
     try {
-      await logout();
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out",
-      });
-      
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ['/api/watchlist'] });
+      // Use our new auth system for logout
+      await logoutMutation.mutateAsync();
       setSheetOpen(false);
+      // Toast is handled by the mutation itself
     } catch (error) {
       toast({
         title: "Error",
@@ -89,7 +94,8 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     setSheetOpen(false);
   };
 
-  const displayName = currentUser?.displayName || currentUser?.username || "Guest";
+  // Get display name from the new auth system
+  const displayName = user?.displayName || user?.username || "Guest";
 
   // Use a bottom sheet for mobile devices
   if (actualIsMobile && isMobile) {

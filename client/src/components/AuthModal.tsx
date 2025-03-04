@@ -10,7 +10,8 @@ import { LoginForm } from "./LoginForm";
 import { RegisterForm } from "./RegisterForm";
 import { PasswordResetForm } from "./PasswordResetForm";
 import { UserResponse } from "@shared/schema";
-import { useUserContext } from "./UserSelector";
+import { useContext } from 'react';
+import { AuthContext } from '../hooks/use-auth';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -22,10 +23,10 @@ type AuthView = "login" | "register" | "passwordReset";
 
 export const AuthModal = ({ isOpen, onClose, onAuthSuccess }: AuthModalProps) => {
   const [view, setView] = useState<AuthView>("login");
-  const { login } = useUserContext();
+  const auth = useContext(AuthContext);
 
   const handleAuthSuccess = (user: UserResponse) => {
-    login(user);
+    // The user will be set in the auth context automatically by the mutations
     onClose();
   };
 
