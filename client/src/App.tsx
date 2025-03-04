@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Switch, Route, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -9,65 +8,76 @@ import SearchPage from "@/pages/SearchPage";
 import WatchlistPage from "@/pages/WatchlistPage";
 import AuthPage from "@/pages/auth-page";
 import { UserContext } from "@/components/UserSelector";
-import { UserResponse } from "@shared/schema";
-import { AuthProvider } from "@/hooks/use-auth";
+import { Switch, Route } from "wouter";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
 
-function App() {
+// Bridge component to connect new AuthProvider with legacy UserContext
+function AuthBridge({ children }: { children: React.ReactNode }) {
+  const { user, loginMutation, logoutMutation } = useAuth();
+  
+  const userContextValue = {
+    currentUser: user,
+    setCurrentUser: (newUser: any) => {
+      console.log("setCurrentUser called with", newUser);
+      // This won't be used anymore since we're using the auth hook
+    },
+    login: (user: any) => {
+      console.log("Legacy login called with", user);
+      // User already handled by the auth hook
+    },
+    logout: async () => {
+      console.log("Legacy logout called");
+      return logoutMutation.mutateAsync();
+    },
+    isAuthenticated: !!user
+  };
+  
+  return (
+    <UserContext.Provider value={userContextValue}>
+      {children}
+    </UserContext.Provider>
+  );
+}
+
+function AppContent() {
   // For header tab navigation
   const [location, setLocation] = useLocation();
+  const { user } = useAuth();
   
-  // Legacy UserContext - we'll update our components to use useAuth hook gradually
-  const [currentUser, setCurrentUser] = useState<UserResponse | null>(null);
-  
-  // This is a bridge function between the old UserContext and the new useAuth hook
-  // Later we can refactor all components to use useAuth directly
-  const login = (user: UserResponse) => {
-    setCurrentUser(user);
-  };
-  
-  // Legacy logout function - will be replaced by useAuth's logoutMutation
-  const logout = async () => {
-    // This will be handled by the AuthProvider
-    setCurrentUser(null);
-    return Promise.resolve();
-  };
+  return (
+    <div className="flex flex-col min-h-screen">
+      <Header 
+        onTabChange={(tab) => {
+          if (tab === "search") {
+            setLocation("/");
+          } else if (tab === "watchlist") {
+            setLocation("/watched");
+          }
+        }}
+        activeTab={location === "/" ? "search" : "watchlist"}
+      />
+      
+      <main className="flex-grow">
+        <Switch>
+          <ProtectedRoute path="/" component={SearchPage} />
+          <ProtectedRoute path="/watched" component={WatchlistPage} />
+          <Route path="/auth" component={AuthPage} />
+          <Route component={NotFound} />
+        </Switch>
+      </main>
+      <Toaster />
+    </div>
+  );
+}
 
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <UserContext.Provider 
-          value={{ 
-            currentUser, 
-            setCurrentUser, 
-            login, 
-            logout,
-            isAuthenticated: !!currentUser
-          }}
-        >
-          <div className="flex flex-col min-h-screen">
-            <Header 
-              onTabChange={(tab) => {
-                if (tab === "search") {
-                  setLocation("/");
-                } else if (tab === "watchlist") {
-                  setLocation("/watched");
-                }
-              }}
-              activeTab={location === "/" ? "search" : "watchlist"}
-            />
-            
-            <main className="flex-grow">
-              <Switch>
-                <ProtectedRoute path="/" component={SearchPage} />
-                <ProtectedRoute path="/watched" component={WatchlistPage} />
-                <Route path="/auth" component={AuthPage} />
-                <Route component={NotFound} />
-              </Switch>
-            </main>
-          </div>
-          <Toaster />
-        </UserContext.Provider>
+        <AuthBridge>
+          <AppContent />
+        </AuthBridge>
       </AuthProvider>
     </QueryClientProvider>
   );

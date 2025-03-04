@@ -56,8 +56,7 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
       {
         username,
         displayName: displayName || username,
-        password,
-        confirmPassword
+        password
       },
       {
         onSuccess: (user) => {
