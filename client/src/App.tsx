@@ -12,24 +12,17 @@ import { Switch, Route } from "wouter";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
 
-// Bridge component to connect new AuthProvider with legacy UserContext
+// This is now a simplified component since all components use useAuth directly
 function AuthBridge({ children }: { children: React.ReactNode }) {
-  const { user, loginMutation, logoutMutation } = useAuth();
+  const { user, logoutMutation } = useAuth();
   
+  // Keep providing UserContext for backward compatibility
+  // but all components should migrate to useAuth directly
   const userContextValue = {
     currentUser: user,
-    setCurrentUser: (newUser: any) => {
-      console.log("setCurrentUser called with", newUser);
-      // This won't be used anymore since we're using the auth hook
-    },
-    login: (user: any) => {
-      console.log("Legacy login called with", user);
-      // User already handled by the auth hook
-    },
-    logout: async () => {
-      console.log("Legacy logout called");
-      return logoutMutation.mutateAsync();
-    },
+    setCurrentUser: () => {}, // Deprecated
+    login: () => {}, // Deprecated
+    logout: () => logoutMutation.mutateAsync(),
     isAuthenticated: !!user
   };
   
