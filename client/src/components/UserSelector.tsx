@@ -18,6 +18,7 @@ import { ChevronDown, UserCircle, Users, LogOut, LockKeyhole } from 'lucide-reac
 import { AuthModal } from './AuthModal';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '../hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { UserResponse } from '@shared/schema';
