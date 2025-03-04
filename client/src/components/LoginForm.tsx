@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 import { UserResponse } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 
 interface LoginFormProps {
   onLoginSuccess: (user: UserResponse) => void;
@@ -16,8 +17,9 @@ interface LoginFormProps {
 export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword }: LoginFormProps) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const { loginMutation } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,67 +33,23 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword
       return;
     }
     
-    setIsLoading(true);
-    
-    try {
-      // Use apiRequest instead of fetch for better error handling and consistency
-      const response = await apiRequest("POST", "/api/auth/login", { 
-        username, 
-        password 
-      });
-      
-      // Check HTTP status before parsing JSON to handle non-JSON responses
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Invalid username or password");
-        } else if (response.status === 503) {
-          throw new Error("Server is temporarily unavailable. Please try again later.");
-        } else {
-          const errorText = await response.text();
-          throw new Error(errorText || `Login failed with status ${response.status}`);
+    loginMutation.mutate(
+      { username, password },
+      {
+        onSuccess: (user) => {
+          onLoginSuccess(user);
+          // Redirect to home page after successful login
+          setLocation("/");
+        },
+        onError: (error: Error) => {
+          // Error handling is already done in the mutation
+          console.error("Login error:", error);
         }
       }
-      
-      const data = await response.json();
-      
-      if (!data.user) {
-        throw new Error("Login successful but user data is missing");
-      }
-      
-      console.log("Login successful:", data);
-      
-      toast({
-        title: "Welcome Back!",
-        description: "You've successfully logged in",
-      });
-      
-      onLoginSuccess(data.user);
-    } catch (error: any) {
-      console.error("Login error:", error);
-      
-      // Provide more specific error messages based on error types
-      const errorMessage = (() => {
-        if (error.message.includes("ECONNREFUSED") || error.message.includes("Failed to fetch")) {
-          return "Unable to connect to the server. Please check your internet connection and try again.";
-        } else if (error.message.includes("timeout")) {
-          return "Request timed out. The server might be busy, please try again later.";
-        } else if (error.message.includes("Invalid username or password")) {
-          return "Invalid username or password. Please try again.";
-        } else {
-          return error.message || "Login failed. Please try again.";
-        }
-      })();
-      
-      toast({
-        title: "Login Failed",
-        description: errorMessage,
-        variant: "destructive",
-        duration: 5000,
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    );
   };
+
+  const isLoading = loginMutation.isPending;
 
   return (
     <Card className="w-full max-w-md mx-auto">
@@ -122,7 +80,12 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword
             />
           </div>
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Logging in..." : "Log In"}
+            {isLoading ? (
+              <div className="flex items-center justify-center">
+                <span className="mr-2">Logging in</span>
+                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+              </div>
+            ) : "Log In"}
           </Button>
           <div className="flex flex-col items-center gap-2 mt-4">
             <p className="text-sm text-muted-foreground">

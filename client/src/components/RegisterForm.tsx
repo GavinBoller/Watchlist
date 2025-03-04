@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 import { UserResponse } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 
 interface RegisterFormProps {
   onRegisterSuccess: (user: UserResponse) => void;
@@ -17,8 +18,9 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const { registerMutation } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,76 +52,28 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
       return;
     }
     
-    setIsLoading(true);
-    
-    try {
-      // Use apiRequest instead of fetch for better error handling and consistency
-      console.log("Sending registration request to endpoint...");
-      const response = await apiRequest("POST", "/api/auth/register", {
+    registerMutation.mutate(
+      {
         username,
         displayName: displayName || username,
         password,
         confirmPassword
-      });
-      
-      const data = await response.json();
-      
-      console.log("Registration response:", data);
-      
-      // Check for specific error conditions in the response
-      if (response.status >= 400) {
-        // Handle the error based on the response from the server
-        if (response.status === 409) {
-          throw new Error("Username already exists. Please choose another one.");
-        } else if (response.status === 503) {
-          throw new Error("Server is temporarily unavailable. Please try again later.");
-        } else {
-          throw new Error(data.message || "Registration failed");
+      },
+      {
+        onSuccess: (user) => {
+          onRegisterSuccess(user);
+          // Redirect to home page after successful registration
+          setLocation("/");
+        },
+        onError: (error: Error) => {
+          // Error handling is already done in the mutation
+          console.error("Registration error:", error);
         }
       }
-      
-      // Handle case where registration succeeded but auto-login failed
-      if (data.loginSuccessful === false) {
-        toast({
-          title: "Account Created",
-          description: "Your account was created successfully, but we couldn't log you in automatically. Please log in manually.",
-          duration: 5000,
-        });
-        // Switch to login view
-        onSwitchToLogin();
-        return;
-      }
-      
-      toast({
-        title: "Success",
-        description: "Account created and logged in successfully!",
-      });
-      
-      onRegisterSuccess(data.user);
-    } catch (error: any) {
-      console.error("Registration error:", error);
-      
-      // Provide more specific error messages based on error types
-      const errorMessage = (() => {
-        if (error.message.includes("ECONNREFUSED") || error.message.includes("Failed to fetch")) {
-          return "Unable to connect to the server. Please check your internet connection and try again.";
-        } else if (error.message.includes("timeout")) {
-          return "Request timed out. The server might be busy, please try again later.";
-        } else {
-          return error.message || "Registration failed. Please try again.";
-        }
-      })();
-      
-      toast({
-        title: "Registration Failed",
-        description: errorMessage,
-        variant: "destructive",
-        duration: 5000,
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    );
   };
+
+  const isLoading = registerMutation.isPending;
 
   return (
     <Card className="w-full max-w-md mx-auto">
@@ -180,7 +134,12 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
             />
           </div>
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Creating Account..." : "Register"}
+            {isLoading ? (
+              <div className="flex items-center justify-center">
+                <span className="mr-2">Creating Account</span>
+                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+              </div>
+            ) : "Register"}
           </Button>
           <div className="text-center mt-4">
             <p className="text-sm text-muted-foreground">
