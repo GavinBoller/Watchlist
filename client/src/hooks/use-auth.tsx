@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error,
     isLoading,
   } = useQuery<SelectUser | null, Error>({
-    queryKey: ["/api/user"],
+    queryKey: ["/api/auth/user"],
     queryFn: async () => {
       try {
         // Try the session endpoint first
@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return data.user;
     },
     onSuccess: (userData: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], userData);
+      queryClient.setQueryData(["/api/auth/user"], userData);
       toast({
         title: "Welcome back!",
         description: `You've successfully logged in as ${userData.username}`,
@@ -109,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return data.user;
     },
     onSuccess: (userData: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], userData);
+      queryClient.setQueryData(["/api/auth/user"], userData);
       toast({
         title: "Account created",
         description: `Welcome to MovieTracker, ${userData.username}!`,
@@ -133,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: () => {
-      queryClient.setQueryData(["/api/user"], null);
+      queryClient.setQueryData(["/api/auth/user"], null);
       // Invalidate watchlist queries to clear user-specific data
       queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
       toast({
