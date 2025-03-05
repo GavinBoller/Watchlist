@@ -207,12 +207,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log("POST /api/watchlist - Request body:", JSON.stringify(req.body, null, 2));
     console.log("Environment:", process.env.NODE_ENV || 'development');
     
+    // Log authentication status - this helps debug 401 issues
+    console.log("User authenticated:", req.isAuthenticated());
+    if (req.isAuthenticated()) {
+      console.log("Authenticated user:", (req.user as any)?.id, (req.user as any)?.username);
+    }
+    
     try {
       const { userId, tmdbMovie, watchedDate, notes, status } = req.body;
       
-      if (!userId || !tmdbMovie) {
-        console.log("Missing required fields - userId:", userId, "tmdbMovie:", tmdbMovie ? "present" : "missing");
-        return res.status(400).json({ message: "User ID and movie data are required" });
+      // Enhanced validation for production stability
+      if (!userId) {
+        console.log("Missing userId field");
+        return res.status(400).json({ message: "User ID is required" });
+      }
+      
+      if (!tmdbMovie) {
+        console.log("Missing tmdbMovie field");
+        return res.status(400).json({ message: "Movie data is required" });
+      }
+      
+      if (!tmdbMovie.id) {
+        console.log("Missing tmdbMovie.id field");
+        return res.status(400).json({ message: "Movie ID is required" });
+      }
+      
+      // Check for authentication if in production - prevent malicious access
+      const isProd = process.env.NODE_ENV === 'production';
+      if (isProd && req.isAuthenticated()) {
+        const authenticatedUserId = (req.user as any)?.id;
+        if (authenticatedUserId && authenticatedUserId !== userId) {
+          console.log("Auth mismatch - auth user:", authenticatedUserId, "request user:", userId);
+          return res.status(403).json({ message: "You can only add movies to your own watchlist" });
+        }
       }
       
       // Check if user exists
