@@ -111,6 +111,9 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
                   // This helps with session persistence across redirects
                   try {
                     localStorage.setItem('movietracker_user', JSON.stringify(user));
+                    // Store the registration time to help identify new users for enhanced protection
+                    localStorage.setItem('movietracker_registration_time', Date.now().toString());
+                    localStorage.setItem('movietracker_username', username);
                     console.log("Stored user data in localStorage for session persistence backup");
                   } catch (storageError) {
                     console.error("Failed to store user data in localStorage:", storageError);

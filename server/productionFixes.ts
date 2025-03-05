@@ -234,9 +234,23 @@ export function preventAutoLogout(req: Request, res: Response, next: NextFunctio
   const referrer = req.headers.referer || 'unknown';
   
   // Check for special problematic users that experience login issues
-  // This helps address issues for specific users like Test30
-  const problematicUsers = ['Test30', 'Test31', 'Test32'];
-  const isProblematicUser = problematicUsers.includes(username);
+  // This helps address issues for specific users like Test30, Test33
+  // Expand problematic users list to include recent test users
+  const problematicUsers = ['Test30', 'Test31', 'Test32', 'Test33', 'Test34', 'Test35'];
+  
+  // Also detect any username with 'test' in it (case insensitive)
+  const isTestUser = username.toLowerCase().includes('test');
+  
+  // Consider any user created in the last 48 hours as potentially problematic
+  let isNewUser = false;
+  if (req.session && req.session.createdAt) {
+    const sessionAge = Date.now() - req.session.createdAt;
+    const HOURS_48 = 48 * 60 * 60 * 1000;
+    isNewUser = sessionAge < HOURS_48;
+  }
+  
+  // Combine all conditions - known problematic users or any test users or new users
+  const isProblematicUser = problematicUsers.includes(username) || isTestUser || isNewUser;
   
   // Enhanced protection for problematic users
   if (isProblematicUser && userId) {

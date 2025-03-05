@@ -132,9 +132,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add special refresh session endpoint that can recover sessions
   app.get("/api/refresh-session", async (req: Request, res: Response) => {
     const userId = req.query.userId ? parseInt(req.query.userId as string, 10) : null;
+    const username = req.query.username as string || null;
     const sessionId = req.sessionID || 'unknown';
     
-    console.log(`[SESSION-REFRESH] Refresh request received, session: ${sessionId}, userId: ${userId || 'none'}`);
+    console.log(`[SESSION-REFRESH] Refresh request received, session: ${sessionId}, userId: ${userId || 'none'}, username: ${username || 'none'}`);
     
     // If the user is already authenticated, just return the current user
     if (req.isAuthenticated() && req.user) {
@@ -153,11 +154,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
     
-    // If a user ID was provided and the user is not authenticated, attempt recovery
-    if (userId) {
+    // If a user ID or username was provided and the user is not authenticated, attempt recovery
+    if (userId || username) {
       try {
-        // Get the user from storage
-        const user = await storage.getUser(userId);
+        // Get the user from storage - by ID or username
+        let user;
+        if (userId) {
+          user = await storage.getUser(userId);
+        } else if (username) {
+          user = await storage.getUserByUsername(username);
+        }
         
         if (!user) {
           return res.status(404).json({ 
@@ -166,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        console.log(`[SESSION-REFRESH] Found user ${user.username} (ID: ${userId}), attempting login`);
+        console.log(`[SESSION-REFRESH] Found user ${user.username} (ID: ${user.id}), attempting login`);
         
         // Log the user in
         req.login(user, (loginErr) => {

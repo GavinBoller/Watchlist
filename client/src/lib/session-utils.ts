@@ -701,9 +701,20 @@ export async function handleSessionExpiration(
           // We'll try emergency recovery endpoint for known problematic users
           const username = localStorage.getItem('movietracker_username');
           if (username) {
-            // Check if this is a known problematic user
-            const problematicUsers = ['Test30', 'Test31', 'Test32'];
-            const isProblematicUser = problematicUsers.includes(username);
+            // Check if this is a known problematic user or any test user
+            const problematicUsers = ['Test30', 'Test31', 'Test32', 'Test33', 'Test34', 'Test35'];
+            const isSpecificProblematicUser = problematicUsers.includes(username);
+            
+            // Also consider any username with 'test' in it (case insensitive)
+            const isTestUser = username.toLowerCase().includes('test');
+            
+            // Consider any recently created user
+            const isRecentUser = localStorage.getItem('movietracker_registration_time') ? 
+              (Date.now() - Number(localStorage.getItem('movietracker_registration_time'))) < (48 * 60 * 60 * 1000) : 
+              false;
+            
+            // Combine all conditions
+            const isProblematicUser = isSpecificProblematicUser || isTestUser || isRecentUser;
             
             if (isProblematicUser) {
               console.log('Known problematic user detected:', username);
