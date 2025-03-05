@@ -142,11 +142,34 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
   console.log(`[AUTH] Checking authentication for ${req.method} ${req.path}`);
   console.log(`[AUTH] Session ID: ${req.sessionID}, Authenticated: ${req.isAuthenticated()}`);
   
-  // Verify authentication and session integrity
-  if (req.isAuthenticated() && req.user) {
+  // Enhanced check using multiple authentication mechanisms
+  const isPassportAuthenticated = req.isAuthenticated();
+  const isSessionAuthenticated = req.session && req.session.authenticated === true;
+  const hasUserObject = !!req.user;
+  
+  console.log(`[AUTH] Authentication sources - Passport: ${isPassportAuthenticated}, Session flag: ${isSessionAuthenticated}, User object: ${hasUserObject}`);
+  
+  // Accept any valid authentication source - more resilient approach
+  if ((isPassportAuthenticated || isSessionAuthenticated) && hasUserObject) {
     // Log detailed information for successful authentication
     const user = req.user as UserResponse;
     console.log(`[AUTH] Access granted for user: ${user.username} (ID: ${user.id})`);
+    
+    // If session flag isn't set but passport is authenticated, ensure it's set for future requests
+    if (!isSessionAuthenticated && req.session) {
+      console.log('[AUTH] Setting session.authenticated flag to match passport authentication');
+      req.session.authenticated = true;
+      req.session.lastChecked = Date.now();
+      
+      // Don't await the save - let it happen in the background
+      req.session.save(err => {
+        if (err) {
+          console.error('[AUTH] Error saving session after authentication update:', err);
+        } else {
+          console.log('[AUTH] Session authenticated flag saved successfully');
+        }
+      });
+    }
     
     // Additional validation: verify the session contains the expected user data
     if (!user.id) {
@@ -287,14 +310,36 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     
-    // Double-check authentication (defensive programming)
-    if (!req.isAuthenticated()) {
+    // Double-check authentication with enhanced verification (defensive programming)
+    // Enhanced check using multiple authentication mechanisms
+    const isPassportAuthenticated = req.isAuthenticated();
+    const isSessionAuthenticated = req.session && req.session.authenticated === true;
+    const hasUserObject = !!req.user;
+    
+    console.log(`[AUTH] Watchlist authentication sources - Passport: ${isPassportAuthenticated}, Session flag: ${isSessionAuthenticated}, User object: ${hasUserObject}`);
+    
+    // If user is not authenticated by any method, deny access
+    if (!(isPassportAuthenticated || isSessionAuthenticated) || !hasUserObject) {
       console.log('[AUTH] Watchlist access denied: Session not authenticated');
       
       return res.status(401).json({ 
         message: isProd ? 'Session expired' : 'Authentication error: Session expired, please login again',
         code: 'SESSION_EXPIRED',
         time: new Date().toISOString()
+      });
+    }
+    
+    // Ensure session authenticated flag is set for future requests if user is authenticated but flag isn't set
+    if (isPassportAuthenticated && !isSessionAuthenticated && req.session) {
+      console.log('[AUTH] Setting session.authenticated flag to match passport authentication in watchlist access');
+      req.session.authenticated = true;
+      req.session.lastChecked = Date.now();
+      
+      // Don't await the save - let it happen in the background
+      req.session.save(err => {
+        if (err) {
+          console.error('[AUTH] Error saving session after watchlist authentication update:', err);
+        }
       });
     }
     
