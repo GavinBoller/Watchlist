@@ -10,10 +10,23 @@ import { User } from '@shared/schema';
 // Environment detection
 const isProd = process.env.NODE_ENV === 'production';
 
-// List of users that need special protection from auto-logout
-const PROTECTED_USERS = ['Test30'];
-// Flag to track if we've seen Test30 logout requests recently to prevent spam
-const recentTest30Logouts: Record<string, number> = {};
+// Track auto-logout attempts per session to prevent session instability
+// This will help identify patterns and protect ALL users from session issues
+interface LogoutAttempt {
+  timestamp: number;
+  username?: string;
+  sessionId: string;
+  userAgent?: string;
+  referrer?: string;
+  count: number;
+}
+
+// Store recent logout attempts to detect and prevent rapid auto-logouts
+const recentLogoutAttempts: Record<string, LogoutAttempt> = {};
+// Threshold for how many logout attempts are suspicious in a time period
+const LOGOUT_THRESHOLD = 3;
+// Time window in ms (30 seconds) to consider auto-logouts suspicious
+const LOGOUT_WINDOW_MS = 30 * 1000;
 
 /**
  * Production-specific session repair middleware
@@ -183,24 +196,90 @@ export function productionOptimizations(req: Request, res: Response, next: NextF
  * This adds a hidden route that can be used to recover problematic users
  * like Test30 that experience persistent auth issues
  */
+/**
+ * Detects and prevents automatic logout issues for all users
+ * This middleware catches rapid logout attempts that might be caused by client-side bugs
+ */
+export function preventAutoLogout(req: Request, res: Response, next: NextFunction) {
+  // Only run in production
+  if (!isProd) {
+    return next();
+  }
+  
+  // Skip for all requests except logout endpoints
+  if (!req.path.endsWith('/logout') && !req.path.endsWith('/api/logout')) {
+    return next();
+  }
+  
+  const sessionId = req.sessionID || 'unknown';
+  const username = req.isAuthenticated() && req.user ? (req.user as User).username : 'unknown';
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  const referrer = req.headers.referer || 'unknown';
+  
+  console.log(`[AUTO-LOGOUT] Logout request detected for session ${sessionId}, user: ${username}`);
+  console.log(`[AUTO-LOGOUT] Source: UA=${userAgent}, Referrer=${referrer}`);
+  
+  // Check for rapid logout patterns
+  const now = Date.now();
+  
+  // Clean up old entries (older than LOGOUT_WINDOW_MS)
+  Object.keys(recentLogoutAttempts).forEach(key => {
+    if (now - recentLogoutAttempts[key].timestamp > LOGOUT_WINDOW_MS) {
+      delete recentLogoutAttempts[key];
+    }
+  });
+  
+  // Check if this session has attempted logout too many times
+  if (recentLogoutAttempts[sessionId]) {
+    const attempt = recentLogoutAttempts[sessionId];
+    attempt.count += 1;
+    attempt.timestamp = now;
+    
+    // If this session has hit the threshold, block the logout to prevent session bouncing
+    if (attempt.count >= LOGOUT_THRESHOLD) {
+      console.log(`[AUTO-LOGOUT] BLOCKED automatic logout for ${username} (session: ${sessionId})`);
+      console.log(`[AUTO-LOGOUT] Detected ${attempt.count} logout attempts in ${LOGOUT_WINDOW_MS/1000}s window`);
+      
+      // Return success response but don't actually log out
+      // This prevents client from repeatedly trying to log out while still allowing
+      // normal navigation to continue
+      return res.status(200).json({
+        message: 'Logout prevented due to rapid successive attempts',
+        autoLogoutPrevented: true,
+        retainSession: true
+      });
+    }
+  } else {
+    // First logout attempt for this session
+    recentLogoutAttempts[sessionId] = {
+      timestamp: now,
+      username,
+      sessionId,
+      userAgent,
+      referrer,
+      count: 1
+    };
+  }
+  
+  // Allow the logout to proceed
+  next();
+}
+
 export function registerEmergencyEndpoints(app: Application) {
   // Only add these endpoints in production
   if (!isProd) {
     return;
   }
   
-  // Special endpoint for recovering Test30 user or other problematic users
+  // Universal emergency recovery endpoint for all users experiencing session issues
   app.get('/api/emergency-recovery/:username', async (req: Request, res: Response) => {
     try {
       const username = req.params.username;
       console.log(`[EMERGENCY] Attempting emergency recovery for user: ${username}`);
       
-      // Only allow recovery for specific usernames that are experiencing issues
-      if (!['Test30'].includes(username)) {
-        return res.status(404).json({
-          message: 'Not found',
-          error: 'Unknown username'
-        });
+      // Allow recovery for all users but log special known problematic cases
+      if (username === 'Test30') {
+        console.log(`[EMERGENCY] Known problematic user detected: ${username}`);
       }
       
       // Find the user

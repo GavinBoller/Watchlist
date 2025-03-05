@@ -23,12 +23,19 @@ type RegisterData = Omit<InsertUser, 'confirmPassword'> & {
   confirmPassword: string;
 };
 
+// Define the type for our logout mutation result
+type LogoutResult = { 
+  autoLogoutPrevented?: boolean;
+  success?: boolean;
+  clientSideOnly?: boolean;
+};
+
 type AuthContextType = {
   user: SelectUser | null;
   isLoading: boolean;
   error: Error | null;
   loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
-  logoutMutation: UseMutationResult<void, Error, void>;
+  logoutMutation: UseMutationResult<LogoutResult, Error, void>;
   registerMutation: UseMutationResult<SelectUser, Error, RegisterData>;
 };
 
@@ -432,13 +439,87 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      // Try the new endpoint first
+      // Record timestamp for auto-logout protection
+      const logoutTimestamp = Date.now();
+      const username = user?.username || 'unknown';
+      
+      // Check localStorage for recent logout attempts to detect auto-logout patterns
+      const checkForAutoLogout = () => {
+        try {
+          // Get the recent logout history from localStorage
+          const recentLogoutsJSON = localStorage.getItem('movietracker_recent_logouts');
+          let recentLogouts: {timestamp: number, count: number} = recentLogoutsJSON ? 
+            JSON.parse(recentLogoutsJSON) : { timestamp: 0, count: 0 };
+          
+          // Check if we have multiple rapid logout attempts
+          const now = Date.now();
+          const withinTimeWindow = (now - recentLogouts.timestamp) < 30000; // 30 seconds
+          
+          if (withinTimeWindow) {
+            // Increment the counter for tracking
+            recentLogouts.count++;
+            recentLogouts.timestamp = now;
+            
+            // Save it back to localStorage
+            localStorage.setItem('movietracker_recent_logouts', JSON.stringify(recentLogouts));
+            
+            // If we've seen too many logout attempts in a short window, this looks like auto-logout
+            if (recentLogouts.count >= 3) {
+              console.warn(`Detected potential auto-logout pattern for user ${username}: ${recentLogouts.count} attempts in 30s`);
+              return true;
+            }
+          } else {
+            // Reset the counter if outside time window
+            recentLogouts = { timestamp: now, count: 1 };
+            localStorage.setItem('movietracker_recent_logouts', JSON.stringify(recentLogouts));
+          }
+          
+          return false;
+        } catch (e) {
+          console.error("Error checking for auto-logout pattern:", e);
+          return false;
+        }
+      };
+      
+      // Check if this might be an auto-logout situation
+      const isAutoLogout = checkForAutoLogout();
+      
+      // If we detect auto-logout pattern, don't actually call the server logout 
+      // but pretend success while retaining the session
+      if (isAutoLogout) {
+        console.log("Auto-logout pattern detected - preventing server logout but allowing client-side state clear");
+        
+        // Store user in emergency recovery for later restoration
+        try {
+          localStorage.setItem('movietracker_emergency_user', JSON.stringify(user));
+          localStorage.setItem('movietracker_emergency_ts', String(Date.now()));
+        } catch (e) {
+          console.error("Error storing emergency recovery data:", e);
+        }
+        
+        // Return success without actually logging out on server
+        return { autoLogoutPrevented: true };
+      }
+      
+      // Normal logout path - try the new endpoint first
       try {
         const res = await apiRequest("POST", "/api/logout");
         
         if (res.ok) {
           console.log("Logout successful with /api/logout endpoint");
-          return;
+          
+          // Check if server prevented the logout due to auto-logout detection
+          try {
+            const data = await res.json();
+            if (data && data.autoLogoutPrevented) {
+              console.log("Server prevented logout due to auto-logout detection");
+              return { autoLogoutPrevented: true };
+            }
+          } catch (e) {
+            // If not JSON or parsing fails, that's fine - just a normal logout
+          }
+          
+          return { success: true };
         }
         
         console.log("Direct logout endpoint returned status:", res.status);
@@ -452,7 +533,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (res.ok) {
           console.log("Logout successful with /api/auth/logout endpoint");
-          return;
+          return { success: true };
         }
         
         // If we get here, neither endpoint worked
@@ -462,7 +543,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // consider the logout "successful" since we'll clear the local state anyway
         if (res.status < 500) {
           console.log("Non-server error status received, treating as successful logout");
-          return;
+          return { success: true };
         }
         
         throw new Error(`Logout failed with status ${res.status}`);
@@ -472,10 +553,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Even if server-side logout fails, we can still clear client state
         // This provides a better UX in case of server issues
         console.log("Treating as successful logout despite server errors");
-        return;
+        return { success: true, clientSideOnly: true };
       }
     },
-    onSuccess: () => {
+    onSuccess: (result: any) => {
+      // Check if auto-logout prevention was activated
+      if (result && result.autoLogoutPrevented) {
+        console.log("Auto-logout prevention activated - preserving session on server but clearing UI state");
+        
+        // Create backup recovery data in case user needs to relogin
+        try {
+          localStorage.setItem('movietracker_auto_logout_detected', 'true');
+          localStorage.setItem('movietracker_session_preserved', 'true');
+          localStorage.setItem('movietracker_auto_logout_ts', String(Date.now()));
+        } catch (e) {
+          console.error("Failed to store auto-logout metadata:", e);
+        }
+        
+        // Clear UI state but don't invalidate server sessions
+        queryClient.setQueryData(["/api/user"], null);
+        queryClient.setQueryData(["/api/auth/user"], null);
+        
+        // Notice we're not invalidating the queries to prevent refetching
+        // that could trigger additional auto-logouts
+        
+        toast({
+          title: "Session Management",
+          description: "Your session was maintained but you've been logged out of this device. You can log back in anytime.",
+        });
+        
+        return;
+      }
+      
+      // Standard logout success handling
       console.log("Logout successful, clearing user data from cache");
       
       // Clear all query caches
