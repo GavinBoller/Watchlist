@@ -60,10 +60,51 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
         confirmPassword
       },
       {
-        onSuccess: (user) => {
+        onSuccess: async (user) => {
+          console.log("Registration form received success response");
+          
+          // Signal success to parent component
           onRegisterSuccess(user);
-          // Redirect to home page after successful registration
-          setLocation("/");
+          
+          // Critical fix: Wait for session to be established properly
+          // This delay allows the server to complete its session setup
+          await new Promise(resolve => setTimeout(resolve, 800));
+          
+          // Check if authentication succeeded before redirecting
+          try {
+            const sessionResponse = await fetch("/api/session", {
+              credentials: "include",
+              headers: { "Cache-Control": "no-cache" }
+            });
+            
+            if (sessionResponse.ok) {
+              const sessionData = await sessionResponse.json();
+              console.log("Pre-redirect session check:", sessionData);
+              
+              if (sessionData.authenticated) {
+                console.log("Session authenticated, redirecting to home page");
+                setLocation("/");
+              } else {
+                console.error("Session not authenticated after registration, manual login required");
+                toast({
+                  title: "Session error",
+                  description: "Your account was created but you need to login manually",
+                  variant: "destructive"
+                });
+              }
+            } else {
+              console.error("Failed to verify session before redirect");
+              toast({
+                title: "Session verification failed",
+                description: "Please try logging in manually",
+                variant: "destructive"
+              });
+            }
+          } catch (sessionError) {
+            console.error("Error checking session before redirect:", sessionError);
+            // Fall back to redirecting anyway
+            setLocation("/");
+          }
         },
         onError: (error: Error) => {
           // Error handling is already done in the mutation
