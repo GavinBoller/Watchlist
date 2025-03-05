@@ -477,10 +477,23 @@ async function startServer() {
     const isProd = process.env.NODE_ENV === 'production';
     console.log(`Configuring session for ${isProd ? 'production' : 'development'} environment`);
     
+    // Enhanced environment detection with more detailed logging
+    const environment = isProd ? 'PRODUCTION' : 'development';
+    
+    // Log key environment settings
+    console.log(`[ENV] Running server in ${environment} mode`);
+    console.log(`[ENV] NODE_ENV=${process.env.NODE_ENV || 'undefined'}`);
+    console.log(`[ENV] Database connection: ${process.env.DATABASE_URL ? 'configured' : 'not configured'}`);
+    console.log(`[ENV] Session secret length: ${SESSION_SECRET ? SESSION_SECRET.length : 'undefined'} characters`);
+    
     if (isProd) {
-      console.log('Using production-optimized session settings with secure cookies');
+      console.log('[ENV] Using production-optimized session settings with secure cookies');
+      console.log('[ENV] Session cookie name: watchlist.sid');
+      console.log('[ENV] Cookie security: secure=true, httpOnly=true, sameSite=lax');
     } else {
-      console.log('Using development-friendly session settings');
+      console.log('[ENV] Using development-friendly session settings');
+      console.log('[ENV] Session cookie name: watchlist.sid');
+      console.log('[ENV] Cookie security: secure=false, httpOnly=true, sameSite=lax');
     }
     
     app.use(session({

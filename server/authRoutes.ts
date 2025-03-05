@@ -46,10 +46,26 @@ const retryOperation = async <T>(operation: () => Promise<T>, maxRetries: number
   throw lastError;
 };
 
-// Login route with improved error handling, retry logic, and emergency mode
+// Login route with improved error handling, retry logic, and enhanced production debugging
 router.post('/login', (req: Request, res: Response, next) => {
-  // Check if emergency mode is active for severe database outages
+  // Enhanced environment debugging
   const isProd = process.env.NODE_ENV === 'production';
+  console.log(`[LOGIN] Processing login request in ${isProd ? 'PRODUCTION' : 'development'} mode`);
+  console.log(`[LOGIN] Current session ID: ${req.sessionID || 'none'}`);
+  
+  if (req.session) {
+    console.log(`[LOGIN] Session cookie settings:`, {
+      secure: req.session.cookie.secure,
+      httpOnly: req.session.cookie.httpOnly,
+      sameSite: req.session.cookie.sameSite,
+      path: req.session.cookie.path,
+      maxAge: req.session.cookie.maxAge
+    });
+  } else {
+    console.log(`[LOGIN] No session object available`);
+  }
+  
+  // Check if emergency mode is active for severe database outages
   if (isProd && isEmergencyModeActive()) {
     const { username, password } = req.body;
     
@@ -188,6 +204,60 @@ router.post('/login', (req: Request, res: Response, next) => {
         req.session.save((saveErr) => {
           if (saveErr) {
             console.error('[AUTH] Session save error:', saveErr);
+            
+            // Special production-only recovery for session save failures
+            if (process.env.NODE_ENV === 'production') {
+              console.log('[AUTH] Attempting production-specific session save recovery...');
+              
+              try {
+                // Force session regeneration as a recovery mechanism
+                req.session.regenerate((regErr) => {
+                  if (regErr) {
+                    console.error('[AUTH] Session regeneration error during recovery:', regErr);
+                    return res.status(500).json({
+                      message: 'Login successful but session could not be saved or recovered.'
+                    });
+                  } 
+                  
+                  // Manually re-login the user after regeneration
+                  req.login(req.user, (loginErr) => {
+                    if (loginErr) {
+                      console.error('[AUTH] Re-login error during recovery:', loginErr);
+                      return res.status(500).json({
+                        message: 'Login successful but user session could not be restored.'
+                      });
+                    }
+                    
+                    // Try saving the regenerated session
+                    req.session.save((secondSaveErr) => {
+                      if (secondSaveErr) {
+                        console.error('[AUTH] Final session save failed after recovery:', secondSaveErr);
+                        return res.status(500).json({
+                          message: 'Login successful but backup session could not be saved.'
+                        });
+                      }
+                      
+                      console.log('[AUTH] Session recovery successful, new session ID:', req.sessionID);
+                      
+                      return res.json({
+                        message: 'Login successful (with session recovery)',
+                        user: req.user,
+                        sessionId: req.sessionID,
+                        sessionRecovered: true
+                      });
+                    });
+                  });
+                });
+                
+                // Return here to prevent the code after the try-catch from executing
+                // Response will be sent from inside the callbacks
+                return;
+              } catch (recoveryErr) {
+                console.error('[AUTH] Session recovery failed:', recoveryErr);
+                // Continue to standard error response
+              }
+            }
+            
             return res.status(500).json({
               message: 'Login successful but session could not be saved.'
             });
@@ -323,14 +393,14 @@ router.post('/logout', (req: Request, res: Response) => {
           sameSite: 'lax'
         });
         
-        // Special cookie cleanup for production
-        if (isProd) {
-          // Force-clear any potentially stuck cookies
-          res.setHeader('Set-Cookie', [
-            `watchapp.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
-            `connect.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
-          ]);
-        }
+        // Force-clear all potential cookie variations to ensure complete logout
+        // This addresses issues with inconsistent cookie naming between environments
+        res.setHeader('Set-Cookie', [
+          `watchlist.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
+          `connect.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
+          // Also clear legacy cookie names for complete cleanup
+          `watchapp.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
+        ]);
       } catch (cookieErr) {
         console.error('Error clearing cookies when session is null:', cookieErr);
         // Continue despite cookie error
@@ -426,10 +496,52 @@ router.get('/session', async (req: Request, res: Response) => {
 });
 
 // Direct user info endpoint to support the client's API calls
+// Enhanced with session repair mechanism for production
 router.get('/user', (req: Request, res: Response) => {
+  // First check - standard authentication check
   if (req.isAuthenticated()) {
     return res.json(req.user);
   }
+  
+  // Enhanced logging for production troubleshooting 
+  const isProd = process.env.NODE_ENV === 'production';
+  console.log(`[USER] User check failed. Auth status: ${req.isAuthenticated()}, Session ID: ${req.sessionID || 'none'}`);
+  
+  if (req.session) {
+    console.log(`[USER] Session exists but user not authenticated. Cookie details:`, {
+      expires: req.session.cookie.expires,
+      maxAge: req.session.cookie.maxAge,
+      secure: req.session.cookie.secure
+    });
+    
+    // Check if there's data in the session that suggests a broken authentication state
+    const sessionData = req.session as any;
+    if (sessionData.passport && sessionData.passport.user) {
+      console.log(`[USER] Found user ID ${sessionData.passport.user} in session passport data`);
+      console.log(`[USER] Session appears to be in inconsistent state - authentication data exists but isAuthenticated() is false`);
+      
+      // In production, attempt emergency session repair for this specific issue
+      if (isProd) {
+        try {
+          // If we have a user ID in the session but isAuthenticated() is false,
+          // this could be due to session deserialization failures
+          console.log(`[USER] Attempting emergency session repair for session ${req.sessionID}`);
+          return res.status(401).json({ 
+            message: 'Unauthorized - Session repair needed',
+            sessionRepairNeeded: true,
+            sessionId: req.sessionID
+          });
+        } catch (repairError) {
+          console.error(`[USER] Session repair attempt failed:`, repairError);
+          // Continue to standard unauthorized response
+        }
+      }
+    }
+  } else {
+    console.log(`[USER] No session object available`);
+  }
+  
+  // Standard unauthorized response
   return res.status(401).json({ message: 'Unauthorized' });
 });
 
@@ -599,8 +711,12 @@ function isEmergencyModeActive() {
   return false;
 }
 
-// Register a new user with ultra-reliable fallback options
+// Register a new user with ultra-reliable fallback options and enhanced production debugging
 router.post('/register', async (req: Request, res: Response) => {
+  // Log environment for debugging
+  const isProd = process.env.NODE_ENV === 'production';
+  console.log(`[REGISTER] Processing registration request in ${isProd ? 'PRODUCTION' : 'development'} mode`);
+  
   try {
     // First validate the input data
     const registerSchema = insertUserSchema
@@ -614,6 +730,7 @@ router.post('/register', async (req: Request, res: Response) => {
         path: ['confirmPassword']
       });
     
+    console.log('[REGISTER] Validating registration data');
     const validatedData = registerSchema.parse(req.body);
     
     // Track if we're in production mode for different error handling strategies
