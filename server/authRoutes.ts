@@ -6,14 +6,6 @@ import { insertUserSchema, UserResponse } from '@shared/schema';
 import { z } from 'zod';
 import 'express-session';
 
-// Extend the Express Session interface to include our custom properties
-declare module 'express-session' {
-  interface SessionData {
-    createdAt?: number;
-    authenticated?: boolean;
-  }
-}
-
 // Password reset schemas
 const resetPasswordRequestSchema = z.object({
   username: z.string().min(1, "Username is required")

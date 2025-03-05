@@ -14,6 +14,15 @@ import { exec } from "child_process";
 import util from "util";
 import fs from "fs";
 
+// Extend the Express Session interface to include our custom properties
+// This ensures TypeScript recognizes our custom session data
+declare module 'express-session' {
+  interface SessionData {
+    createdAt?: number;
+    authenticated?: boolean;
+  }
+}
+
 // Load environment variables from .env file
 config();
 
