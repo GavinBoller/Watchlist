@@ -40,8 +40,11 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Configure session with proper SESSION_SECRET
+// Configure session storage based on environment
+const isProd = process.env.NODE_ENV === 'production';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'watchlist-app-secret';
+
+// Initialize session early in the middleware chain (required by passport)
 app.use(session({
   secret: SESSION_SECRET,
   resave: false,
@@ -57,10 +60,6 @@ configurePassport();
 app.use(productionLogging);         // Enhanced logging for production
 app.use(productionSessionRepair);   // Session repair mechanisms
 app.use(productionOptimizations);   // Performance optimizations
-
-// Configure session storage based on environment
-const isProd = process.env.NODE_ENV === 'production';
-const SESSION_SECRET = process.env.SESSION_SECRET || 'watchlist-app-secret';
 
 // Setup session store with fallback
 let sessionStore: any; // Using any type here since we'll be assigning different types of stores
