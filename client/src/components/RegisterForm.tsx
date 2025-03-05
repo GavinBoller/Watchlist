@@ -18,7 +18,7 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const { registerMutation } = useAuth();
+  const { registerMutation, loginMutation } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -51,6 +51,9 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
       });
       return;
     }
+    
+    // Store the original password locally for auto-login later
+    const originalPassword = password;
     
     registerMutation.mutate(
       {
@@ -85,12 +88,42 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
                 console.log("Session authenticated, redirecting to home page");
                 setLocation("/");
               } else {
-                console.error("Session not authenticated after registration, manual login required");
-                toast({
-                  title: "Session error",
-                  description: "Your account was created but you need to login manually",
-                  variant: "destructive"
-                });
+                console.log("Session not authenticated after registration, attempting auto-login");
+                
+                // Attempt auto-login using the credentials from the registration
+                try {
+                  console.log("Attempting auto-login after registration");
+                  
+                  // Use the loginMutation from the useAuth hook
+                  loginMutation.mutate(
+                    {
+                      username: username,
+                      password: originalPassword
+                    },
+                    {
+                      onSuccess: (userData) => {
+                        console.log("Auto-login successful after registration");
+                        // After successful auto-login, redirect to home
+                        setLocation("/");
+                      },
+                      onError: (error) => {
+                        console.error("Auto-login failed after registration:", error);
+                        toast({
+                          title: "Login required",
+                          description: "Your account was created but you need to login manually",
+                          variant: "destructive"
+                        });
+                      }
+                    }
+                  );
+                } catch (loginError) {
+                  console.error("Error during auto-login:", loginError);
+                  toast({
+                    title: "Login error",
+                    description: "Please try logging in manually",
+                    variant: "destructive"
+                  });
+                }
               }
             } else {
               console.error("Failed to verify session before redirect");
