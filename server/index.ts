@@ -134,15 +134,45 @@ async function pushDatabaseSchema() {
   
   try {
     console.log('Attempting to push database schema changes...');
+    
+    // Check if drizzle.config.ts exists
+    const configPath = path.resolve(process.cwd(), 'drizzle.config.ts');
+    console.log(`Looking for drizzle config at: ${configPath}`);
+    
+    if (!fs.existsSync(configPath)) {
+      console.log('drizzle.config.ts not found, skipping schema push');
+      return false;
+    }
+    
+    // Verify theme.json exists before proceeding (to prevent Vite errors)
+    const themePath = path.resolve(process.cwd(), 'theme.json');
+    if (!fs.existsSync(themePath)) {
+      console.log('theme.json not found, creating minimal version');
+      fs.writeFileSync(themePath, JSON.stringify({
+        variant: "professional",
+        primary: "hsl(358, 92%, 49%)",
+        appearance: "dark",
+        radius: 0.5
+      }, null, 2));
+    }
+    
     const execPromise = util.promisify(exec);
     
-    // Use the drizzle-kit CLI to push schema changes
-    await execPromise('npx drizzle-kit push');
+    // Use the drizzle-kit CLI to push schema changes, with a timeout to prevent hanging
+    const { stdout, stderr } = await execPromise('npx drizzle-kit push', { timeout: 10000 });
+    console.log('Schema push output:', stdout);
+    if (stderr) console.error('Schema push stderr:', stderr);
     console.log('Successfully pushed database schema changes!');
     return true;
   } catch (error) {
     console.error('Error pushing database schema:', error);
     console.log('Continuing application startup despite schema push failure.');
+    // Add detailed error logging
+    if (error instanceof Error) {
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
     return false;
   }
 }

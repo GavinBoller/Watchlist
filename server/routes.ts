@@ -204,23 +204,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/watchlist", async (req: Request, res: Response) => {
+    console.log("POST /api/watchlist - Request body:", JSON.stringify(req.body, null, 2));
+    
     try {
       const { userId, tmdbMovie, watchedDate, notes, status } = req.body;
       
       if (!userId || !tmdbMovie) {
+        console.log("Missing required fields - userId:", userId, "tmdbMovie:", tmdbMovie ? "present" : "missing");
         return res.status(400).json({ message: "User ID and movie data are required" });
       }
       
       // Check if user exists
+      console.log("Checking if user exists - userId:", userId);
       const user = await storage.getUser(userId);
       if (!user) {
+        console.log("User not found - userId:", userId);
         return res.status(404).json({ message: "User not found" });
       }
+      console.log("User found:", user.username);
       
       // Check if movie already exists in our database, if not create it
+      console.log("Checking if movie exists in database - tmdbId:", tmdbMovie.id);
       let movie = await storage.getMovieByTmdbId(tmdbMovie.id);
       
       if (!movie) {
+        console.log("Movie not found in database, creating new record");
         // Convert genre IDs to genre names
         const genreNames = await convertGenreIdsToNames(tmdbMovie.genre_ids, tmdbMovie.media_type || "movie");
         const genres = genreNames.join(",");
@@ -241,13 +249,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           mediaType,
         });
         
+        console.log("Creating movie with data:", JSON.stringify(movieData, null, 2));
         movie = await storage.createMovie(movieData);
+        console.log("Movie created successfully:", movie.id);
+      } else {
+        console.log("Movie found in database:", movie.id, movie.title);
       }
       
       // Check if this movie is already in the user's watchlist
+      console.log("Checking if movie is already in user's watchlist - userId:", userId, "movieId:", movie.id);
       const alreadyInWatchlist = await storage.hasWatchlistEntry(userId, movie.id);
       if (alreadyInWatchlist) {
         const movieTitle = movie.title || "this title";
+        console.log("Movie already in watchlist:", movieTitle);
         return res.status(409).json({ 
           message: "Already in watchlist", 
           details: `You've already added "${movieTitle}" to your watchlist` 
@@ -259,6 +273,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? status 
         : 'watched'; // Default to 'watched' if not specified or invalid
       
+      console.log("Creating watchlist entry with status:", validStatus);
+      
       // Create watchlist entry
       const entryData = insertWatchlistEntrySchema.parse({
         userId,
@@ -268,7 +284,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: validStatus,
       });
       
+      console.log("Watchlist entry data:", JSON.stringify(entryData, null, 2));
       const watchlistEntry = await storage.createWatchlistEntry(entryData);
+      console.log("Watchlist entry created successfully:", watchlistEntry.id);
       
       // Return the entry with movie details
       const entryWithMovie = {
@@ -277,12 +295,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       res.status(201).json(entryWithMovie);
+      console.log("Watchlist entry response sent with status 201");
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("Validation error creating watchlist entry:", JSON.stringify(error.errors, null, 2));
         res.status(400).json({ message: "Invalid watchlist entry data", errors: error.errors });
       } else {
         console.error("Error creating watchlist entry:", error);
-        res.status(500).json({ message: "Failed to add movie to watchlist" });
+        // Get detailed error message
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorStack = error instanceof Error ? error.stack : 'No stack trace';
+        console.error("Error details:", errorMessage);
+        console.error("Error stack:", errorStack);
+        res.status(500).json({ message: "Failed to add movie to watchlist", error: errorMessage });
       }
     }
   });

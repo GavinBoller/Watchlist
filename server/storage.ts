@@ -1152,15 +1152,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createWatchlistEntry(insertEntry: InsertWatchlistEntry): Promise<WatchlistEntry> {
+    console.log(`[DB] Creating watchlist entry for user ${insertEntry.userId} and movie ${insertEntry.movieId}`);
+    
     try {
       // First check if entry already exists
+      console.log(`[DB] Checking if entry already exists`);
       const exists = await this.hasWatchlistEntry(
         insertEntry.userId, 
         insertEntry.movieId
       );
       
       if (exists) {
-        console.log(`Watchlist entry already exists for user ${insertEntry.userId} and movie ${insertEntry.movieId}`);
+        console.log(`[DB] Watchlist entry already exists for user ${insertEntry.userId} and movie ${insertEntry.movieId}`);
         // Get the existing entry
         const entries = await db
           .select()
@@ -1173,24 +1176,34 @@ export class DatabaseStorage implements IStorage {
           );
         
         if (entries.length > 0) {
+          console.log(`[DB] Returning existing entry:`, JSON.stringify(entries[0]));
           return entries[0];
         }
       }
       
       // Create new entry using ORM
+      console.log(`[DB] Creating new watchlist entry using ORM:`, JSON.stringify(insertEntry));
       const [entry] = await db
         .insert(watchlistEntries)
         .values(insertEntry)
         .returning();
       
+      console.log(`[DB] Successfully created watchlist entry with ID ${entry.id}`);
       return entry;
     } catch (error) {
-      console.error("Database error in createWatchlistEntry using ORM:", error);
+      console.error(`[DB] Database error in createWatchlistEntry using ORM:`, error);
       
       // Check for common error types
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : 'No stack trace';
+      console.error(`[DB] Error details:`, errorMessage);
+      console.error(`[DB] Error stack:`, errorStack);
+      
+      // Log environment info for debugging production vs development differences
+      console.log(`[DB] Environment: ${process.env.NODE_ENV || 'development'}`);
       
       if (errorMessage.includes('duplicate key') || errorMessage.includes('unique constraint')) {
+        console.log(`[DB] Detected duplicate key error, trying to fetch existing entry`);
         // Try to fetch existing entry instead of failing
         try {
           const entries = await db
@@ -1204,18 +1217,19 @@ export class DatabaseStorage implements IStorage {
             );
           
           if (entries.length > 0) {
-            console.log(`Watchlist entry already exists, returning existing record`);
+            console.log(`[DB] Found existing entry, returning`, JSON.stringify(entries[0]));
             return entries[0];
           }
         } catch (fetchError) {
-          console.error("Error fetching existing watchlist entry:", fetchError);
+          console.error(`[DB] Error fetching existing watchlist entry:`, fetchError);
         }
       }
       
       // Try direct SQL as fallback for connection issues
       if (this.shouldUseDirectSqlFallback(error)) {
+        console.log(`[DB] Attempting direct SQL fallback due to connection issues`);
         try {
-          console.log("Attempting direct SQL fallback for createWatchlistEntry");
+          console.log(`[DB] Checking if entry already exists via direct SQL`);
           
           // Check if entry already exists
           const existingRows = await executeDirectSql<WatchlistEntry>(
@@ -1225,13 +1239,18 @@ export class DatabaseStorage implements IStorage {
           );
           
           if (existingRows.length > 0) {
+            console.log(`[DB] Found existing entry via direct SQL, returning`, JSON.stringify(existingRows[0]));
             return existingRows[0];
           }
           
           // Direct SQL insertion with proper value escaping
+          console.log(`[DB] Inserting new entry via direct SQL`);
           const columns = Object.keys(insertEntry).map(key => `"${key}"`).join(', ');
           const placeholders = Object.keys(insertEntry).map((_, index) => `$${index + 1}`).join(', ');
           const values = Object.values(insertEntry);
+          
+          console.log(`[DB] SQL: INSERT INTO "watchlist_entries" (${columns}) VALUES (${placeholders}) RETURNING *`);
+          console.log(`[DB] Values:`, JSON.stringify(values));
           
           const rows = await executeDirectSql<WatchlistEntry>(
             `INSERT INTO "watchlist_entries" (${columns}) VALUES (${placeholders}) RETURNING *`,
@@ -1240,15 +1259,18 @@ export class DatabaseStorage implements IStorage {
           );
           
           if (rows.length === 0) {
+            console.error(`[DB] Direct SQL insert returned no data`);
             throw new Error('Watchlist entry creation did not return any data');
           }
           
+          console.log(`[DB] Successfully created entry via direct SQL:`, JSON.stringify(rows[0]));
           return rows[0];
         } catch (fallbackError) {
-          console.error("Direct SQL fallback also failed:", fallbackError);
+          console.error(`[DB] Direct SQL fallback also failed:`, fallbackError);
           
           // One last attempt to check if entry exists (might have been created in a race condition)
           try {
+            console.log(`[DB] Last chance check for existing entry`);
             const lastChanceCheck = await executeDirectSql<WatchlistEntry>(
               'SELECT * FROM "watchlist_entries" WHERE "userId" = $1 AND "movieId" = $2 LIMIT 1',
               [insertEntry.userId, insertEntry.movieId],
@@ -1256,16 +1278,20 @@ export class DatabaseStorage implements IStorage {
             );
             
             if (lastChanceCheck.length > 0) {
+              console.log(`[DB] Found existing entry in last chance check, returning`, JSON.stringify(lastChanceCheck[0]));
               return lastChanceCheck[0];
             }
           } catch (e) {
+            console.error(`[DB] Last chance check also failed:`, e);
             // Ignore this error and proceed with the original error
           }
           
+          console.error(`[DB] All fallback attempts failed, throwing error`);
           throw fallbackError;
         }
       }
       
+      console.error(`[DB] Final error in createWatchlistEntry:`, errorMessage);
       throw new Error(`Failed to create watchlist entry: ${errorMessage}`);
     }
   }
