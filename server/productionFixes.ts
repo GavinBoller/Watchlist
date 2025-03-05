@@ -6,6 +6,22 @@
 import express, { Request, Response, NextFunction, Application } from 'express';
 import { storage } from './storage';
 import { User } from '@shared/schema';
+import { Session } from 'express-session';
+
+// Extend express-session with our custom properties
+declare module 'express-session' {
+  interface SessionData {
+    authenticated?: boolean;
+    createdAt?: number;
+    lastChecked?: number;
+    repaired?: boolean;
+    autoLogoutPrevented?: boolean;
+    enhancedProtection?: boolean;
+    preservedUserId?: number;
+    preservedUsername?: string;
+    preservedTimestamp?: number;
+  }
+}
 
 // Environment detection
 const isProd = process.env.NODE_ENV === 'production';
