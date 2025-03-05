@@ -56,16 +56,43 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
       return;
     }
 
+    // Validate watchlist entry data before submission
+    if (status === 'watched' && !watchedDate) {
+      toast({
+        title: "Missing watched date",
+        description: "Please select a date when you watched this content",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     
+    // Prepare watchlist entry data with proper validation
+    const watchlistData = {
+      userId: currentUser.id,
+      tmdbMovie: {
+        ...item,
+        // Ensure required fields have valid values with fallbacks
+        id: item.id || 0,
+        title: getTitle(item) || "Unknown Title",
+        overview: item.overview || "",
+        poster_path: item.poster_path || "",
+        backdrop_path: item.backdrop_path || "",
+        vote_average: item.vote_average || 0,
+        genre_ids: item.genre_ids || [],
+        media_type: item.media_type || (item.first_air_date ? "tv" : "movie"),
+      },
+      watchedDate: status === 'watched' ? watchedDate || null : null,
+      notes: notes || null,
+      status: status,
+    };
+    
     try {
-      await apiRequest('POST', '/api/watchlist', {
-        userId: currentUser.id,
-        tmdbMovie: item,
-        watchedDate: status === 'watched' ? watchedDate || null : null,
-        notes: notes || null,
-        status: status,
-      });
+      console.log("Submitting watchlist data:", JSON.stringify(watchlistData, null, 2));
+      
+      const res = await apiRequest('POST', '/api/watchlist', watchlistData);
+      const data = await res.json().catch(() => null);
       
       const statusLabel = status === 'to_watch' 
         ? 'plan to watch list' 
@@ -73,12 +100,20 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
           ? 'currently watching list'
           : 'watched list';
       
-      toast({
-        title: `${mediaTypeLabel} added`,
-        description: `${title} has been added to your ${statusLabel}`,
-      });
+      if (data?.message === "Already in watchlist") {
+        toast({
+          title: "Already Added",
+          description: data?.details || `You've already added "${title}" to your list`,
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: `${mediaTypeLabel} added`,
+          description: `${title} has been added to your ${statusLabel}`,
+        });
+      }
       
-      // Invalidate the watchlist cache
+      // Invalidate the watchlist cache to refresh the UI
       queryClient.invalidateQueries({ queryKey: [`/api/watchlist/${currentUser.id}`] });
       
       // Close the modal and reset form
@@ -86,17 +121,37 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
     } catch (error: any) {
       console.error('Error adding to watchlist:', error);
       
-      // Check for 409 conflict (already in watchlist)
+      // Check for different error types and provide specific messages
       if (error.status === 409) {
         toast({
           title: "Already Added",
           description: error.data?.details || `You've already added "${title}" to your list`,
           variant: "default",
         });
+      } else if (error.status === 400) {
+        // Handle validation errors
+        let errorMsg = "There was a problem with the data submitted";
+        if (error.data?.errors) {
+          errorMsg = Object.values(error.data.errors)
+            .map((e: any) => e.message || e)
+            .join(", ");
+        }
+        
+        toast({
+          title: "Invalid data",
+          description: errorMsg,
+          variant: "destructive",
+        });
+      } else if (error.status === 401) {
+        toast({
+          title: "Authentication error",
+          description: "Please log in again to add items to your watchlist",
+          variant: "destructive",
+        });
       } else {
         toast({
           title: "Failed to add item",
-          description: "There was an error adding the item to your list",
+          description: error.message || "There was an error adding the item to your list",
           variant: "destructive",
         });
       }
