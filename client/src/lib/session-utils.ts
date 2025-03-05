@@ -19,17 +19,17 @@ export interface SessionCheckResult {
 export function detectAutoLogoutPattern(): boolean {
   try {
     // First, check if this is a known problematic user that needs special handling
-    const username = localStorage.getItem('movietracker_username');
-    if (username) {
+    const storedUsername = localStorage.getItem('movietracker_username');
+    if (storedUsername) {
       // Special problematic usernames that require enhanced protection
       const problematicUsers = ['Test30', 'Test31', 'Test32'];
-      if (problematicUsers.includes(username)) {
-        console.warn(`Detected problematic user ${username} - applying enhanced session protection`);
+      if (problematicUsers.includes(storedUsername)) {
+        console.warn(`Detected problematic user ${storedUsername} - applying enhanced session protection`);
         
         // Record this for analytics and debugging
         localStorage.setItem('movietracker_enhanced_protection', 'true');
         localStorage.setItem('movietracker_enhanced_protection_ts', String(Date.now()));
-        localStorage.setItem('movietracker_enhanced_user', username);
+        localStorage.setItem('movietracker_enhanced_user', storedUsername);
         
         // Always return true for problematic users to ensure maximum protection
         return true;
@@ -62,8 +62,23 @@ export function detectAutoLogoutPattern(): boolean {
     // Check if we have multiple rapid logout attempts
     const now = Date.now();
     
-    // More aggressive timeframe - consider logout attempts within 60 seconds
-    const withinTimeWindow = (now - recentLogouts.timestamp) < 60000; // 60 seconds
+    // More selective timeframe - consider only very rapid logout attempts (15 seconds)
+    const withinTimeWindow = (now - recentLogouts.timestamp) < 15000; // 15 seconds
+    
+    // Check if this is a test user (to avoid false positives for regular users)
+    const cachedUser = localStorage.getItem('movietracker_user');
+    let isTestUser = false;
+    let cachedUsername = '';
+    
+    if (cachedUser) {
+      try {
+        const userData = JSON.parse(cachedUser);
+        cachedUsername = userData?.username || '';
+        isTestUser = cachedUsername.toLowerCase().includes('test');
+      } catch (e) {
+        console.error('Error parsing cached user:', e);
+      }
+    }
     
     if (withinTimeWindow) {
       // Increment the counter for tracking
@@ -73,16 +88,24 @@ export function detectAutoLogoutPattern(): boolean {
       // Save it back to localStorage
       localStorage.setItem('movietracker_recent_logouts', JSON.stringify(recentLogouts));
       
-      // Lower threshold - if we've seen 2 or more logout attempts in a minute, this looks suspicious
-      if (recentLogouts.count >= 2) {
-        console.warn(`Detected potential auto-logout pattern: ${recentLogouts.count} attempts in 60s`);
+      // Different thresholds based on user type
+      // For test users: higher threshold (3+ rapid logouts)
+      // For regular users: only trigger on extremely rapid and frequent patterns (4+)
+      const threshold = isTestUser ? 3 : 4;
+      
+      if (recentLogouts.count >= threshold) {
+        console.warn(`Detected potential auto-logout pattern: ${recentLogouts.count} attempts in 15s for ${isTestUser ? 'test user' : 'regular user'}`);
         console.warn('Navigation patterns:', recentLogouts.patterns);
+        console.warn('Username:', cachedUsername);
         
         // Record the detection for diagnostics
         localStorage.setItem('movietracker_auto_logout_detected', 'true');
         localStorage.setItem('movietracker_auto_logout_ts', String(now));
         localStorage.setItem('movietracker_auto_logout_count', String(recentLogouts.count));
         localStorage.setItem('movietracker_auto_logout_patterns', JSON.stringify(recentLogouts.patterns));
+        if (cachedUsername) {
+          localStorage.setItem('movietracker_auto_logout_username', cachedUsername);
+        }
         
         return true;
       }
@@ -682,12 +705,22 @@ export async function handleSessionExpiration(
   if (detectAutoLogoutPattern()) {
     console.warn('Auto-logout pattern detected during session expiration handling');
     
-    // Show a friendly notification instead of redirecting
-    toast({
-      title: "Session issue detected",
-      description: "We noticed unusual session activity. Your session has been preserved.",
-      duration: 5000,
-    });
+    // Check if we've shown this message recently to avoid spamming
+    const lastToastTime = localStorage.getItem('movietracker_auth_toast_time');
+    const now = Date.now();
+    const showToast = !lastToastTime || (now - parseInt(lastToastTime)) > 30000; // Only show once per 30 seconds
+    
+    if (showToast) {
+      // Store the time we showed the toast
+      localStorage.setItem('movietracker_auth_toast_time', String(now));
+      
+      // Show a friendly notification instead of redirecting
+      toast({
+        title: "Session issue detected",
+        description: "We noticed unusual activity. Your session has been preserved.",
+        duration: 3000,
+      });
+    }
     
     // Try to force a session recovery for problematic patterns
     try {
