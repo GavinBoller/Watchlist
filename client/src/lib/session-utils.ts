@@ -63,6 +63,21 @@ export async function handleSessionExpiration(
 ): Promise<void> {
   console.log('Handling session expiration:', errorCode, errorMessage);
   
+  // Check if session is actually expired before taking any action
+  // This prevents false session expirations
+  const sessionData = await checkSessionStatus();
+  
+  // If session check shows user is still authenticated, it's a temporary issue
+  // Do NOT log the user out or show any error message
+  if (sessionData?.authenticated) {
+    console.log('User appears to be authenticated despite 401 error - IGNORING ERROR');
+    // Don't show any toasts or take any action - the session is still valid
+    return;
+  }
+  
+  // Only if we're sure the session is expired, show a message
+  console.log('Session is confirmed expired, showing error message and clearing data');
+  
   // Show a user-friendly message
   toast({
     title: "Session expired",
@@ -75,24 +90,7 @@ export async function handleSessionExpiration(
   queryClient.setQueryData(["/api/auth/user"], null);
   queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
   
-  // Check if session is actually expired
-  const sessionData = await checkSessionStatus();
-  
-  // We've disabled emergency mode due to problems it causes
-  // Just proceed with normal session handling
-  
-  // If session check shows user is still authenticated, it might be a temporary issue
-  if (sessionData?.authenticated) {
-    console.log('User appears to be authenticated despite 401 error');
-    toast({
-      title: "Session Issue",
-      description: "Please try again or refresh the page",
-      variant: "destructive",
-    });
-    return;
-  }
-  
-  // Otherwise, redirect to login page
+  // Redirect to login page
   console.log('Redirecting to auth page after session expiration');
   setTimeout(() => {
     window.location.href = '/auth';

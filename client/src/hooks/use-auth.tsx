@@ -38,53 +38,121 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ["/api/user"],
     queryFn: async () => {
       try {
-        // Try both endpoint formats to handle redeployment and backward compatibility
-        // First try the newer directly on /api endpoint
-        try {
-          const userRes = await fetch("/api/user", {
-            credentials: "include",
-          });
-          
-          if (userRes.ok) {
-            return await userRes.json();
+        // Enhanced session validation with three attempts and longer connection timeout
+        const maxAttempts = 3;
+        let lastError = null;
+        
+        for(let attempt = 0; attempt < maxAttempts; attempt++) {
+          try {
+            // Add delay between retries
+            if(attempt > 0) {
+              console.log(`Retry attempt ${attempt+1}/${maxAttempts} for auth check`);
+              await new Promise(r => setTimeout(r, 1000 * attempt));
+            }
+            
+            // Try both endpoint formats to handle redeployment and backward compatibility
+            // First try the newer directly on /api endpoint with improved timeout handling
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+              
+              const userRes = await fetch("/api/user", {
+                credentials: "include",
+                signal: controller.signal,
+                headers: {
+                  "Cache-Control": "no-cache, no-store, must-revalidate",
+                  "Pragma": "no-cache" 
+                }
+              });
+              
+              clearTimeout(timeoutId);
+              
+              if (userRes.ok) {
+                const userData = await userRes.json();
+                console.log("Auth check successful via /api/user", userData);
+                return userData;
+              }
+            } catch (directError) {
+              console.log("Direct user endpoint error, trying session endpoint");
+            }
+            
+            // If that fails, try the session endpoint with timeout handling
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+              
+              const sessionRes = await fetch("/api/session", {
+                credentials: "include",
+                signal: controller.signal,
+                headers: {
+                  "Cache-Control": "no-cache, no-store, must-revalidate",
+                  "Pragma": "no-cache" 
+                }
+              });
+              
+              clearTimeout(timeoutId);
+              
+              if (sessionRes.ok) {
+                const data = await sessionRes.json();
+                console.log("Auth check successful via /api/session", data);
+                if (data.authenticated && data.user) {
+                  return data.user;
+                }
+              }
+            } catch (sessionError) {
+              console.log("Session endpoint error, trying legacy user endpoint");
+            }
+            
+            // Fall back to the user endpoint with timeout handling
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+              
+              const userRes = await fetch("/api/auth/user", {
+                credentials: "include",
+                signal: controller.signal,
+                headers: {
+                  "Cache-Control": "no-cache, no-store, must-revalidate",
+                  "Pragma": "no-cache" 
+                }
+              });
+              
+              clearTimeout(timeoutId);
+              
+              if (userRes.ok) {
+                const userData = await userRes.json();
+                console.log("Auth check successful via /api/auth/user", userData);
+                if (userData && userData.id) {
+                  return userData;
+                }
+              }
+            } catch (legacyError) {
+              console.log("Legacy user endpoint error");
+            }
+            
+            // If all endpoints failed but didn't throw (returned unsuccessful response codes)
+            // We can consider the user not authenticated
+            console.log("All auth endpoints returned unsuccessful responses - user not authenticated");
+            return null;
+          } catch (attemptError) {
+            // Store the error and try again
+            lastError = attemptError;
+            console.error(`Auth check attempt ${attempt+1} failed:`, attemptError);
           }
-        } catch (directError) {
-          console.log("Direct user endpoint error, trying session endpoint");
         }
         
-        // If that fails, try the session endpoint
-        const sessionRes = await fetch("/api/session", {
-          credentials: "include",
-        });
-        
-        if (sessionRes.ok) {
-          const data = await sessionRes.json();
-          if (data.authenticated && data.user) {
-            return data.user;
-          }
-          return null;
-        }
-        
-        // Fall back to the user endpoint
-        const userRes = await fetch("/api/auth/user", {
-          credentials: "include",
-        });
-        
-        if (userRes.ok) {
-          const userData = await userRes.json();
-          if (userData && userData.id) {
-            return userData;
-          }
-        }
-        
+        // If we've tried all attempts and all failed with errors, return null
+        console.error(`All ${maxAttempts} auth check attempts failed. Last error:`, lastError);
         return null;
       } catch (error) {
         console.error("Failed to fetch user session:", error);
         return null;
       }
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    gcTime: 1000 * 60 * 10,   // 10 minutes
+    staleTime: 1000 * 60 * 10, // 10 minutes instead of 5
+    gcTime: 1000 * 60 * 15,    // 15 minutes instead of 10
+    refetchOnWindowFocus: false, // Don't refetch on window focus as it can cause excess 401 errors
+    retry: 2, // Additional retries at the React Query level
   });
 
   const loginMutation = useMutation({
