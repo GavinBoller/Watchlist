@@ -187,16 +187,32 @@ export async function apiRequest(
       )) {
         console.log('[API] Detected potential 401 error, checking session status first...');
         // Handle auth errors more gracefully - don't log out immediately
-        // Wait at least 3 seconds before considering it a real session error
-        setTimeout(() => {
+        // Wait at least 2 seconds before considering it a real session error
+        setTimeout(async () => {
           console.log('[API] Delayed session check after 401 error');
+          
+          // Check session status directly first to avoid unnecessary logout
+          const sessionData = await fetch('/api/session', {
+            credentials: 'include',
+            headers: {
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              "Pragma": "no-cache"
+            }
+          }).then(res => res.json()).catch(err => null);
+          
+          // If session appears valid, don't show error
+          if (sessionData?.authenticated) {
+            console.log('[API] Session appears valid after direct check - ignoring auth error');
+            return;
+          }
+          
           // Check if session is still valid after a delay
           handleSessionExpiration(
             (error as any)?.status || 'auth_error',
-            (error as any)?.data?.message || (error as Error).message,
+            "Please sign in to continue", // Simpler message
             1000 // shorter redirect delay since we already waited
           );
-        }, 3000);
+        }, 2000);
       }
       
       // Don't retry client errors (4xx) or aborted requests

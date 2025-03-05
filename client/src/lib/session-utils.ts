@@ -61,40 +61,66 @@ export async function handleSessionExpiration(
   errorMessage?: string,
   redirectDelay: number = 1500
 ): Promise<void> {
-  console.log('Handling session expiration:', errorCode, errorMessage);
+  console.log('Handling session expiration check:', errorCode, errorMessage);
   
-  // Check if session is actually expired before taking any action
-  // This prevents false session expirations
+  // Enhanced session verification with multiple checks to avoid false logouts
+  
+  // First check: try session endpoint
   const sessionData = await checkSessionStatus();
   
-  // If session check shows user is still authenticated, it's a temporary issue
-  // Do NOT log the user out or show any error message
+  // If session status shows authenticated, we don't need to do anything
   if (sessionData?.authenticated) {
-    console.log('User appears to be authenticated despite 401 error - IGNORING ERROR');
-    // Don't show any toasts or take any action - the session is still valid
+    console.log('User appears to be authenticated despite error - IGNORING');
     return;
   }
   
-  // Only if we're sure the session is expired, show a message
-  console.log('Session is confirmed expired, showing error message and clearing data');
+  // Second check: try direct API call to user endpoint for final confirmation
+  console.log('Session appears expired, doing final verification...');
+  try {
+    const directUserResponse = await fetch('/api/user', {
+      credentials: 'include',
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache"
+      }
+    });
+    
+    if (directUserResponse.ok) {
+      // User is actually authenticated!
+      console.log('User verified as authenticated in final check - IGNORING ERROR');
+      return;
+    }
+  } catch (e) {
+    // Failed to check - continue with session expiration
+    console.log('Final authentication check failed:', e);
+  }
   
-  // Show a user-friendly message
-  toast({
-    title: "Session expired",
-    description: "Please log in again to continue",
-    variant: "destructive",
-  });
+  // If we get here, we're reasonably confident the session is truly expired
+  console.log('Session is confirmed expired, clearing client state');
   
   // Clear all user data from the client
   queryClient.setQueryData(["/api/user"], null);
   queryClient.setQueryData(["/api/auth/user"], null);
   queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
   
-  // Redirect to login page
-  console.log('Redirecting to auth page after session expiration');
-  setTimeout(() => {
-    window.location.href = '/auth';
-  }, redirectDelay);
+  // Only show the toast if we're going to redirect
+  if (window.location.pathname !== '/auth') {
+    console.log('User not on auth page, showing notification');
+    // Show a gentle message
+    toast({
+      title: "Authentication needed",
+      description: errorMessage || "Please sign in to continue",
+      variant: "default",
+    });
+    
+    // Redirect to login page
+    console.log('Redirecting to auth page after session expiration');
+    setTimeout(() => {
+      window.location.href = '/auth';
+    }, redirectDelay);
+  } else {
+    console.log('User already on auth page, no redirect needed');
+  }
 }
 
 /**
