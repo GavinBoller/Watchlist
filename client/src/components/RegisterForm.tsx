@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { UserResponse } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
+import { queryClient } from "@/lib/queryClient";
 
 interface RegisterFormProps {
   onRegisterSuccess: (user: UserResponse) => void;
@@ -94,7 +95,23 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
                 try {
                   console.log("Attempting auto-login after registration");
                   
-                  // Use the loginMutation from the useAuth hook
+                  // IMPORTANT: Pre-populate the cache with user data to prevent the login screen flash
+                  // This creates the illusion of a seamless transition
+                  queryClient.setQueryData(["/api/user"], user);
+                  queryClient.setQueryData(["/api/auth/user"], user);
+                  
+                  // Store temporary registration data to help the protected route
+                  // This is used to prevent login page flash during the redirect
+                  window.__tempRegistrationData = {
+                    timestamp: Date.now(),
+                    username: username
+                  };
+                  
+                  // First redirect to home page to prevent the flash of login screen
+                  setLocation("/");
+                  
+                  // Then perform the actual login in the background
+                  // This ensures the session is properly established
                   loginMutation.mutate(
                     {
                       username: username,
@@ -103,16 +120,12 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
                     {
                       onSuccess: (userData) => {
                         console.log("Auto-login successful after registration");
-                        // After successful auto-login, redirect to home
-                        setLocation("/");
+                        // The user is already on the home page
                       },
                       onError: (error) => {
                         console.error("Auto-login failed after registration:", error);
-                        toast({
-                          title: "Login required",
-                          description: "Your account was created but you need to login manually",
-                          variant: "destructive"
-                        });
+                        // Don't show an error toast since we already redirected
+                        // Just log the error and let the app's session refresh handle it
                       }
                     }
                   );

@@ -5,6 +5,16 @@ import { Redirect, Route, useLocation } from "wouter";
 import { checkSessionStatus } from "./session-utils";
 import { queryClient } from "./queryClient";
 
+// Define the window property for temporary registration data
+declare global {
+  interface Window {
+    __tempRegistrationData?: {
+      timestamp: number;
+      username: string;
+    };
+  }
+}
+
 export function ProtectedRoute({
   path,
   component: Component,
@@ -167,20 +177,39 @@ export function ProtectedRoute({
     }
   }, [isLoading, isVerifyingSession, user, verifiedStatus, verifySession]);
 
+  // Check for cached registration data to prevent login page flash during registration
+  const recentlyRegistered = window.__tempRegistrationData && 
+                             (Date.now() - window.__tempRegistrationData.timestamp < 5000);
+                             
   // If we're loading OR verifying session, show loading indicator
   if (isLoading || isVerifyingSession) {
     return (
       <Route path={path}>
         <div className="flex items-center justify-center min-h-screen">
           <Loader2 className="h-8 w-8 animate-spin text-border" />
-          <span className="ml-2 text-muted-foreground">Verifying your session...</span>
+          <span className="ml-2 text-muted-foreground">
+            {recentlyRegistered ? "Completing your registration..." : "Verifying your session..."}
+          </span>
         </div>
       </Route>
     );
   }
 
-  // If user exists OR verified session says they're authenticated, render component
-  if (user || verifiedStatus === true) {
+  // If user exists OR verified session says they're authenticated OR recently registered, render component
+  if (user || verifiedStatus === true || recentlyRegistered) {
+    // If this was triggered by recent registration, increase loading time to ensure auto-login completes
+    if (recentlyRegistered && !user && !verifiedStatus) {
+      console.log("Auto-login still in progress, showing loading state");
+      return (
+        <Route path={path}>
+          <div className="flex items-center justify-center min-h-screen">
+            <Loader2 className="h-8 w-8 animate-spin text-border" />
+            <span className="ml-2 text-muted-foreground">Setting up your account...</span>
+          </div>
+        </Route>
+      );
+    }
+    
     return (
       <Route path={path}>
         <Component />
