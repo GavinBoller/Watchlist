@@ -272,9 +272,14 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      refetchOnWindowFocus: true, // Enable refresh on window focus to improve session detection
+      staleTime: 1000 * 60 * 5, // 5 minutes instead of Infinity for more frequent refreshes
       retry: (failureCount, error) => {
+        // Don't retry 401/403 errors as they indicate auth issues
+        if ((error as any)?.status === 401 || (error as any)?.status === 403) {
+          console.log("[Query] Not retrying auth error:", (error as any)?.status);
+          return false;
+        }
         // Retry network and server errors up to 3 times, but not client errors
         if ((error as any)?.isClientError) return false;
         return failureCount < 3;
@@ -283,6 +288,11 @@ export const queryClient = new QueryClient({
     },
     mutations: {
       retry: (failureCount, error) => {
+        // Don't retry 401/403 errors as they indicate auth issues
+        if ((error as any)?.status === 401 || (error as any)?.status === 403) {
+          console.log("[Mutation] Not retrying auth error:", (error as any)?.status);
+          return false;
+        }
         // Retry network and server errors up to 2 times, but not client errors
         if ((error as any)?.isClientError) return false;
         return failureCount < 2;
