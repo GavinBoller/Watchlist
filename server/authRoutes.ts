@@ -420,6 +420,59 @@ router.get('/user', (req: Request, res: Response) => {
   return res.status(401).json({ message: 'Unauthorized' });
 });
 
+// Session validation and refresh endpoint
+// This endpoint can be called before performing important operations
+// to ensure the session is still valid and refresh its timeout
+router.get('/refresh-session', (req: Request, res: Response) => {
+  const sessionID = req.sessionID || 'no-session';
+  console.log(`[SESSION] Session refresh request for ID: ${sessionID}`);
+  
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ 
+      valid: false, 
+      message: 'Session expired or invalid',
+      sessionId: sessionID
+    });
+  }
+  
+  if (req.session) {
+    // Update session data to refresh its expiration
+    req.session.lastChecked = Date.now();
+    if (!req.session.authenticated) {
+      req.session.authenticated = true;
+    }
+    
+    // Force save the updated session
+    req.session.save((err) => {
+      if (err) {
+        console.error('[SESSION] Error saving refreshed session:', err);
+        return res.status(500).json({ 
+          valid: false, 
+          message: 'Failed to refresh session',
+          error: err.message
+        });
+      }
+      
+      const user = req.user as UserResponse;
+      console.log(`[SESSION] Session refreshed for user: ${user.username} (ID: ${user.id})`);
+      
+      return res.json({ 
+        valid: true, 
+        message: 'Session refreshed successfully',
+        user,
+        sessionId: req.sessionID
+      });
+    });
+  } else {
+    // This should never happen but handle it just in case
+    console.error('[SESSION] User authenticated but no session object available');
+    return res.status(500).json({ 
+      valid: false, 
+      message: 'Session error: No session object available'
+    });
+  }
+});
+
 // Configuration: Emergency in-memory user storage for severe database outages in production
 // This allows the app to function with basic functionality even when DB is completely unavailable
 const emergencyMemoryStorage = {

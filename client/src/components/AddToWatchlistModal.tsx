@@ -69,6 +69,53 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
 
     setIsSubmitting(true);
     
+    // First, verify and refresh the session to ensure it's valid before continuing
+    try {
+      console.log("Refreshing session before watchlist operation");
+      const sessionResponse = await fetch("/api/auth/refresh-session", {
+        credentials: "include",
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache"
+        }
+      });
+      
+      if (!sessionResponse.ok) {
+        console.error("Session refresh failed with status:", sessionResponse.status);
+        
+        if (sessionResponse.status === 401) {
+          // If session is invalid, show toast and redirect to login
+          toast({
+            title: "Session expired",
+            description: "Your session has expired. Please login again to continue.",
+            variant: "destructive",
+          });
+          
+          // Update auth state
+          queryClient.setQueryData(["/api/user"], null);
+          
+          // Close modal and redirect
+          onClose();
+          setTimeout(() => {
+            window.location.href = '/auth';
+          }, 1500);
+          
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // For other errors, try to proceed anyway
+        console.warn("Session refresh failed but proceeding with watchlist operation");
+      } else {
+        // Session refreshed successfully
+        const refreshData = await sessionResponse.json();
+        console.log("Session refreshed successfully:", refreshData);
+      }
+    } catch (sessionError) {
+      console.error("Error during session refresh:", sessionError);
+      // Continue despite error - the main request will handle auth issues if they exist
+    }
+    
     // Prepare watchlist entry data with proper validation
     const watchlistData = {
       userId: currentUser.id,
