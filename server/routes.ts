@@ -205,6 +205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/watchlist", async (req: Request, res: Response) => {
     console.log("POST /api/watchlist - Request body:", JSON.stringify(req.body, null, 2));
+    console.log("Environment:", process.env.NODE_ENV || 'development');
     
     try {
       const { userId, tmdbMovie, watchedDate, notes, status } = req.body;
@@ -223,35 +224,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.log("User found:", user.username);
       
+      // Ensure tmdbMovie has the required fields with fallback values for production robustness
+      const validatedTmdbMovie = {
+        id: tmdbMovie.id || 0,
+        title: tmdbMovie.title || tmdbMovie.name || "Unknown Title",
+        overview: tmdbMovie.overview || "",
+        poster_path: tmdbMovie.poster_path || null,
+        backdrop_path: tmdbMovie.backdrop_path || null,
+        release_date: tmdbMovie.release_date || tmdbMovie.first_air_date || null,
+        vote_average: tmdbMovie.vote_average || 0,
+        genre_ids: Array.isArray(tmdbMovie.genre_ids) ? tmdbMovie.genre_ids : [],
+        media_type: tmdbMovie.media_type || "movie"
+      };
+      
+      if (validatedTmdbMovie.id === 0) {
+        console.error("Invalid TMDB movie data - missing ID");
+        return res.status(400).json({ message: "Invalid movie data: missing ID" });
+      }
+      
       // Check if movie already exists in our database, if not create it
-      console.log("Checking if movie exists in database - tmdbId:", tmdbMovie.id);
-      let movie = await storage.getMovieByTmdbId(tmdbMovie.id);
+      console.log("Checking if movie exists in database - tmdbId:", validatedTmdbMovie.id);
+      let movie = await storage.getMovieByTmdbId(validatedTmdbMovie.id);
       
       if (!movie) {
         console.log("Movie not found in database, creating new record");
         // Convert genre IDs to genre names
-        const genreNames = await convertGenreIdsToNames(tmdbMovie.genre_ids, tmdbMovie.media_type || "movie");
+        const genreNames = await convertGenreIdsToNames(validatedTmdbMovie.genre_ids, validatedTmdbMovie.media_type);
         const genres = genreNames.join(",");
         
-        const mediaType = tmdbMovie.media_type || "movie";
-        const title = tmdbMovie.title || tmdbMovie.name || "Unknown Title";
-        const releaseDate = tmdbMovie.release_date || tmdbMovie.first_air_date || null;
+        const mediaType = validatedTmdbMovie.media_type || "movie";
+        const title = validatedTmdbMovie.title || "Unknown Title";
+        const releaseDate = validatedTmdbMovie.release_date || null;
         
-        const movieData = insertMovieSchema.parse({
-          tmdbId: tmdbMovie.id,
-          title,
-          overview: tmdbMovie.overview,
-          posterPath: tmdbMovie.poster_path,
-          backdropPath: tmdbMovie.backdrop_path,
-          releaseDate,
-          voteAverage: tmdbMovie.vote_average.toString(),
-          genres,
-          mediaType,
-        });
-        
-        console.log("Creating movie with data:", JSON.stringify(movieData, null, 2));
-        movie = await storage.createMovie(movieData);
-        console.log("Movie created successfully:", movie.id);
+        try {
+          const movieData = {
+            tmdbId: validatedTmdbMovie.id,
+            title,
+            overview: validatedTmdbMovie.overview || "",
+            posterPath: validatedTmdbMovie.poster_path || null,
+            backdropPath: validatedTmdbMovie.backdrop_path || null,
+            releaseDate,
+            voteAverage: validatedTmdbMovie.vote_average?.toString() || "0",
+            genres,
+            mediaType,
+          };
+          
+          console.log("Creating movie with data:", JSON.stringify(movieData, null, 2));
+          
+          // Validate the movie data
+          const validatedMovieData = insertMovieSchema.parse(movieData);
+          movie = await storage.createMovie(validatedMovieData);
+          console.log("Movie created successfully:", movie.id);
+          
+        } catch (movieError) {
+          console.error("Error creating movie record:", movieError);
+          
+          // Check if the movie was created despite the error (race condition)
+          const existingMovie = await storage.getMovieByTmdbId(validatedTmdbMovie.id);
+          if (existingMovie) {
+            console.log("Movie found after error (possible race condition):", existingMovie.id);
+            movie = existingMovie;
+          } else {
+            throw new Error(`Failed to create movie record: ${movieError instanceof Error ? movieError.message : 'Unknown error'}`);
+          }
+        }
       } else {
         console.log("Movie found in database:", movie.id, movie.title);
       }
@@ -262,6 +298,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (alreadyInWatchlist) {
         const movieTitle = movie.title || "this title";
         console.log("Movie already in watchlist:", movieTitle);
+        
+        // Find the existing entry to return to client
+        const entries = await storage.getWatchlistEntries(userId);
+        const existingEntry = entries.find(entry => entry.movieId === movie.id);
+        
+        if (existingEntry) {
+          console.log("Returning existing watchlist entry:", existingEntry.id);
+          return res.status(200).json({
+            ...existingEntry,
+            message: "Already in watchlist",
+            details: `You've already added "${movieTitle}" to your watchlist`
+          });
+        }
+        
         return res.status(409).json({ 
           message: "Already in watchlist", 
           details: `You've already added "${movieTitle}" to your watchlist` 
@@ -271,44 +321,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate the status
       const validStatus = status === 'to_watch' || status === 'watching' || status === 'watched' 
         ? status 
-        : 'watched'; // Default to 'watched' if not specified or invalid
+        : 'to_watch'; // Default to 'to_watch' if not specified or invalid
       
       console.log("Creating watchlist entry with status:", validStatus);
       
-      // Create watchlist entry
-      const entryData = insertWatchlistEntrySchema.parse({
-        userId,
-        movieId: movie.id,
-        watchedDate: watchedDate ? watchedDate : null, // Keep as string for SQLite
-        notes: notes || null,
-        status: validStatus,
-      });
-      
-      console.log("Watchlist entry data:", JSON.stringify(entryData, null, 2));
-      const watchlistEntry = await storage.createWatchlistEntry(entryData);
-      console.log("Watchlist entry created successfully:", watchlistEntry.id);
-      
-      // Return the entry with movie details
-      const entryWithMovie = {
-        ...watchlistEntry,
-        movie,
-      };
-      
-      res.status(201).json(entryWithMovie);
-      console.log("Watchlist entry response sent with status 201");
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        console.error("Validation error creating watchlist entry:", JSON.stringify(error.errors, null, 2));
-        res.status(400).json({ message: "Invalid watchlist entry data", errors: error.errors });
-      } else {
-        console.error("Error creating watchlist entry:", error);
-        // Get detailed error message
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        const errorStack = error instanceof Error ? error.stack : 'No stack trace';
-        console.error("Error details:", errorMessage);
-        console.error("Error stack:", errorStack);
-        res.status(500).json({ message: "Failed to add movie to watchlist", error: errorMessage });
+      try {
+        // Create watchlist entry
+        const entryData = {
+          userId,
+          movieId: movie.id,
+          watchedDate: watchedDate || null,
+          notes: notes || null,
+          status: validStatus,
+        };
+        
+        console.log("Watchlist entry data:", JSON.stringify(entryData, null, 2));
+        // Validate and create the entry
+        const validatedEntryData = insertWatchlistEntrySchema.parse(entryData);
+        const watchlistEntry = await storage.createWatchlistEntry(validatedEntryData);
+        console.log("Watchlist entry created successfully:", watchlistEntry.id);
+        
+        // Return the entry with movie details
+        const entryWithMovie = {
+          ...watchlistEntry,
+          movie,
+        };
+        
+        res.status(201).json(entryWithMovie);
+        console.log("Watchlist entry response sent with status 201");
+      } catch (entryError) {
+        // Try to gracefully handle the error
+        console.error("Error creating watchlist entry:", entryError);
+        
+        if (entryError instanceof z.ZodError) {
+          console.error("Validation error details:", JSON.stringify(entryError.errors, null, 2));
+          return res.status(400).json({ 
+            message: "Invalid watchlist entry data", 
+            errors: entryError.errors 
+          });
+        }
+        
+        // Check for duplicate entry (race condition)
+        const errorMessage = entryError instanceof Error ? entryError.message : 'Unknown error';
+        if (errorMessage.includes('duplicate') || errorMessage.includes('unique constraint')) {
+          console.log("Detected duplicate entry error, retrieving existing entry");
+          
+          // Try to find the existing entry
+          const entries = await storage.getWatchlistEntries(userId);
+          const existingEntry = entries.find(entry => entry.movieId === movie.id);
+          
+          if (existingEntry) {
+            console.log("Found existing entry after error:", existingEntry.id);
+            return res.status(200).json({
+              ...existingEntry,
+              message: "Entry already exists",
+              details: "This movie is already in your watchlist"
+            });
+          }
+        }
+        
+        // Pass the error details to client for debugging in development
+        const isDevEnvironment = process.env.NODE_ENV !== 'production';
+        const errorDetails = isDevEnvironment ? {
+          error: errorMessage,
+          stack: entryError instanceof Error ? entryError.stack : undefined
+        } : {};
+        
+        res.status(500).json({ 
+          message: "Failed to add movie to watchlist", 
+          ...errorDetails
+        });
       }
+    } catch (error) {
+      console.error("Unhandled error in watchlist creation:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : 'No stack trace';
+      console.error("Error details:", errorMessage);
+      console.error("Error stack:", errorStack);
+      
+      // Only include detailed error info in development
+      const errorResponse = process.env.NODE_ENV === 'production' 
+        ? { message: "Failed to add movie to watchlist" }
+        : { message: "Failed to add movie to watchlist", error: errorMessage, stack: errorStack };
+      
+      res.status(500).json(errorResponse);
     }
   });
 
