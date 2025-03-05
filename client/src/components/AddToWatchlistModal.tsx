@@ -28,6 +28,12 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
   const [notes, setNotes] = useState<string>('');
   const [status, setStatus] = useState<string>('watched');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const handleClose = () => {
+    setWatchedDate(format(new Date(), 'yyyy-MM-dd'));
+    setNotes('');
+    onClose();
+  };
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -342,53 +348,58 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
           description: errorMsg,
           variant: "destructive",
         });
-      } else if (error.status === 401 || isSessionError(error)) {
-        // Use our centralized session expiration handler
-        const errorCode = errorData?.code;
-        const errorMessage = errorData?.message || "Please log in again to add items to your watchlist";
+      } else {
+        // Use our enhanced error detection for better error messages
+        const errorInfo = isSessionError(error);
         
-        console.log('Authentication error detected:', errorCode, errorMessage);
-        
-        // Let the utility handle all aspects of session expiration
-        await handleSessionExpiration(errorCode, errorMessage);
-      } else if (error.status === 404) {
-        // Handle user not found errors with specific message
-        if (errorData?.message?.includes("User not found")) {
+        if (errorInfo.isAuthError) {
+          // Use our centralized session expiration handler for auth errors
+          console.log('Authentication error detected:', errorInfo);
+          const errorMessage = errorData?.message || "Please log in again to add items to your watchlist";
+          
+          // Handle session expiration with the central handler
+          handleSessionExpiration(errorInfo.errorType, errorMessage);
+        } else if (errorInfo.isNetworkError) {
+          console.log('Network error detected:', errorInfo);
+          // Show a network-specific error message
           toast({
-            title: "User not found",
-            description: errorData?.details || "The selected user account could not be found. Please try selecting a different user.",
+            title: "Connection error",
+            description: "Please check your internet connection and try again",
+            variant: "destructive",
+          });
+        } else if (error.status === 404) {
+          // Handle user not found errors with specific message
+          if (errorData?.message?.includes("User not found")) {
+            toast({
+              title: "User not found",
+              description: errorData?.details || "The selected user account could not be found. Please try selecting a different user.",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Not found",
+              description: errorData?.message || "The requested resource was not found",
+              variant: "destructive",
+            });
+          }
+        } else if (error.isHtmlResponse) {
+          // Special case for HTML responses (typically from error pages)
+          toast({
+            title: "Server error",
+            description: "The server returned an unexpected response. Please try again later.",
             variant: "destructive",
           });
         } else {
           toast({
-            title: "Not found",
-            description: errorData?.message || "The requested resource was not found",
+            title: "Failed to add item",
+            description: error.message || errorData?.message || "There was an error adding the item to your list",
             variant: "destructive",
           });
         }
-      } else if (error.isHtmlResponse) {
-        // Special case for HTML responses (typically from error pages)
-        toast({
-          title: "Server error",
-          description: "The server returned an unexpected response. Please try again later.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Failed to add item",
-          description: error.message || errorData?.message || "There was an error adding the item to your list",
-          variant: "destructive",
-        });
       }
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleClose = () => {
-    setWatchedDate(format(new Date(), 'yyyy-MM-dd'));
-    setNotes('');
-    onClose();
   };
 
   return (

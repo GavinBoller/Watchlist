@@ -12,12 +12,15 @@ import { Switch, Route } from "wouter";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
 
-// This is now a simplified component since all components use useAuth directly
-function AuthBridge({ children }: { children: React.ReactNode }) {
+/**
+ * Internal app structure with authentication-aware components
+ * This component must be rendered inside the AuthProvider
+ */
+function AppInternal() {
+  const [location, setLocation] = useLocation();
   const { user, logoutMutation } = useAuth();
   
-  // Keep providing UserContext for backward compatibility
-  // but all components should migrate to useAuth directly
+  // Prepare the user context value for backward compatibility
   const userContextValue = {
     currentUser: user,
     setCurrentUser: () => {}, // Deprecated
@@ -28,49 +31,41 @@ function AuthBridge({ children }: { children: React.ReactNode }) {
   
   return (
     <UserContext.Provider value={userContextValue}>
-      {children}
+      <div className="flex flex-col min-h-screen">
+        <Header 
+          onTabChange={(tab) => {
+            if (tab === "search") {
+              setLocation("/");
+            } else if (tab === "watchlist") {
+              setLocation("/watched");
+            }
+          }}
+          activeTab={location === "/" ? "search" : "watchlist"}
+        />
+        
+        <main className="flex-grow">
+          <Switch>
+            <ProtectedRoute path="/" component={SearchPage} />
+            <ProtectedRoute path="/watched" component={WatchlistPage} />
+            <Route path="/auth" component={AuthPage} />
+            <Route component={NotFound} />
+          </Switch>
+        </main>
+        <Toaster />
+      </div>
     </UserContext.Provider>
   );
 }
 
-function AppContent() {
-  // For header tab navigation
-  const [location, setLocation] = useLocation();
-  const { user } = useAuth();
-  
-  return (
-    <div className="flex flex-col min-h-screen">
-      <Header 
-        onTabChange={(tab) => {
-          if (tab === "search") {
-            setLocation("/");
-          } else if (tab === "watchlist") {
-            setLocation("/watched");
-          }
-        }}
-        activeTab={location === "/" ? "search" : "watchlist"}
-      />
-      
-      <main className="flex-grow">
-        <Switch>
-          <ProtectedRoute path="/" component={SearchPage} />
-          <ProtectedRoute path="/watched" component={WatchlistPage} />
-          <Route path="/auth" component={AuthPage} />
-          <Route component={NotFound} />
-        </Switch>
-      </main>
-      <Toaster />
-    </div>
-  );
-}
-
+/**
+ * Main App component with all providers set up
+ * This ensures correct provider nesting and prevents context errors
+ */
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <AuthBridge>
-          <AppContent />
-        </AuthBridge>
+        <AppInternal />
       </AuthProvider>
     </QueryClientProvider>
   );
