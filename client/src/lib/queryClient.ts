@@ -180,12 +180,14 @@ export async function apiRequest(
       
       // Handle session expiration globally for a consistent user experience
       // Only if this isn't a special endpoint that ignores auth errors
-      // Added enhanced auth error handling - we'll first check if it's just a transient error
+      // Use enhanced error detection to differentiate between auth and network errors
+      const errorInfo = isSessionError(error);
+      
       if (!ignoreAuthErrors && (
         (error as any)?.status === 401 || 
-        isSessionError(error)
+        errorInfo.isAuthError
       )) {
-        console.log('[API] Detected potential 401 error, checking session status first...');
+        console.log('[API] Detected potential auth error:', errorInfo);
         // Handle auth errors more gracefully - don't log out immediately
         // Wait at least 2 seconds before considering it a real session error
         setTimeout(async () => {

@@ -6,6 +6,7 @@ export interface SessionCheckResult {
   user: any | null;
   emergencyMode?: boolean;
   error?: string;
+  sessionId?: string;
 }
 
 /**
@@ -57,6 +58,26 @@ export async function checkSessionStatus(): Promise<SessionCheckResult | null> {
         try {
           sessionCheckResult = await sessionResponse.json();
           console.log('Primary session check successful:', sessionCheckResult);
+          
+          // Store the session ID for emergency recovery
+          if (sessionCheckResult?.sessionId) {
+            try {
+              localStorage.setItem('movietracker_session_id', sessionCheckResult.sessionId);
+            } catch (e) {
+              console.error('Failed to store session ID in localStorage:', e);
+            }
+          }
+          
+          // If authenticated, store the user data
+          if (sessionCheckResult?.authenticated && sessionCheckResult?.user) {
+            try {
+              localStorage.setItem('movietracker_user', JSON.stringify(sessionCheckResult.user));
+              localStorage.setItem('movietracker_last_verified', new Date().toISOString());
+            } catch (e) {
+              console.error('Failed to store user data in localStorage:', e);
+            }
+          }
+          
           // Successfully got data from primary endpoint
           return sessionCheckResult;
         } catch (parseError) {
@@ -99,6 +120,14 @@ export async function checkSessionStatus(): Promise<SessionCheckResult | null> {
           // Store the recovery method for debugging
           localStorage.setItem('movietracker_session_recovery', 'user_endpoint');
           
+          // Also store the user data for potential future emergency recovery
+          try {
+            localStorage.setItem('movietracker_user', JSON.stringify(userData));
+            localStorage.setItem('movietracker_last_verified', new Date().toISOString());
+          } catch (e) {
+            console.error('Failed to store user data in localStorage:', e);
+          }
+          
           return sessionCheckResult;
         } catch (parseError) {
           console.error('Error parsing user response:', parseError);
@@ -108,15 +137,92 @@ export async function checkSessionStatus(): Promise<SessionCheckResult | null> {
       console.error('Network error checking user endpoint:', userError);
     }
     
-    // 3. Try to read from localStorage as a last resort
+    // 3. Check if we have temporary registration data from a recent registration
+    if (window.__tempRegistrationData && 
+        window.__tempRegistrationData.timestamp > (Date.now() - 30000)) { // 30 second window
+      console.log('Found recent registration data, attempting to use it for recovery');
+      
+      try {
+        // Try to recover session using the temporary registration data
+        const username = window.__tempRegistrationData.username;
+        
+        // Try to find the user in localStorage (might have been stored during registration)
+        const cachedUser = localStorage.getItem('movietracker_user');
+        if (cachedUser) {
+          try {
+            const userData = JSON.parse(cachedUser);
+            if (userData.username === username) {
+              console.log('Found matching user in localStorage for temp registration data');
+              
+              // Use the stored user data
+              sessionCheckResult = {
+                authenticated: true,
+                user: userData,
+                emergencyMode: true
+              };
+              
+              // Attempt to recover the session via the refresh endpoint
+              try {
+                console.log('Attempting session recovery with userId:', userData.id);
+                const recoveryResponse = await fetch(`/api/refresh-session?userId=${userData.id}`, {
+                  method: 'GET',
+                  credentials: 'include',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache'
+                  }
+                });
+                
+                if (recoveryResponse.ok) {
+                  const recoveryData = await recoveryResponse.json();
+                  console.log('Session recovery successful:', recoveryData);
+                  
+                  // If recovery was successful, use this data instead
+                  if (recoveryData.authenticated && recoveryData.user) {
+                    sessionCheckResult = {
+                      authenticated: true,
+                      user: recoveryData.user,
+                      emergencyMode: false,
+                      sessionId: recoveryData.sessionId
+                    };
+                    
+                    // Clear the temporary registration data since we've recovered
+                    window.__tempRegistrationData = undefined;
+                    
+                    console.log('Successfully recovered session from temp registration data');
+                  }
+                } else {
+                  console.warn('Session recovery attempt failed, status:', recoveryResponse.status);
+                }
+              } catch (recoveryError) {
+                console.error('Error during session recovery attempt:', recoveryError);
+              }
+              
+              return sessionCheckResult;
+            }
+          } catch (parseError) {
+            console.error('Error parsing cached user data from localStorage:', parseError);
+          }
+        }
+      } catch (tempDataError) {
+        console.error('Error processing temporary registration data:', tempDataError);
+      }
+    }
+    
+    // 4. Try to read from localStorage as a last resort
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
         console.log('No session from remote endpoints, checking local storage...');
         const cachedUser = localStorage.getItem('movietracker_user');
         const cachedSessionId = localStorage.getItem('movietracker_session_id');
+        const lastVerified = localStorage.getItem('movietracker_last_verified');
         
-        if (cachedUser && cachedSessionId) {
-          console.log('Found cached user and session in localStorage');
+        // Check if we have data and it's not too old (24 hours max)
+        const isDataRecent = lastVerified && 
+          (new Date().getTime() - new Date(lastVerified).getTime() < 24 * 60 * 60 * 1000);
+        
+        if (cachedUser && (cachedSessionId || isDataRecent)) {
+          console.log('Found cached user data in localStorage', isDataRecent ? '(recent)' : '(with session ID)');
           try {
             const userData = JSON.parse(cachedUser);
             
@@ -124,29 +230,61 @@ export async function checkSessionStatus(): Promise<SessionCheckResult | null> {
             sessionCheckResult = {
               authenticated: true,
               user: userData,
-              emergencyMode: true // Flag this as emergency mode
+              emergencyMode: true, // Flag this as emergency mode
+              sessionId: cachedSessionId || undefined
             };
             
             // Note the emergency recovery in localStorage
             localStorage.setItem('movietracker_session_recovery', 'local_storage');
             localStorage.setItem('movietracker_emergency_ts', new Date().toISOString());
             
-            // Try to refresh the session in the background
-            fetch('/api/refresh-session', {
-              credentials: 'include'
-            }).then(res => {
-              console.log('Background session refresh status:', res.status);
-            }).catch(e => {
-              console.error('Background session refresh failed:', e);
-            });
+            // Try to recover the session via the refresh endpoint with the user ID
+            if (userData.id) {
+              try {
+                console.log('Attempting emergency session recovery with userId:', userData.id);
+                const recoveryResponse = await fetch(`/api/refresh-session?userId=${userData.id}`, {
+                  method: 'GET',
+                  credentials: 'include',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache'
+                  }
+                });
+                
+                if (recoveryResponse.ok) {
+                  const recoveryData = await recoveryResponse.json();
+                  console.log('Emergency session recovery response:', recoveryData);
+                  
+                  // If recovery worked, update our result
+                  if (recoveryData.authenticated && recoveryData.user) {
+                    sessionCheckResult.emergencyMode = false;
+                    sessionCheckResult.sessionId = recoveryData.sessionId;
+                    console.log('Successfully recovered session on server');
+                  }
+                } else {
+                  console.warn('Emergency recovery failed, status:', recoveryResponse.status);
+                }
+              } catch (recoveryError) {
+                console.error('Error during emergency recovery attempt:', recoveryError);
+              }
+            } else {
+              // Try a basic session refresh as fallback
+              fetch('/api/refresh-session', {
+                credentials: 'include'
+              }).then(res => {
+                console.log('Basic session refresh status:', res.status);
+              }).catch(e => {
+                console.error('Basic session refresh failed:', e);
+              });
+            }
             
-            console.log('Created emergency session from localStorage:', sessionCheckResult);
+            console.log('Using emergency session from localStorage:', sessionCheckResult);
             return sessionCheckResult;
           } catch (parseError) {
             console.error('Error parsing cached user data:', parseError);
           }
         } else {
-          console.log('No cached user data found in localStorage');
+          console.log('No usable cached user data found in localStorage');
         }
       } catch (localStorageError) {
         console.error('Error accessing localStorage:', localStorageError);
@@ -181,16 +319,69 @@ export async function handleSessionExpiration(
   
   // Enhanced session verification with multiple checks to avoid false logouts
   
-  // First check: try session endpoint
+  // First check: Try to recover the session using our robust recovery system
+  try {
+    // Attempt session recovery with userId if we have cached user data
+    const cachedUser = localStorage.getItem('movietracker_user');
+    if (cachedUser) {
+      try {
+        const userData = JSON.parse(cachedUser);
+        if (userData?.id) {
+          console.log('Attempting session recovery with stored user ID:', userData.id);
+          
+          // Try to recover the session using the user ID
+          const recoveryResponse = await fetch(`/api/refresh-session?userId=${userData.id}`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache'
+            }
+          });
+          
+          if (recoveryResponse.ok) {
+            const recoveryData = await recoveryResponse.json();
+            console.log('Session recovery attempt result:', recoveryData);
+            
+            if (recoveryData.authenticated && recoveryData.user) {
+              console.log('Session successfully recovered!');
+              
+              // Update the query cache with the recovered user
+              queryClient.setQueryData(["/api/user"], recoveryData.user);
+              
+              // Record successful recovery
+              localStorage.setItem('movietracker_recovery_successful', 'true');
+              localStorage.setItem('movietracker_recovery_time', new Date().toISOString());
+              
+              // No need to continue with session expiration
+              return;
+            }
+          }
+        }
+      } catch (recoveryError) {
+        console.error('Error during recovery attempt:', recoveryError);
+      }
+    }
+  } catch (e) {
+    console.error('Error during initial recovery attempt:', e);
+  }
+  
+  // Second check: try session endpoint
   const sessionData = await checkSessionStatus();
   
   // If session status shows authenticated, we don't need to do anything
   if (sessionData?.authenticated) {
     console.log('User appears to be authenticated despite error - IGNORING');
+    
+    // Update the queryClient with any recovered user data
+    if (sessionData.user) {
+      queryClient.setQueryData(["/api/user"], sessionData.user);
+    }
+    
     return;
   }
   
-  // Second check: try direct API call to user endpoint for final confirmation
+  // Third check: try direct API call to user endpoint for final confirmation
   console.log('Session appears expired, doing final verification...');
   try {
     const directUserResponse = await fetch('/api/user', {
@@ -204,6 +395,17 @@ export async function handleSessionExpiration(
     if (directUserResponse.ok) {
       // User is actually authenticated!
       console.log('User verified as authenticated in final check - IGNORING ERROR');
+      
+      try {
+        const userData = await directUserResponse.json();
+        if (userData) {
+          // Update the query cache
+          queryClient.setQueryData(["/api/user"], userData);
+        }
+      } catch (parseError) {
+        console.error('Error parsing user data from final check:', parseError);
+      }
+      
       return;
     }
   } catch (e) {
@@ -214,6 +416,14 @@ export async function handleSessionExpiration(
   // If we get here, we're reasonably confident the session is truly expired
   console.log('Session is confirmed expired, clearing client state');
   
+  // Clear recovery flags
+  try {
+    localStorage.removeItem('movietracker_recovery_successful');
+    localStorage.removeItem('movietracker_recovery_time');
+  } catch (e) {
+    console.error('Error clearing recovery flags:', e);
+  }
+  
   // Clear all user data from the client
   queryClient.setQueryData(["/api/user"], null);
   queryClient.setQueryData(["/api/auth/user"], null);
@@ -222,18 +432,28 @@ export async function handleSessionExpiration(
   // Only show the toast if we're going to redirect
   if (window.location.pathname !== '/auth') {
     console.log('User not on auth page, showing notification');
-    // Show a gentle message
+    
+    // Determine if this is a network issue or auth issue
+    const isNetworkProblem = errorCode === 'NETWORK_ERROR' || 
+                            (errorMessage && errorMessage.toLowerCase().includes('network'));
+    
+    // Show an appropriate message
     toast({
-      title: "Authentication needed",
-      description: errorMessage || "Please sign in to continue",
-      variant: "default",
+      title: isNetworkProblem ? "Connection issue" : "Authentication needed",
+      description: errorMessage || (isNetworkProblem ? 
+                                  "Please check your internet connection" : 
+                                  "Please sign in to continue"),
+      variant: isNetworkProblem ? "destructive" : "default",
     });
     
+    // For network issues, we might not want to redirect immediately
+    const finalRedirectDelay = isNetworkProblem ? redirectDelay * 1.5 : redirectDelay;
+    
     // Redirect to login page
-    console.log('Redirecting to auth page after session expiration');
+    console.log(`Redirecting to auth page after ${isNetworkProblem ? 'network issue' : 'session expiration'}`);
     setTimeout(() => {
       window.location.href = '/auth';
-    }, redirectDelay);
+    }, finalRedirectDelay);
   } else {
     console.log('User already on auth page, no redirect needed');
   }
@@ -241,13 +461,68 @@ export async function handleSessionExpiration(
 
 /**
  * Check if the current error is an authentication/session error
+ * Returns an object with detailed classification of the error
  */
-export function isSessionError(error: any): boolean {
-  // Check for status code
-  if (error?.status === 401) return true;
+type ErrorType = 'auth_error' | 'network_error' | 'other_error';
+
+export function isSessionError(error: any): { 
+  isAuthError: boolean;
+  isNetworkError: boolean;
+  errorType: ErrorType;
+  errorMessage?: string;
+} {
+  // Default result
+  const result = {
+    isAuthError: false,
+    isNetworkError: false,
+    errorType: 'other_error' as ErrorType,
+    errorMessage: undefined as string | undefined
+  };
   
-  // Check for error message patterns
-  const errorMsg = error?.message || error?.data?.message || '';
+  // If no error, return immediately
+  if (!error) return result;
+  
+  // Extract error message from various possible formats
+  const errorMsg = (
+    error.message || 
+    error.data?.message || 
+    error.error?.message || 
+    error.statusText ||
+    ''
+  ).toLowerCase();
+  
+  // Set error message for return
+  result.errorMessage = errorMsg || undefined;
+  
+  // Check for network errors
+  const networkErrorPatterns = [
+    'network',
+    'failed to fetch',
+    'connection',
+    'offline',
+    'timeout',
+    'aborted',
+    'internet',
+    'socket',
+    'unreachable',
+    'refused'
+  ];
+  
+  // Check for auth errors - explicit status code check
+  if (error.status === 401 || error.statusCode === 401) {
+    result.isAuthError = true;
+    result.errorType = 'auth_error';
+    return result;
+  }
+  
+  // Check for network error patterns
+  if (networkErrorPatterns.some(pattern => errorMsg.includes(pattern))) {
+    result.isNetworkError = true;
+    result.errorType = 'network_error';
+    return result;
+  }
+  
+  // Check for specific auth error patterns
   const sessionErrorPatterns = [
     'unauthorized',
     'unauthenticated', 
@@ -255,10 +530,26 @@ export function isSessionError(error: any): boolean {
     'session expired',
     'invalid session',
     'login required',
-    'authentication required'
+    'authentication required',
+    'access denied',
+    'permission denied',
+    'forbidden'
   ];
   
-  return sessionErrorPatterns.some(pattern => 
-    errorMsg.toLowerCase().includes(pattern.toLowerCase())
-  );
+  // Check auth error message patterns
+  if (sessionErrorPatterns.some(pattern => errorMsg.includes(pattern))) {
+    result.isAuthError = true;
+    result.errorType = 'auth_error';
+    return result;
+  }
+  
+  return result;
+}
+
+/**
+ * Legacy version for backward compatibility
+ * @deprecated Use the detailed version instead
+ */
+export function isSessionErrorOld(error: any): boolean {
+  return isSessionError(error).isAuthError;
 }
