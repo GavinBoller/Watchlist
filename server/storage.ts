@@ -841,70 +841,433 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMovie(id: number): Promise<Movie | undefined> {
-    const [movie] = await db.select().from(movies).where(eq(movies.id, id));
-    return movie || undefined;
+    try {
+      // Try with ORM first
+      const [movie] = await db.select().from(movies).where(eq(movies.id, id));
+      return movie || undefined;
+    } catch (error) {
+      console.error("Database error in getMovie using ORM:", error);
+      
+      // Try direct SQL as fallback for connection issues
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          console.log("Attempting direct SQL fallback for getMovie");
+          const rows = await executeDirectSql<Movie>(
+            'SELECT * FROM "movies" WHERE "id" = $1 LIMIT 1',
+            [id],
+            'Failed to retrieve movie by ID'
+          );
+          return rows[0] || undefined;
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback also failed:", fallbackError);
+          // Return undefined instead of throwing an error
+          return undefined;
+        }
+      }
+      
+      // Return undefined for any other error instead of throwing
+      return undefined;
+    }
   }
 
   async getMovieByTmdbId(tmdbId: number): Promise<Movie | undefined> {
-    const [movie] = await db.select().from(movies).where(eq(movies.tmdbId, tmdbId));
-    return movie || undefined;
+    try {
+      // Try with ORM first
+      const [movie] = await db.select().from(movies).where(eq(movies.tmdbId, tmdbId));
+      return movie || undefined;
+    } catch (error) {
+      console.error("Database error in getMovieByTmdbId using ORM:", error);
+      
+      // Try direct SQL as fallback for connection issues
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          console.log("Attempting direct SQL fallback for getMovieByTmdbId");
+          const rows = await executeDirectSql<Movie>(
+            'SELECT * FROM "movies" WHERE "tmdbId" = $1 LIMIT 1',
+            [tmdbId],
+            'Failed to retrieve movie by TMDB ID'
+          );
+          return rows[0] || undefined; // Return undefined if no movie found
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback also failed:", fallbackError);
+          // Return undefined instead of throwing an error
+          return undefined;
+        }
+      }
+      
+      // Return undefined for any other error instead of throwing
+      return undefined;
+    }
   }
 
   async createMovie(insertMovie: InsertMovie): Promise<Movie> {
-    const [movie] = await db
-      .insert(movies)
-      .values(insertMovie)
-      .returning();
-    return movie;
+    try {
+      // First try ORM approach
+      const [movie] = await db
+        .insert(movies)
+        .values(insertMovie)
+        .returning();
+      return movie;
+    } catch (error) {
+      console.error("Database error in createMovie using ORM:", error);
+      
+      // Check for common error types
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('duplicate key') || errorMessage.includes('unique constraint')) {
+        // Try to fetch existing movie instead of failing
+        try {
+          const existingMovie = await this.getMovieByTmdbId(insertMovie.tmdbId);
+          if (existingMovie) {
+            console.log(`Movie with tmdbId ${insertMovie.tmdbId} already exists, returning existing record`);
+            return existingMovie;
+          }
+        } catch (fetchError) {
+          console.error("Error fetching existing movie:", fetchError);
+        }
+      }
+      
+      // Try direct SQL as fallback for connection issues
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          console.log("Attempting direct SQL fallback for createMovie");
+          
+          // Check if movie already exists with this tmdbId
+          const existingRows = await executeDirectSql<Movie>(
+            'SELECT * FROM "movies" WHERE "tmdbId" = $1 LIMIT 1',
+            [insertMovie.tmdbId],
+            'Failed to check for existing movie'
+          );
+          
+          if (existingRows.length > 0) {
+            return existingRows[0];
+          }
+          
+          // Direct SQL insertion with proper value escaping
+          const columns = Object.keys(insertMovie).map(key => `"${key}"`).join(', ');
+          const placeholders = Object.keys(insertMovie).map((_, index) => `$${index + 1}`).join(', ');
+          const values = Object.values(insertMovie);
+          
+          const rows = await executeDirectSql<Movie>(
+            `INSERT INTO "movies" (${columns}) VALUES (${placeholders}) RETURNING *`,
+            values,
+            'Failed to create movie'
+          );
+          
+          if (rows.length === 0) {
+            throw new Error('Movie creation did not return any data');
+          }
+          
+          return rows[0];
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback also failed:", fallbackError);
+          
+          // One last attempt to check if movie exists (might have been created in a race condition)
+          try {
+            const lastChanceCheck = await executeDirectSql<Movie>(
+              'SELECT * FROM "movies" WHERE "tmdbId" = $1 LIMIT 1',
+              [insertMovie.tmdbId],
+              'Failed to check for existing movie'
+            );
+            
+            if (lastChanceCheck.length > 0) {
+              return lastChanceCheck[0];
+            }
+          } catch (e) {
+            // Ignore this error and proceed with the original error
+          }
+          
+          throw fallbackError;
+        }
+      }
+      
+      throw new Error(`Failed to create movie: ${errorMessage}`);
+    }
   }
 
   async getWatchlistEntry(id: number): Promise<WatchlistEntry | undefined> {
-    const [entry] = await db.select().from(watchlistEntries).where(eq(watchlistEntries.id, id));
-    return entry || undefined;
+    try {
+      // Try using ORM first
+      const [entry] = await db.select().from(watchlistEntries).where(eq(watchlistEntries.id, id));
+      return entry || undefined;
+    } catch (error) {
+      console.error("Database error in getWatchlistEntry using ORM:", error);
+      
+      // Try direct SQL as fallback for connection issues
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          console.log("Attempting direct SQL fallback for getWatchlistEntry");
+          const rows = await executeDirectSql<WatchlistEntry>(
+            'SELECT * FROM "watchlist_entries" WHERE "id" = $1 LIMIT 1',
+            [id],
+            'Failed to retrieve watchlist entry'
+          );
+          return rows[0] || undefined;
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback also failed:", fallbackError);
+          // Return undefined instead of throwing an error
+          return undefined;
+        }
+      }
+      
+      // Return undefined for any other error instead of throwing
+      return undefined;
+    }
   }
 
   async getWatchlistEntries(userId: number): Promise<WatchlistEntryWithMovie[]> {
-    const entries = await db
-      .select()
-      .from(watchlistEntries)
-      .where(eq(watchlistEntries.userId, userId));
-    
-    const result: WatchlistEntryWithMovie[] = [];
-    
-    for (const entry of entries) {
-      const [movie] = await db.select().from(movies).where(eq(movies.id, entry.movieId));
-      if (movie) {
-        result.push({
-          ...entry,
-          movie
-        });
+    try {
+      // Get watchlist entries for this user
+      const entries = await db
+        .select()
+        .from(watchlistEntries)
+        .where(eq(watchlistEntries.userId, userId));
+      
+      const result: WatchlistEntryWithMovie[] = [];
+      
+      // Load movie data for each entry
+      for (const entry of entries) {
+        try {
+          const [movie] = await db.select().from(movies).where(eq(movies.id, entry.movieId));
+          if (movie) {
+            result.push({
+              ...entry,
+              movie
+            });
+          }
+        } catch (movieError) {
+          console.error(`Error fetching movie ${entry.movieId} for watchlist entry ${entry.id}:`, movieError);
+          // Try direct SQL as fallback for movie lookup
+          try {
+            const movies = await executeDirectSql<Movie>(
+              'SELECT * FROM "movies" WHERE "id" = $1 LIMIT 1',
+              [entry.movieId],
+              'Failed to retrieve movie for watchlist entry'
+            );
+            if (movies.length > 0) {
+              result.push({
+                ...entry,
+                movie: movies[0]
+              });
+            }
+          } catch (fallbackError) {
+            console.error("Failed to fetch movie using fallback:", fallbackError);
+            // Skip this entry rather than failing the entire operation
+          }
+        }
       }
+      
+      return result;
+    } catch (error) {
+      console.error("Database error in getWatchlistEntries using ORM:", error);
+      
+      // Try direct SQL as fallback for connection issues
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          console.log("Attempting direct SQL fallback for getWatchlistEntries");
+          // Get entries
+          const entries = await executeDirectSql<WatchlistEntry>(
+            'SELECT * FROM "watchlist_entries" WHERE "userId" = $1',
+            [userId],
+            'Failed to retrieve watchlist entries'
+          );
+          
+          const result: WatchlistEntryWithMovie[] = [];
+          
+          // Load movie data for each entry
+          for (const entry of entries) {
+            try {
+              const movies = await executeDirectSql<Movie>(
+                'SELECT * FROM "movies" WHERE "id" = $1 LIMIT 1',
+                [entry.movieId],
+                'Failed to retrieve movie for watchlist entry'
+              );
+              
+              if (movies.length > 0) {
+                result.push({
+                  ...entry,
+                  movie: movies[0]
+                });
+              }
+            } catch (movieError) {
+              console.error(`Failed to fetch movie ${entry.movieId} for watchlist entry ${entry.id}:`, movieError);
+              // Skip this entry rather than failing the entire operation
+            }
+          }
+          
+          return result;
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback also failed:", fallbackError);
+          // Return empty array instead of throwing an error
+          return [];
+        }
+      }
+      
+      // Return empty array for any other error instead of throwing
+      return [];
     }
-    
-    return result;
   }
 
   async hasWatchlistEntry(userId: number, movieId: number): Promise<boolean> {
-    const entries = await db
-      .select()
-      .from(watchlistEntries)
-      .where(
-        and(
-          eq(watchlistEntries.userId, userId),
-          eq(watchlistEntries.movieId, movieId)
-        )
-      );
-    
-    return entries.length > 0;
+    try {
+      // Try using ORM first
+      const entries = await db
+        .select()
+        .from(watchlistEntries)
+        .where(
+          and(
+            eq(watchlistEntries.userId, userId),
+            eq(watchlistEntries.movieId, movieId)
+          )
+        );
+      
+      return entries.length > 0;
+    } catch (error) {
+      console.error("Database error in hasWatchlistEntry using ORM:", error);
+      
+      // Try direct SQL as fallback for connection issues
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          console.log("Attempting direct SQL fallback for hasWatchlistEntry");
+          const rows = await executeDirectSql<{count: number}>(
+            'SELECT COUNT(*) as count FROM "watchlist_entries" WHERE "userId" = $1 AND "movieId" = $2',
+            [userId, movieId],
+            'Failed to check watchlist entry existence'
+          );
+          
+          if (rows.length > 0) {
+            return rows[0].count > 0;
+          }
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback also failed:", fallbackError);
+          // Return false instead of throwing an error, as this is a check operation
+          return false;
+        }
+      }
+      
+      // Return false for any error rather than throwing
+      // This won't break watchlist operations
+      return false;
+    }
   }
 
   async createWatchlistEntry(insertEntry: InsertWatchlistEntry): Promise<WatchlistEntry> {
-    const [entry] = await db
-      .insert(watchlistEntries)
-      .values(insertEntry)
-      .returning();
-    
-    return entry;
+    try {
+      // First check if entry already exists
+      const exists = await this.hasWatchlistEntry(
+        insertEntry.userId, 
+        insertEntry.movieId
+      );
+      
+      if (exists) {
+        console.log(`Watchlist entry already exists for user ${insertEntry.userId} and movie ${insertEntry.movieId}`);
+        // Get the existing entry
+        const entries = await db
+          .select()
+          .from(watchlistEntries)
+          .where(
+            and(
+              eq(watchlistEntries.userId, insertEntry.userId),
+              eq(watchlistEntries.movieId, insertEntry.movieId)
+            )
+          );
+        
+        if (entries.length > 0) {
+          return entries[0];
+        }
+      }
+      
+      // Create new entry using ORM
+      const [entry] = await db
+        .insert(watchlistEntries)
+        .values(insertEntry)
+        .returning();
+      
+      return entry;
+    } catch (error) {
+      console.error("Database error in createWatchlistEntry using ORM:", error);
+      
+      // Check for common error types
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('duplicate key') || errorMessage.includes('unique constraint')) {
+        // Try to fetch existing entry instead of failing
+        try {
+          const entries = await db
+            .select()
+            .from(watchlistEntries)
+            .where(
+              and(
+                eq(watchlistEntries.userId, insertEntry.userId),
+                eq(watchlistEntries.movieId, insertEntry.movieId)
+              )
+            );
+          
+          if (entries.length > 0) {
+            console.log(`Watchlist entry already exists, returning existing record`);
+            return entries[0];
+          }
+        } catch (fetchError) {
+          console.error("Error fetching existing watchlist entry:", fetchError);
+        }
+      }
+      
+      // Try direct SQL as fallback for connection issues
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          console.log("Attempting direct SQL fallback for createWatchlistEntry");
+          
+          // Check if entry already exists
+          const existingRows = await executeDirectSql<WatchlistEntry>(
+            'SELECT * FROM "watchlist_entries" WHERE "userId" = $1 AND "movieId" = $2 LIMIT 1',
+            [insertEntry.userId, insertEntry.movieId],
+            'Failed to check for existing watchlist entry'
+          );
+          
+          if (existingRows.length > 0) {
+            return existingRows[0];
+          }
+          
+          // Direct SQL insertion with proper value escaping
+          const columns = Object.keys(insertEntry).map(key => `"${key}"`).join(', ');
+          const placeholders = Object.keys(insertEntry).map((_, index) => `$${index + 1}`).join(', ');
+          const values = Object.values(insertEntry);
+          
+          const rows = await executeDirectSql<WatchlistEntry>(
+            `INSERT INTO "watchlist_entries" (${columns}) VALUES (${placeholders}) RETURNING *`,
+            values,
+            'Failed to create watchlist entry'
+          );
+          
+          if (rows.length === 0) {
+            throw new Error('Watchlist entry creation did not return any data');
+          }
+          
+          return rows[0];
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback also failed:", fallbackError);
+          
+          // One last attempt to check if entry exists (might have been created in a race condition)
+          try {
+            const lastChanceCheck = await executeDirectSql<WatchlistEntry>(
+              'SELECT * FROM "watchlist_entries" WHERE "userId" = $1 AND "movieId" = $2 LIMIT 1',
+              [insertEntry.userId, insertEntry.movieId],
+              'Failed to check for existing watchlist entry'
+            );
+            
+            if (lastChanceCheck.length > 0) {
+              return lastChanceCheck[0];
+            }
+          } catch (e) {
+            // Ignore this error and proceed with the original error
+          }
+          
+          throw fallbackError;
+        }
+      }
+      
+      throw new Error(`Failed to create watchlist entry: ${errorMessage}`);
+    }
   }
 
   async updateWatchlistEntry(id: number, updates: Partial<InsertWatchlistEntry>): Promise<WatchlistEntry | undefined> {
