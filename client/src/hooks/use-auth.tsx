@@ -35,11 +35,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error,
     isLoading,
   } = useQuery<SelectUser | null, Error>({
-    queryKey: ["/api/auth/user"],
+    queryKey: ["/api/user"],
     queryFn: async () => {
       try {
-        // Try the session endpoint first
-        const sessionRes = await fetch("/api/auth/session", {
+        // Try both endpoint formats to handle redeployment and backward compatibility
+        // First try the newer directly on /api endpoint
+        try {
+          const userRes = await fetch("/api/user", {
+            credentials: "include",
+          });
+          
+          if (userRes.ok) {
+            return await userRes.json();
+          }
+        } catch (directError) {
+          console.log("Direct user endpoint error, trying session endpoint");
+        }
+        
+        // If that fails, try the session endpoint
+        const sessionRes = await fetch("/api/session", {
           credentials: "include",
         });
         
@@ -75,17 +89,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      const res = await apiRequest("POST", "/api/auth/login", credentials);
-      
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: "Login failed" }));
-        throw new Error(errorData.message || `Login failed with status ${res.status}`);
+      // Try the new endpoint first
+      try {
+        const res = await apiRequest("POST", "/api/login", credentials);
+        
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ message: "Login failed" }));
+          throw new Error(errorData.message || `Login failed with status ${res.status}`);
+        }
+        
+        const data = await res.json();
+        return data.user || data; // Handle both response formats
+      } catch (directError) {
+        console.log("Direct login endpoint error, trying legacy endpoint", directError);
+        
+        // Try the old endpoint as fallback
+        const res = await apiRequest("POST", "/api/auth/login", credentials);
+        
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ message: "Login failed" }));
+          throw new Error(errorData.message || `Login failed with status ${res.status}`);
+        }
+        
+        const data = await res.json();
+        return data.user || data;
       }
-      
-      const data = await res.json();
-      return data.user;
     },
     onSuccess: (userData: SelectUser) => {
+      // Update both cache keys to ensure both endpoint formats work
+      queryClient.setQueryData(["/api/user"], userData);
       queryClient.setQueryData(["/api/auth/user"], userData);
       toast({
         title: "Welcome back!",
@@ -103,17 +135,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (userData: RegisterData) => {
-      const res = await apiRequest("POST", "/api/auth/register", userData);
-      
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: "Registration failed" }));
-        throw new Error(errorData.message || `Registration failed with status ${res.status}`);
+      // Try the new endpoint first
+      try {
+        const res = await apiRequest("POST", "/api/register", userData);
+        
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ message: "Registration failed" }));
+          throw new Error(errorData.message || `Registration failed with status ${res.status}`);
+        }
+        
+        const data = await res.json();
+        return data.user || data;
+      } catch (directError) {
+        console.log("Direct register endpoint error, trying legacy endpoint", directError);
+        
+        // Try the old endpoint as fallback
+        const res = await apiRequest("POST", "/api/auth/register", userData);
+        
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ message: "Registration failed" }));
+          throw new Error(errorData.message || `Registration failed with status ${res.status}`);
+        }
+        
+        const data = await res.json();
+        return data.user || data;
       }
-      
-      const data = await res.json();
-      return data.user;
     },
     onSuccess: (userData: SelectUser) => {
+      // Update both cache keys to ensure both endpoint formats work
+      queryClient.setQueryData(["/api/user"], userData);
       queryClient.setQueryData(["/api/auth/user"], userData);
       toast({
         title: "Account created",
@@ -131,6 +181,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
+      // Try the new endpoint first
+      try {
+        const res = await apiRequest("POST", "/api/logout");
+        
+        if (res.ok) {
+          return;
+        }
+        
+        console.log("Direct logout endpoint returned:", res.status);
+      } catch (directError) {
+        console.log("Direct logout endpoint error, trying legacy endpoint", directError);
+      }
+      
+      // Try the old endpoint as fallback
       const res = await apiRequest("POST", "/api/auth/logout");
       
       if (!res.ok) {
@@ -138,6 +202,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: () => {
+      // Clear cache for both endpoint formats
+      queryClient.setQueryData(["/api/user"], null);
       queryClient.setQueryData(["/api/auth/user"], null);
       // Invalidate watchlist queries to clear user-specific data
       queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
