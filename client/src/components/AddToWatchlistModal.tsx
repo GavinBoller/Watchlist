@@ -88,18 +88,40 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
       status: status,
     };
     
+    // Use multiple retries with our improved API client
+    const apiOptions = {
+      retries: 3,
+      retryDelay: 800,
+      timeout: 20000 // Longer timeout for this important operation
+    };
+
     try {
       console.log("Submitting watchlist data:", JSON.stringify(watchlistData, null, 2));
       
-      const res = await apiRequest('POST', '/api/watchlist', watchlistData);
-      const data = await res.json().catch(() => null);
+      // Try with max retries and cross-browser compatibility improvements
+      const res = await apiRequest('POST', '/api/watchlist', watchlistData, apiOptions);
       
+      // Handle successful response
+      const contentType = res.headers.get('content-type');
+      let data: any = null;
+      
+      // Make sure we can parse the response
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          data = await res.json();
+        } catch (parseError) {
+          console.error('Error parsing watchlist response:', parseError);
+        }
+      }
+      
+      // Create appropriate status labels for the toast
       const statusLabel = status === 'to_watch' 
         ? 'plan to watch list' 
         : status === 'watching' 
           ? 'currently watching list'
           : 'watched list';
       
+      // Check if it was already in watchlist
       if (data?.message === "Already in watchlist") {
         toast({
           title: "Already Added",
@@ -114,6 +136,8 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
       }
       
       // Invalidate the watchlist cache to refresh the UI
+      // Use array format for better cache invalidation
+      queryClient.invalidateQueries({ queryKey: ['/api/watchlist', currentUser.id] });
       queryClient.invalidateQueries({ queryKey: [`/api/watchlist/${currentUser.id}`] });
       
       // Close the modal and reset form
@@ -123,6 +147,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
       
       // Get response data where available for better error messages
       const errorData = error.data || {};
+      console.log('Error details:', errorData);
       
       // Check for different error types and provide specific messages
       if (error.status === 409 || (errorData?.message === "Already in watchlist")) {
@@ -131,6 +156,8 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
           description: errorData?.details || `You've already added "${title}" to your list`,
           variant: "default",
         });
+        // Still consider this a success since the item is in the watchlist
+        handleClose();
       } else if (error.status === 400) {
         // Handle validation errors
         let errorMsg = "There was a problem with the data submitted";
@@ -148,27 +175,55 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
           variant: "destructive",
         });
       } else if (error.status === 401) {
-        // Use error code if available for more specific error messages
+        // Enhanced error handling for auth errors with retry
         const errorCode = errorData?.code;
         const errorMessage = errorData?.message || "Please log in again to add items to your watchlist";
         
-        // Handle session expiration specially
-        if (errorCode === 'SESSION_EXPIRED') {
-          // Force the user to the login page 
-          window.location.href = '/auth';
-        } else {
-          toast({
-            title: "Authentication error",
-            description: errorMessage,
-            variant: "destructive",
+        console.log('Authentication error detected:', errorCode, errorMessage);
+        
+        // Create a more specific error message for auth errors
+        toast({
+          title: "Authentication error",
+          description: "Your session may have expired. Please try again or log in again to continue.",
+          variant: "destructive",
+        });
+        
+        // Attempt to refresh the authentication status
+        try {
+          const userCheck = await apiRequest('GET', '/api/user', undefined, {
+            ignoreAuthErrors: true // Don't throw on 401
           });
           
-          // If we get an explicit AUTH_REQUIRED_WATCHLIST error, force a login reload
-          if (errorCode === 'AUTH_REQUIRED_WATCHLIST') {
+          if (userCheck.status === 401) {
+            console.log('User is not authenticated, redirecting to login...');
+            
+            toast({
+              title: "Authentication required",
+              description: "Please log in to continue",
+              variant: "destructive",
+            });
+            
+            // Use a short delay to allow the toast to show before redirecting
             setTimeout(() => {
               window.location.href = '/auth';
-            }, 1500); // Small delay to allow toast to be seen
+            }, 1500);
+          } else {
+            // User is actually authenticated but something else went wrong
+            console.log('User is authenticated but watchlist operation failed');
+            
+            toast({
+              title: "Server error",
+              description: "Please try again or refresh the page",
+              variant: "destructive",
+            });
           }
+        } catch (authCheckError) {
+          console.error('Error checking authentication status:', authCheckError);
+          
+          // Fallback to simple redirect
+          setTimeout(() => {
+            window.location.href = '/auth';
+          }, 1500);
         }
       } else if (error.status === 404) {
         // Handle user not found errors with specific message

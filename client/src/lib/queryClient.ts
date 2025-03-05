@@ -76,7 +76,7 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-// Enhanced API request function with timeout and retry capabilities
+// Enhanced API request function with timeout, retry capabilities, and improved error handling
 export async function apiRequest(
   method: string,
   url: string,
@@ -85,12 +85,14 @@ export async function apiRequest(
     timeout?: number;
     retries?: number;
     retryDelay?: number;
+    ignoreAuthErrors?: boolean; // Flag to handle auth errors differently
   } = {}
 ): Promise<Response> {
   const { 
-    timeout = 15000, // 15 second default timeout
-    retries = 2,     // 2 retries by default 
-    retryDelay = 1000 // 1 second delay between retries
+    timeout = 15000,       // 15 second default timeout
+    retries = 2,           // 2 retries by default 
+    retryDelay = 1000,     // 1 second delay between retries
+    ignoreAuthErrors = false // Default to throwing auth errors
   } = options;
   
   let lastError: Error | null = null;
@@ -101,23 +103,45 @@ export async function apiRequest(
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
       
+      console.log(`[API] ${method} request to ${url} (attempt ${attempt + 1}/${retries + 1})`);
+      if (data) {
+        console.log(`[API] Request data:`, data);
+      }
+      
       try {
         const res = await fetch(url, {
           method,
-          headers: data ? { "Content-Type": "application/json" } : {},
+          headers: data ? { 
+            "Content-Type": "application/json",
+            // Add cache-busting headers for IE11 and some mobile browsers
+            "Pragma": "no-cache",
+            "Cache-Control": "no-cache, no-store, must-revalidate"
+          } : {
+            "Pragma": "no-cache", 
+            "Cache-Control": "no-cache, no-store, must-revalidate"
+          },
           body: data ? JSON.stringify(data) : undefined,
-          credentials: "include",
+          credentials: "include", // Always send cookies for authentication
           signal: controller.signal
         });
         
         clearTimeout(timeoutId);
+        console.log(`[API] Response status: ${res.status}, URL: ${url}`);
+        
+        // Special handling for auth errors if requested
+        if (res.status === 401 && ignoreAuthErrors) {
+          console.log(`[API] Ignoring 401 Unauthorized error as requested`);
+          return res; // Return the response without throwing
+        }
         
         // For server errors (5xx), we might want to retry
         if (res.status >= 500 && attempt < retries) {
           lastError = new Error(`Server error: ${res.status}`);
           (lastError as any).status = res.status;
-          // Wait before retrying
-          await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
+          // Wait before retrying with exponential backoff
+          const delayTime = retryDelay * Math.pow(2, attempt);
+          console.log(`[API] Server error (${res.status}), retrying in ${delayTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delayTime));
           continue;
         }
         
@@ -129,19 +153,31 @@ export async function apiRequest(
       }
     } catch (error) {
       lastError = error as Error;
+      console.error(`[API] Error during ${method} request to ${url}:`, error);
+      
+      // Special handling for auth errors if requested
+      if ((error as any)?.status === 401 && ignoreAuthErrors) {
+        console.log(`[API] Ignoring thrown 401 Unauthorized error as requested`);
+        const mockResponse = new Response(JSON.stringify({ message: "Unauthorized" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" }
+        });
+        return mockResponse;
+      }
       
       // Don't retry client errors (4xx) or aborted requests
       if (
         (error instanceof Error && (error as any).isClientError) ||
-        (error instanceof DOMException && error.name === 'AbortError' && attempt >= retries)
+        (error instanceof DOMException && error.name === 'AbortError')
       ) {
         throw error;
       }
       
       // For network errors or timeouts, retry if we have attempts left
       if (attempt < retries) {
-        console.warn(`API request attempt ${attempt + 1} failed, retrying in ${retryDelay * Math.pow(2, attempt)}ms`, error);
-        await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
+        const delayTime = retryDelay * Math.pow(2, attempt);
+        console.warn(`[API] Request attempt ${attempt + 1} failed, retrying in ${delayTime}ms`, error);
+        await new Promise(resolve => setTimeout(resolve, delayTime));
         continue;
       }
       
