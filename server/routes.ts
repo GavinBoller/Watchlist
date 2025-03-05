@@ -211,10 +211,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log("User authenticated:", req.isAuthenticated());
     if (req.isAuthenticated()) {
       console.log("Authenticated user:", (req.user as any)?.id, (req.user as any)?.username);
+      
+      // Verify the user is only adding to their own watchlist
+      const authenticatedUserId = (req.user as any)?.id;
+      const requestedUserId = req.body.userId;
+      
+      if (authenticatedUserId && requestedUserId && authenticatedUserId !== requestedUserId) {
+        console.warn(`User ID mismatch! Auth user: ${authenticatedUserId}, Requested: ${requestedUserId}`);
+        return res.status(403).json({ 
+          message: "You can only add items to your own watchlist",
+          code: "USER_MISMATCH" 
+        });
+      }
+      
+      // If userId is missing from the request, use the authenticated user's ID
+      if (!req.body.userId && authenticatedUserId) {
+        console.log(`No userId in request, using authenticated user ID: ${authenticatedUserId}`);
+        req.body.userId = authenticatedUserId;
+      }
     } else {
       console.warn("WARNING: User not authenticated when accessing watchlist POST endpoint");
       // We should not reach here because of the middleware, but just in case:
-      return res.status(401).json({ message: "You must be logged in to add items to your watchlist" });
+      return res.status(401).json({ 
+        message: "Authentication error: Please login again to add items to your watchlist",
+        code: "AUTH_REQUIRED_WATCHLIST"
+      });
     }
     
     try {

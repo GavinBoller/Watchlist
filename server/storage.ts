@@ -633,11 +633,27 @@ export class DatabaseStorage implements IStorage {
   
   async getUser(id: number): Promise<User | undefined> {
     try {
+      // Add detailed logging for session debugging
+      console.log(`[DB] Looking up user with ID: ${id}`);
+      
       // First attempt with Drizzle ORM
       const [user] = await db.select().from(users).where(eq(users.id, id));
+      
+      if (user) {
+        console.log(`[DB] Found user: ${user.username} (ID: ${user.id})`);
+      } else {
+        console.log(`[DB] No user found with ID: ${id}`);
+      }
+      
       return user || undefined;
     } catch (error) {
       console.error("Database error in getUser using ORM:", error);
+      
+      // Enhanced error logging for authentication debugging
+      if (error instanceof Error) {
+        console.error(`[DB] Error type: ${error.name}, Message: ${error.message}`);
+        console.error(`[DB] Stack trace: ${error.stack}`);
+      }
       
       // Try direct SQL as fallback for connection issues
       if (this.shouldUseDirectSqlFallback(error)) {
@@ -648,7 +664,14 @@ export class DatabaseStorage implements IStorage {
             [id],
             'Failed to retrieve user'
           );
-          return rows[0] || undefined; // Explicit undefined return for clarity
+          
+          if (rows && rows.length > 0) {
+            console.log(`[DB] Found user via SQL fallback: ${rows[0].username} (ID: ${rows[0].id})`);
+            return rows[0];
+          } else {
+            console.log(`[DB] No user found via SQL fallback for ID: ${id}`);
+            return undefined;
+          }
         } catch (fallbackError) {
           console.error("Direct SQL fallback also failed:", fallbackError);
           // Return undefined instead of throwing an error
@@ -667,14 +690,30 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
+      // Add detailed logging for authentication debugging
+      console.log(`[DB] Looking up user by username: ${username}`);
+      
       // First attempt with Drizzle ORM
       const [user] = await db
         .select()
         .from(users)
         .where(eq(users.username, username));
+      
+      if (user) {
+        console.log(`[DB] Found user by username: ${user.username} (ID: ${user.id})`);
+      } else {
+        console.log(`[DB] No user found with username: ${username}`);
+      }
+      
       return user || undefined;
     } catch (error) {
       console.error("Database error in getUserByUsername using ORM:", error);
+      
+      // Enhanced error logging for authentication debugging
+      if (error instanceof Error) {
+        console.error(`[DB] Error type: ${error.name}, Message: ${error.message}`);
+        console.error(`[DB] Stack trace: ${error.stack}`);
+      }
       
       // Try direct SQL as fallback for connection issues
       if (this.shouldUseDirectSqlFallback(error)) {
@@ -685,7 +724,14 @@ export class DatabaseStorage implements IStorage {
             [username],
             'Failed to retrieve user by username'
           );
-          return rows[0] || undefined; // Explicit undefined for clarity
+          
+          if (rows && rows.length > 0) {
+            console.log(`[DB] Found user via SQL fallback: ${rows[0].username} (ID: ${rows[0].id})`);
+            return rows[0];
+          } else {
+            console.log(`[DB] No user found via SQL fallback for username: ${username}`);
+            return undefined;
+          }
         } catch (fallbackError) {
           console.error("Direct SQL fallback also failed:", fallbackError);
           // Return undefined instead of throwing error

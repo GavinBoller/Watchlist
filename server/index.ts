@@ -205,6 +205,14 @@ async function startServer() {
     // Initialize the session store
     await setupSessionStore();
     
+    // In production, we need to ensure cookies work with HTTPS
+    if (process.env.NODE_ENV === 'production') {
+      console.log('Production environment detected - configuring secure session cookies');
+      app.set('trust proxy', 1); // Trust first proxy
+    } else {
+      console.log('Development environment detected - using non-secure cookies');
+    }
+    
     // Configure session middleware with appropriate settings
     app.use(session({
       secret: SESSION_SECRET,
@@ -215,8 +223,8 @@ async function startServer() {
       rolling: true, // Reset expiration countdown on every response
       name: 'watchlist.sid', // Custom name to avoid conflicts
       cookie: {
-        secure: process.env.NODE_ENV === 'production', // Only secure in production
         httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // Only secure in production
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         sameSite: 'lax', // This helps with CSRF protection
         path: '/'
