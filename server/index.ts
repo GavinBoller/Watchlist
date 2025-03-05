@@ -69,6 +69,7 @@ if (process.env.DATABASE_URL) {
 }
 
 // Configure session middleware with appropriate settings
+// Added more robust settings to handle redeployment and cookie issues
 app.use(session({
   secret: SESSION_SECRET,
   resave: false,
@@ -76,13 +77,13 @@ app.use(session({
   store: sessionStore,
   proxy: isProd, // Trust the reverse proxy in production
   rolling: true, // Reset expiration countdown on every response
+  name: 'watchlist.sid', // Custom name to avoid conflicts
   cookie: {
-    // Only use secure cookies in production with HTTPS
-    secure: isProd && process.env.ENFORCE_SECURE_COOKIES === 'true',
+    // Disable secure cookie to troubleshoot authentication issues
+    secure: false, // More reliable across environments
     httpOnly: true,
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     sameSite: 'lax', // This helps with CSRF protection and improves cookie security
-    // Fallback to 'strict' in production if not using a custom domain
     path: '/'
   }
 }));
@@ -92,8 +93,8 @@ app.use(passport.initialize());
 app.use(passport.session());
 configurePassport();
 
-// Register auth routes
-app.use('/api/auth', authRoutes);
+// Register auth routes directly at /api for backward compatibility
+app.use('/api', authRoutes);
 
 app.use((req, res, next) => {
   const start = Date.now();
