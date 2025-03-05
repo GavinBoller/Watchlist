@@ -140,7 +140,28 @@ router.post('/login', (req: Request, res: Response, next) => {
             return reject(loginErr);
           }
           
-          return resolve();
+          // Explicitly save the session to ensure it persists
+          req.session.save((saveErr) => {
+            if (saveErr) {
+              console.error('[AUTH] Session save error during login:', saveErr);
+              return reject(saveErr);
+            }
+            
+            console.log(`[AUTH] Session saved successfully for user ${user.id} (${user.username})`);
+            console.log(`[AUTH] Session ID: ${req.sessionID}`);
+            
+            // Mark session as authenticated
+            if (req.session) {
+              req.session.authenticated = true;
+              
+              // Add timestamp for session tracking
+              if (!req.session.createdAt) {
+                req.session.createdAt = Date.now();
+              }
+            }
+            
+            return resolve();
+          });
         });
       })(req, res, next);
     });

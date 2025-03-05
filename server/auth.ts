@@ -62,7 +62,11 @@ export function configurePassport() {
     try {
       const userId = (user as UserResponse).id;
       console.log(`[AUTH] Serializing user ID: ${userId} to session`);
-      done(null, userId);
+      
+      // Add explicit delay to ensure session is saved properly
+      setTimeout(() => {
+        done(null, userId);
+      }, 10);
     } catch (error) {
       console.error('[AUTH] Error serializing user:', error);
       done(error);

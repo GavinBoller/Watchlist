@@ -483,8 +483,8 @@ async function startServer() {
     
     app.use(session({
       secret: SESSION_SECRET,
-      resave: false,
-      saveUninitialized: false,
+      resave: true, // Changed to true to ensure session is saved back to the store
+      saveUninitialized: true, // Changed to true to create session for all visitors
       store: sessionStore,
       proxy: true, // Always trust the reverse proxy
       rolling: true, // Reset expiration countdown on every response
