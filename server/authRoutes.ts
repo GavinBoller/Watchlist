@@ -4,6 +4,15 @@ import bcrypt from 'bcryptjs';
 import { storage } from './storage';
 import { insertUserSchema, UserResponse } from '@shared/schema';
 import { z } from 'zod';
+import 'express-session';
+
+// Extend the Express Session interface to include our custom properties
+declare module 'express-session' {
+  interface SessionData {
+    createdAt?: number;
+    authenticated?: boolean;
+  }
+}
 
 // Password reset schemas
 const resetPasswordRequestSchema = z.object({
@@ -154,10 +163,41 @@ router.post('/login', (req: Request, res: Response, next) => {
       await retryOperation(authenticateWithRetry, maxRetries);
       
       // If we reach here, authentication was successful
-      return res.json({
-        message: 'Login successful',
-        user: req.user
-      });
+      // Make sure the session is saved before responding
+      console.log('[AUTH] Login successful, saving session before responding');
+      
+      if (req.session) {
+        // Add a timestamp to track session creation time
+        req.session.createdAt = Date.now();
+        req.session.authenticated = true;
+        
+        // Save the session explicitly to ensure it's persisted
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error('[AUTH] Session save error:', saveErr);
+            return res.status(500).json({
+              message: 'Login successful but session could not be saved.'
+            });
+          }
+          
+          console.log('[AUTH] Session saved successfully with ID:', req.sessionID);
+          
+          // Now that session is saved, respond with success
+          return res.json({
+            message: 'Login successful',
+            user: req.user,
+            sessionId: req.sessionID // Include session ID for debugging
+          });
+        });
+      } else {
+        // No session object - this is unusual but handle it gracefully
+        console.error('[AUTH] Session object missing after successful login');
+        return res.status(200).json({
+          message: 'Login processed, but session could not be established',
+          user: req.user,
+          warning: 'Session persistence may not work correctly'
+        });
+      }
     } catch (error) {
       console.error('Authentication error:', error);
       
@@ -301,8 +341,32 @@ router.post('/logout', (req: Request, res: Response) => {
 });
 
 // Check authentication status and get current user with retry logic
+// Enhanced with more diagnostic information
 router.get('/session', async (req: Request, res: Response) => {
   try {
+    console.log(`[SESSION] Session check, authenticated: ${req.isAuthenticated()}, session ID: ${req.sessionID || 'none'}`);
+    
+    // Add more session debugging info
+    let sessionInfo = null;
+    if (req.session) {
+      sessionInfo = {
+        id: req.sessionID,
+        cookie: req.session.cookie ? {
+          expires: req.session.cookie.expires,
+          maxAge: req.session.cookie.maxAge,
+          originalMaxAge: req.session.cookie.originalMaxAge,
+          httpOnly: req.session.cookie.httpOnly,
+          secure: req.session.cookie.secure,
+          sameSite: req.session.cookie.sameSite
+        } : 'No cookie data',
+        createdAt: req.session.createdAt || 'Unknown',
+        authenticated: req.session.authenticated || false
+      };
+      console.log('[SESSION] Session details:', JSON.stringify(sessionInfo, null, 2));
+    } else {
+      console.log('[SESSION] No session object available');
+    }
+    
     // If user is already authenticated in session, return immediately
     if (req.isAuthenticated()) {
       const user = req.user as UserResponse;
@@ -311,9 +375,14 @@ router.get('/session', async (req: Request, res: Response) => {
       const isProd = process.env.NODE_ENV === 'production';
       const emergencyMode = isProd && isEmergencyModeActive();
       
+      console.log(`[SESSION] User is authenticated, user ID: ${user.id}, username: ${user.username}`);
+      
+      // Include session diagnostics in the response
       return res.json({ 
         authenticated: true, 
         user,
+        sessionId: req.sessionID,
+        sessionInfo,
         emergencyMode: emergencyMode || undefined 
       });
     }
@@ -321,22 +390,32 @@ router.get('/session', async (req: Request, res: Response) => {
     // Check if we're running in emergency mode (for status info)
     const isProd = process.env.NODE_ENV === 'production';
     if (isProd && isEmergencyModeActive()) {
+      console.log('[SESSION] User not authenticated, emergency mode active');
       return res.json({ 
         authenticated: false, 
         user: null,
+        sessionId: req.sessionID,
+        sessionInfo,
         emergencyMode: true
       });
     }
     
     // Nothing to retry for unauthenticated users
-    return res.json({ authenticated: false, user: null });
+    console.log('[SESSION] User not authenticated, normal operation mode');
+    return res.json({ 
+      authenticated: false, 
+      user: null,
+      sessionId: req.sessionID,
+      sessionInfo
+    });
   } catch (error) {
     console.error('Session check error:', error);
     // Even if there's an error, don't fail the request - just return unauthenticated
     return res.json({ 
       authenticated: false, 
       user: null,
-      error: 'Failed to verify authentication status'
+      error: 'Failed to verify authentication status',
+      errorDetails: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
