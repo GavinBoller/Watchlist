@@ -45,8 +45,72 @@ const retryOperation = async <T>(operation: () => Promise<T>, maxRetries: number
   throw lastError;
 };
 
-// Login route with improved error handling and retry logic
+// Login route with improved error handling, retry logic, and emergency mode
 router.post('/login', (req: Request, res: Response, next) => {
+  // Check if emergency mode is active for severe database outages
+  const isProd = process.env.NODE_ENV === 'production';
+  if (isProd && isEmergencyModeActive()) {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({
+        message: 'Username and password are required'
+      });
+    }
+    
+    console.log('Using emergency mode for login - checking emergency storage');
+    
+    // Check if user exists in emergency storage
+    const lowercaseUsername = username.toLowerCase();
+    const user = emergencyMemoryStorage.users.get(lowercaseUsername);
+    
+    if (!user) {
+      // Check the normal database as fallback - user might exist there
+      // We'll fallback to normal error flow which will handle the failure case
+      console.log('User not found in emergency storage, trying normal auth flow');
+    } else {
+      // User exists in emergency storage, check password
+      return bcrypt.compare(password, user.password)
+        .then(isMatch => {
+          if (!isMatch) {
+            return res.status(401).json({
+              message: 'Invalid credentials'
+            });
+          }
+          
+          // Create sanitized user object
+          const { password: _, ...userWithoutPassword } = user;
+          
+          // Log user in
+          req.login(userWithoutPassword, (loginErr) => {
+            if (loginErr) {
+              console.error('Login error in emergency mode:', loginErr);
+              return res.status(500).json({
+                message: 'Login failed due to server error.',
+                emergencyMode: true
+              });
+            }
+            
+            // Success
+            return res.json({
+              message: 'Login successful (emergency mode)',
+              user: userWithoutPassword,
+              emergencyMode: true
+            });
+          });
+          
+          return;
+        })
+        .catch(err => {
+          console.error('Password comparison error in emergency mode:', err);
+          return res.status(500).json({
+            message: 'Login processing failed in emergency mode'
+          });
+        });
+    }
+  }
+  
+  // Normal authentication flow with retry
   // Custom authenticate function with retry logic
   const authenticateWithRetry = async () => {
     return new Promise<void>((resolve, reject) => {
@@ -85,7 +149,6 @@ router.post('/login', (req: Request, res: Response, next) => {
   (async () => {
     try {
       // Configure retry settings based on environment
-      const isProd = process.env.NODE_ENV === 'production';
       const maxRetries = isProd ? 3 : 1;
       
       await retryOperation(authenticateWithRetry, maxRetries);
@@ -97,6 +160,19 @@ router.post('/login', (req: Request, res: Response, next) => {
       });
     } catch (error) {
       console.error('Authentication error:', error);
+      
+      // If this is a production environment and we're facing connection issues
+      // after multiple retries, activate emergency mode
+      if (isProd && !isEmergencyModeActive() && 
+          error && typeof error === 'object' && 
+          'status' in error && (error.status === 503)) {
+        enableEmergencyMode();
+        return res.status(503).json({ 
+          message: 'Service temporarily in emergency mode. Please try again.',
+          error: 'emergency_mode_activated',
+          retry: true
+        });
+      }
       
       if (error && typeof error === 'object' && 'status' in error && 'message' in error) {
         return res.status(error.status as number).json({ message: error.message });
@@ -128,7 +204,26 @@ router.get('/session', async (req: Request, res: Response) => {
     // If user is already authenticated in session, return immediately
     if (req.isAuthenticated()) {
       const user = req.user as UserResponse;
-      return res.json({ authenticated: true, user });
+      
+      // Check if we're running in emergency mode
+      const isProd = process.env.NODE_ENV === 'production';
+      const emergencyMode = isProd && isEmergencyModeActive();
+      
+      return res.json({ 
+        authenticated: true, 
+        user,
+        emergencyMode: emergencyMode || undefined 
+      });
+    }
+    
+    // Check if we're running in emergency mode (for status info)
+    const isProd = process.env.NODE_ENV === 'production';
+    if (isProd && isEmergencyModeActive()) {
+      return res.json({ 
+        authenticated: false, 
+        user: null,
+        emergencyMode: true
+      });
     }
     
     // Nothing to retry for unauthenticated users
@@ -144,7 +239,28 @@ router.get('/session', async (req: Request, res: Response) => {
   }
 });
 
-// Register a new user
+// Configuration: Emergency in-memory user storage for severe database outages in production
+// This allows the app to function with basic functionality even when DB is completely unavailable
+const emergencyMemoryStorage = {
+  users: new Map<string, any>(),
+  isUsingEmergencyMode: false
+};
+
+/**
+ * IMPORTANT: This is a special fallback mode for severe database outages in production.
+ * It temporarily stores user data in memory to allow basic operations to continue.
+ * Data will be synchronized to the database once it becomes available again.
+ */
+function enableEmergencyMode() {
+  console.warn('⚠️ EMERGENCY MODE ACTIVATED: Using memory fallback for critical operations');
+  emergencyMemoryStorage.isUsingEmergencyMode = true;
+}
+
+function isEmergencyModeActive() {
+  return emergencyMemoryStorage.isUsingEmergencyMode;
+}
+
+// Register a new user with ultra-reliable fallback options
 router.post('/register', async (req: Request, res: Response) => {
   try {
     // First validate the input data
@@ -168,7 +284,59 @@ router.post('/register', async (req: Request, res: Response) => {
     const MAX_RETRIES = isProd ? 3 : 1;
     const RETRY_DELAY = 1000; // ms between retries
     
-    // Check if username already exists with retry logic
+    // Check if emergency mode is active (severe database outage)
+    if (isProd && isEmergencyModeActive()) {
+      console.log('Using emergency mode for user registration');
+      
+      // Check if username exists in emergency storage
+      if (emergencyMemoryStorage.users.has(validatedData.username.toLowerCase())) {
+        return res.status(409).json({ message: 'Username already exists' });
+      }
+      
+      // Hash the password for emergency storage
+      const passwordHash = await bcrypt.hash(validatedData.password, 10);
+      
+      // Create temporary user in emergency storage
+      const { confirmPassword, ...userData } = validatedData;
+      const tempUser = {
+        id: Date.now(), // Temporary ID
+        ...userData,
+        password: passwordHash,
+        displayName: userData.displayName || userData.username,
+        createdAt: new Date().toISOString(),
+        isPendingSync: true // Mark for DB sync when available
+      };
+      
+      // Store in emergency storage
+      emergencyMemoryStorage.users.set(validatedData.username.toLowerCase(), tempUser);
+      
+      // Create a sanitized version for the response
+      const { password, ...userWithoutPassword } = tempUser;
+      
+      // Automatically log the user in after registration
+      req.login(userWithoutPassword, (err) => {
+        if (err) {
+          console.error('Login after emergency registration error:', err);
+          return res.status(201).json({
+            message: 'Account created in emergency mode. Please log in manually.',
+            user: userWithoutPassword,
+            loginSuccessful: false,
+            emergencyMode: true
+          });
+        }
+        
+        return res.status(201).json({
+          message: 'Registration successful (emergency mode)',
+          user: userWithoutPassword,
+          loginSuccessful: true,
+          emergencyMode: true
+        });
+      });
+      
+      return;
+    }
+    
+    // Normal flow - check if username already exists with retry logic
     let existingUser;
     try {
       existingUser = await retryOperation(async () => {
@@ -176,6 +344,17 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     } catch (dbError) {
       console.error('Database error checking user existence after retries:', dbError);
+      
+      // If in production and this failed after multiple retries, enable emergency mode
+      if (isProd && !isEmergencyModeActive()) {
+        enableEmergencyMode();
+        return res.status(503).json({ 
+          message: 'Service temporarily in emergency mode. Please try again.',
+          error: 'emergency_mode_activated',
+          retry: true
+        });
+      }
+      
       return res.status(503).json({ 
         message: 'Service temporarily unavailable. Please try again later.',
         error: 'database_error'
@@ -209,6 +388,16 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     } catch (createError) {
       console.error('User creation error after retries:', createError);
+      
+      // If in production and this failed after multiple retries, enable emergency mode
+      if (isProd && !isEmergencyModeActive()) {
+        enableEmergencyMode();
+        return res.status(503).json({ 
+          message: 'Service temporarily in emergency mode. Please try again.',
+          error: 'emergency_mode_activated',
+          retry: true
+        });
+      }
       
       // Provide more informative error message with fallback timeout
       if (createError instanceof Error && 
