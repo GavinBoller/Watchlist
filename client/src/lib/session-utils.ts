@@ -537,16 +537,16 @@ export async function attemptSessionRecovery(userId?: number, username?: string)
         try {
           const backupData = {
             userId,
-            username,
+            username: username || 'unknown',
             timestamp: Date.now(),
             isSpecialUser: true,
-            specialProtection: ['test30', 'test36', 'janes'].includes(username.toLowerCase())
+            specialProtection: username ? ['test30', 'test36', 'janes'].includes(username.toLowerCase()) : false
           };
           localStorage.setItem('movietracker_enhanced_backup', JSON.stringify(backupData));
-          localStorage.setItem('movietracker_special_user', username);
+          localStorage.setItem('movietracker_special_user', username || 'unknown');
           
           // Set a shorter session refresh interval for these users
-          if (['test30', 'test36', 'janes'].includes(username.toLowerCase())) {
+          if (username && ['test30', 'test36', 'janes'].includes(username.toLowerCase())) {
             const currentInterval = parseInt(localStorage.getItem('movietracker_refresh_interval') || '60000');
             // Use more frequent refreshes for these problematic users (every 30 seconds)
             localStorage.setItem('movietracker_refresh_interval', '30000');

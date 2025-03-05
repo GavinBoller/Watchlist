@@ -54,7 +54,11 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'watchlist-app-secret';
 app.use(session({
   secret: SESSION_SECRET,
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    httpOnly: true
+  }
 }));
 
 // Initialize passport before any middleware that uses it

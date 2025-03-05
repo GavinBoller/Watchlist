@@ -820,7 +820,21 @@ function enableEmergencyMode() {
 }
 
 function isEmergencyModeActive() {
-  // Always return false to disable emergency mode since it's causing issues
+  // Check if emergency mode is explicitly enabled via environment variable
+  if (process.env.ENABLE_EMERGENCY_MODE === 'true') {
+    console.log('[AUTH] Emergency mode is explicitly enabled via environment variable');
+    return true;
+  }
+  
+  // Check for database connection issues
+  const isDatabaseConnected = !!process.env.DATABASE_URL;
+  
+  // If we're in production and database connection is not available, activate emergency mode
+  if (process.env.NODE_ENV === 'production' && !isDatabaseConnected) {
+    console.log('[AUTH] Emergency mode activated due to database connection issues');
+    return true;
+  }
+  
   return false;
 }
 
