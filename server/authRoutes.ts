@@ -290,6 +290,14 @@ router.get('/session', async (req: Request, res: Response) => {
   }
 });
 
+// Direct user info endpoint to support the client's API calls
+router.get('/user', (req: Request, res: Response) => {
+  if (req.isAuthenticated()) {
+    return res.json(req.user);
+  }
+  return res.status(401).json({ message: 'Unauthorized' });
+});
+
 // Configuration: Emergency in-memory user storage for severe database outages in production
 // This allows the app to function with basic functionality even when DB is completely unavailable
 const emergencyMemoryStorage = {

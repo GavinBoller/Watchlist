@@ -31,8 +31,8 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'watchlist-app-secret';
 let sessionStore;
 let usePostgresSession = false;
 
-// Use PostgreSQL session store in production when database is available
-if (isProd && process.env.DATABASE_URL) {
+// Use PostgreSQL session store whenever DATABASE_URL is available
+if (process.env.DATABASE_URL) {
   try {
     // Initialize Postgres session store with the pool from db.ts
     const PgSessionStore = connectPgSimple(session);
@@ -47,7 +47,7 @@ if (isProd && process.env.DATABASE_URL) {
     
     // Indicate we're using postgres for session storage
     usePostgresSession = true;
-    console.log('Using PostgreSQL session store for persistence');
+    console.log('Using PostgreSQL session store for session persistence');
   } catch (err) {
     console.error('Failed to initialize PostgreSQL session store, falling back to memory store:', err);
     
@@ -56,15 +56,16 @@ if (isProd && process.env.DATABASE_URL) {
     sessionStore = new MemoryStoreSession({
       checkPeriod: 86400000 // prune expired entries every 24h
     });
+    console.log('Using memory session store (fallback)');
   }
 } else {
-  // Use memory store for development
+  // Use memory store when no DATABASE_URL is available
   const MemoryStoreSession = MemoryStore(session);
   sessionStore = new MemoryStoreSession({
     checkPeriod: 86400000 // prune expired entries every 24h
   });
   
-  console.log('Using memory session store');
+  console.log('Using memory session store (no DATABASE_URL provided)');
 }
 
 // Configure session middleware with appropriate settings
