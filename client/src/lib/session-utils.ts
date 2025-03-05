@@ -7,6 +7,55 @@ export interface SessionCheckResult {
   emergencyMode?: boolean;
   error?: string;
   sessionId?: string;
+  autoLogoutDetected?: boolean;
+}
+
+/**
+ * Check if auto-logout patterns are detected
+ * This helps prevent unwanted rapid logouts that might be occurring due to bugs
+ * @returns true if auto-logout pattern is detected, false otherwise
+ */
+export function detectAutoLogoutPattern(): boolean {
+  try {
+    // Get the recent logout history from localStorage
+    const recentLogoutsJSON = localStorage.getItem('movietracker_recent_logouts');
+    let recentLogouts: {timestamp: number, count: number} = recentLogoutsJSON ? 
+      JSON.parse(recentLogoutsJSON) : { timestamp: 0, count: 0 };
+    
+    // Check if we have multiple rapid logout attempts
+    const now = Date.now();
+    const withinTimeWindow = (now - recentLogouts.timestamp) < 30000; // 30 seconds
+    
+    if (withinTimeWindow) {
+      // Increment the counter for tracking
+      recentLogouts.count++;
+      recentLogouts.timestamp = now;
+      
+      // Save it back to localStorage
+      localStorage.setItem('movietracker_recent_logouts', JSON.stringify(recentLogouts));
+      
+      // If we've seen too many logout attempts in a short window, this looks like auto-logout
+      if (recentLogouts.count >= 3) {
+        console.warn(`Detected potential auto-logout pattern: ${recentLogouts.count} attempts in 30s`);
+        
+        // Record the detection for diagnostics
+        localStorage.setItem('movietracker_auto_logout_detected', 'true');
+        localStorage.setItem('movietracker_auto_logout_ts', String(now));
+        localStorage.setItem('movietracker_auto_logout_count', String(recentLogouts.count));
+        
+        return true;
+      }
+    } else {
+      // Reset the counter if outside time window
+      recentLogouts = { timestamp: now, count: 1 };
+      localStorage.setItem('movietracker_recent_logouts', JSON.stringify(recentLogouts));
+    }
+    
+    return false;
+  } catch (e) {
+    console.error("Error checking for auto-logout pattern:", e);
+    return false;
+  }
 }
 
 /**
@@ -316,6 +365,21 @@ export async function handleSessionExpiration(
   redirectDelay: number = 1500
 ): Promise<void> {
   console.log('Handling session expiration check:', errorCode, errorMessage);
+  
+  // Check for auto-logout patterns first
+  if (detectAutoLogoutPattern()) {
+    console.warn('Auto-logout pattern detected during session expiration handling');
+    
+    // Show a friendly notification instead of redirecting
+    toast({
+      title: "Session issue detected",
+      description: "We noticed unusual session activity. Your session has been preserved.",
+      duration: 5000,
+    });
+    
+    // Don't continue with session expiration flow
+    return;
+  }
   
   // Enhanced session verification with multiple checks to avoid false logouts
   
