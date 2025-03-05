@@ -93,26 +93,87 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const res = await apiRequest("POST", "/api/login", credentials);
         
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({ message: "Login failed" }));
-          throw new Error(errorData.message || `Login failed with status ${res.status}`);
+        // Check for success before trying to parse JSON
+        if (res.ok) {
+          try {
+            const contentType = res.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const data = await res.json();
+              console.log("Login successful with /api/login endpoint", data);
+              return data.user || data; // Handle both response formats
+            } else {
+              console.log("Response is not JSON, returning credentials username as fallback");
+              // If we got a successful response but not JSON, create a minimal user object
+              return { username: credentials.username, id: -1 };
+            }
+          } catch (jsonError) {
+            console.error("JSON parsing error from /api/login:", jsonError);
+            // If JSON parsing fails but login was successful, create a minimal user object
+            return { username: credentials.username, id: -1 };
+          }
         }
         
-        const data = await res.json();
-        return data.user || data; // Handle both response formats
+        // For error responses, don't try to parse JSON right away
+        console.log("Login error with /api/login endpoint, status:", res.status);
+        
+        // Only try to parse JSON errors if the content type is correct
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await res.json();
+            throw new Error(errorData.message || `Login failed with status ${res.status}`);
+          } catch (jsonParseError) {
+            throw new Error(`Login failed with status ${res.status}. Unable to parse error response.`);
+          }
+        } else {
+          throw new Error(`Login failed with status ${res.status}. Response was not JSON.`);
+        }
       } catch (directError) {
         console.log("Direct login endpoint error, trying legacy endpoint", directError);
         
         // Try the old endpoint as fallback
-        const res = await apiRequest("POST", "/api/auth/login", credentials);
-        
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({ message: "Login failed" }));
-          throw new Error(errorData.message || `Login failed with status ${res.status}`);
+        try {
+          const res = await apiRequest("POST", "/api/auth/login", credentials);
+          
+          // Check for success before trying to parse JSON
+          if (res.ok) {
+            try {
+              const contentType = res.headers.get('content-type');
+              if (contentType && contentType.includes('application/json')) {
+                const data = await res.json();
+                console.log("Login successful with /api/auth/login endpoint", data);
+                return data.user || data; // Handle both response formats
+              } else {
+                console.log("Response is not JSON, returning credentials username as fallback");
+                // If we got a successful response but not JSON, create a minimal user object
+                return { username: credentials.username, id: -1 };
+              }
+            } catch (jsonError) {
+              console.error("JSON parsing error from /api/auth/login:", jsonError);
+              // If JSON parsing fails but login was successful, create a minimal user object
+              return { username: credentials.username, id: -1 };
+            }
+          }
+          
+          // For error responses, handle carefully
+          console.log("Login error with /api/auth/login endpoint, status:", res.status);
+          
+          // Only try to parse JSON errors if the content type is correct
+          const contentType = res.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            try {
+              const errorData = await res.json();
+              throw new Error(errorData.message || `Login failed with status ${res.status}`);
+            } catch (jsonParseError) {
+              throw new Error(`Login failed with status ${res.status}. Unable to parse error response.`);
+            }
+          } else {
+            throw new Error(`Login failed with status ${res.status}. Response was not JSON.`);
+          }
+        } catch (legacyError) {
+          console.error("Both login endpoints failed", legacyError);
+          throw new Error("Login failed. Please try again later.");
         }
-        
-        const data = await res.json();
-        return data.user || data;
       }
     },
     onSuccess: (userData: SelectUser) => {
@@ -139,26 +200,87 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const res = await apiRequest("POST", "/api/register", userData);
         
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({ message: "Registration failed" }));
-          throw new Error(errorData.message || `Registration failed with status ${res.status}`);
+        // Check for success before trying to parse JSON
+        if (res.ok) {
+          try {
+            const contentType = res.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const data = await res.json();
+              console.log("Registration successful with /api/register endpoint", data);
+              return data.user || data; // Handle both response formats
+            } else {
+              console.log("Response is not JSON, returning username as fallback");
+              // If we got a successful response but not JSON, create a minimal user object
+              return { username: userData.username, id: -1 };
+            }
+          } catch (jsonError) {
+            console.error("JSON parsing error from /api/register:", jsonError);
+            // If JSON parsing fails but registration was successful, create a minimal user object
+            return { username: userData.username, id: -1 };
+          }
         }
         
-        const data = await res.json();
-        return data.user || data;
+        // For error responses, don't try to parse JSON right away
+        console.log("Registration error with /api/register endpoint, status:", res.status);
+        
+        // Only try to parse JSON errors if the content type is correct
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await res.json();
+            throw new Error(errorData.message || `Registration failed with status ${res.status}`);
+          } catch (jsonParseError) {
+            throw new Error(`Registration failed with status ${res.status}. Unable to parse error response.`);
+          }
+        } else {
+          throw new Error(`Registration failed with status ${res.status}. Response was not JSON.`);
+        }
       } catch (directError) {
         console.log("Direct register endpoint error, trying legacy endpoint", directError);
         
         // Try the old endpoint as fallback
-        const res = await apiRequest("POST", "/api/auth/register", userData);
-        
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({ message: "Registration failed" }));
-          throw new Error(errorData.message || `Registration failed with status ${res.status}`);
+        try {
+          const res = await apiRequest("POST", "/api/auth/register", userData);
+          
+          // Check for success before trying to parse JSON
+          if (res.ok) {
+            try {
+              const contentType = res.headers.get('content-type');
+              if (contentType && contentType.includes('application/json')) {
+                const data = await res.json();
+                console.log("Registration successful with /api/auth/register endpoint", data);
+                return data.user || data; // Handle both response formats
+              } else {
+                console.log("Response is not JSON, returning username as fallback");
+                // If we got a successful response but not JSON, create a minimal user object
+                return { username: userData.username, id: -1 };
+              }
+            } catch (jsonError) {
+              console.error("JSON parsing error from /api/auth/register:", jsonError);
+              // If JSON parsing fails but registration was successful, create a minimal user object
+              return { username: userData.username, id: -1 };
+            }
+          }
+          
+          // For error responses, handle carefully
+          console.log("Registration error with /api/auth/register endpoint, status:", res.status);
+          
+          // Only try to parse JSON errors if the content type is correct
+          const contentType = res.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            try {
+              const errorData = await res.json();
+              throw new Error(errorData.message || `Registration failed with status ${res.status}`);
+            } catch (jsonParseError) {
+              throw new Error(`Registration failed with status ${res.status}. Unable to parse error response.`);
+            }
+          } else {
+            throw new Error(`Registration failed with status ${res.status}. Response was not JSON.`);
+          }
+        } catch (legacyError) {
+          console.error("Both registration endpoints failed", legacyError);
+          throw new Error("Registration failed. Please try again later.");
         }
-        
-        const data = await res.json();
-        return data.user || data;
       }
     },
     onSuccess: (userData: SelectUser) => {
@@ -186,19 +308,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await apiRequest("POST", "/api/logout");
         
         if (res.ok) {
+          console.log("Logout successful with /api/logout endpoint");
           return;
         }
         
-        console.log("Direct logout endpoint returned:", res.status);
+        console.log("Direct logout endpoint returned status:", res.status);
       } catch (directError) {
         console.log("Direct logout endpoint error, trying legacy endpoint", directError);
       }
       
       // Try the old endpoint as fallback
-      const res = await apiRequest("POST", "/api/auth/logout");
-      
-      if (!res.ok) {
-        throw new Error("Logout failed");
+      try {
+        const res = await apiRequest("POST", "/api/auth/logout");
+        
+        if (res.ok) {
+          console.log("Logout successful with /api/auth/logout endpoint");
+          return;
+        }
+        
+        // If we get here, neither endpoint worked
+        console.log("Legacy logout endpoint returned status:", res.status);
+        
+        // Special handling for production errors: if we get any non-5xx status,
+        // consider the logout "successful" since we'll clear the local state anyway
+        if (res.status < 500) {
+          console.log("Non-server error status received, treating as successful logout");
+          return;
+        }
+        
+        throw new Error(`Logout failed with status ${res.status}`);
+      } catch (legacyError) {
+        console.error("Both logout endpoints failed", legacyError);
+        
+        // Even if server-side logout fails, we can still clear client state
+        // This provides a better UX in case of server issues
+        console.log("Treating as successful logout despite server errors");
+        return;
       }
     },
     onSuccess: () => {

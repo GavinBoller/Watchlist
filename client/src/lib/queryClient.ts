@@ -1,32 +1,71 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// Enhanced error handling with detailed error information
+// Enhanced error handling with detailed error information and HTML response detection
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const contentType = res.headers.get('content-type');
+    console.log(`Error response - Status: ${res.status}, Content-Type: ${contentType || 'none'}`);
+    
     try {
+      // Try to handle JSON responses
       if (contentType && contentType.includes('application/json')) {
-        const jsonData = await res.json();
-        const error = new Error(`${res.status}: ${jsonData.message || res.statusText}`);
+        try {
+          const jsonData = await res.json();
+          console.log("Error response JSON data:", jsonData);
+          const error = new Error(`${res.status}: ${jsonData.message || res.statusText}`);
+          (error as any).status = res.status;
+          (error as any).data = jsonData;
+          (error as any).isServerError = res.status >= 500;
+          (error as any).isClientError = res.status >= 400 && res.status < 500;
+          throw error;
+        } catch (jsonError) {
+          console.error("Failed to parse JSON error response:", jsonError);
+          const error = new Error(`${res.status}: Invalid JSON response`);
+          (error as any).status = res.status;
+          (error as any).isServerError = res.status >= 500;
+          (error as any).isClientError = res.status >= 400 && res.status < 500;
+          throw error;
+        }
+      } 
+      // Check for HTML responses (like error pages) and handle them specially
+      else if (contentType && contentType.includes('text/html')) {
+        const htmlText = await res.text();
+        console.log("Received HTML error response, length:", htmlText.length);
+        
+        // Extract a useful message if possible, or use a friendly error
+        let errorMessage = "Received HTML response instead of data";
+        if (htmlText.includes('<title>') && htmlText.includes('</title>')) {
+          const titleMatch = htmlText.match(/<title>(.*?)<\/title>/i);
+          if (titleMatch && titleMatch[1]) {
+            errorMessage = `Server returned HTML: ${titleMatch[1]}`;
+          }
+        }
+        
+        const error = new Error(errorMessage);
         (error as any).status = res.status;
-        (error as any).data = jsonData;
         (error as any).isServerError = res.status >= 500;
         (error as any).isClientError = res.status >= 400 && res.status < 500;
+        (error as any).isHtmlResponse = true;
         throw error;
-      } else {
+      }
+      // Handle all other non-JSON responses
+      else {
         const text = (await res.text()) || res.statusText;
-        const error = new Error(`${res.status}: ${text}`);
+        console.log("Error response text (first 100 chars):", text.substring(0, 100));
+        const error = new Error(`${res.status}: ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}`);
         (error as any).status = res.status;
         (error as any).isServerError = res.status >= 500;
         (error as any).isClientError = res.status >= 400 && res.status < 500;
         throw error;
       }
     } catch (parseError) {
-      // If there's an error parsing the response (e.g., invalid JSON),
+      // If there's an error parsing the response,
       // throw a more generic error that still includes the status code
       if (parseError instanceof Error && (parseError as any).status) {
         throw parseError; // Re-throw if it's our own error
       }
+      
+      console.error("Error parsing response:", parseError);
       const error = new Error(`${res.status}: Response parsing failed`);
       (error as any).status = res.status;
       (error as any).originalError = parseError;
