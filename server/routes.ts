@@ -242,14 +242,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Check if user exists
-      console.log("Checking if user exists - userId:", userId);
-      const user = await storage.getUser(userId);
-      if (!user) {
-        console.log("User not found - userId:", userId);
-        return res.status(404).json({ message: "User not found" });
+      // Check if user exists - with enhanced error handling and type checking
+      console.log("Checking if user exists - userId:", userId, "typeof:", typeof userId);
+      
+      // Try to parse userId to number if it's a string
+      let userIdNum = userId;
+      if (typeof userId === 'string') {
+        userIdNum = parseInt(userId, 10);
+        console.log("Converted userId string to number:", userIdNum);
       }
-      console.log("User found:", user.username);
+      
+      const user = await storage.getUser(userIdNum);
+      
+      // Enhanced user checking with fallback if user not found
+      if (!user) {
+        console.log("User not found - userId:", userIdNum);
+        
+        // If we have an authenticated user but their ID doesn't match the requested ID
+        if (req.isAuthenticated() && req.user) {
+          const authUserId = (req.user as any).id;
+          console.log("Using authenticated user instead - authUserId:", authUserId);
+          const authUser = await storage.getUser(authUserId);
+          
+          if (authUser) {
+            console.log("Found authenticated user:", authUser.username);
+            // Proceed with the authenticated user instead
+            userIdNum = authUserId;
+          } else {
+            // Try to get users to help with debugging
+            const allUsers = await storage.getAllUsers();
+            console.log("Available users:", allUsers.map(u => ({ id: u.id, username: u.username })));
+            
+            return res.status(404).json({ 
+              message: "User not found", 
+              details: "No valid user found for this request"
+            });
+          }
+        } else {
+          // Try to get users to help with debugging
+          const allUsers = await storage.getAllUsers();
+          console.log("Available users:", allUsers.map(u => ({ id: u.id, username: u.username })));
+          
+          return res.status(404).json({ 
+            message: "User not found", 
+            details: "The user ID provided doesn't exist in the database"
+          });
+        }
+      } else {
+        console.log("User found:", user.username, "ID:", user.id);
+      }
       
       // Ensure tmdbMovie has the required fields with fallback values for production robustness
       const validatedTmdbMovie = {
@@ -320,14 +361,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Check if this movie is already in the user's watchlist
-      console.log("Checking if movie is already in user's watchlist - userId:", userId, "movieId:", movie.id);
-      const alreadyInWatchlist = await storage.hasWatchlistEntry(userId, movie.id);
+      console.log("Checking if movie is already in user's watchlist - userId:", userIdNum, "movieId:", movie.id);
+      const alreadyInWatchlist = await storage.hasWatchlistEntry(userIdNum, movie.id);
       if (alreadyInWatchlist) {
         const movieTitle = movie.title || "this title";
         console.log("Movie already in watchlist:", movieTitle);
         
         // Find the existing entry to return to client
-        const entries = await storage.getWatchlistEntries(userId);
+        const entries = await storage.getWatchlistEntries(userIdNum);
         const existingEntry = entries.find(entry => entry.movieId === movie.id);
         
         if (existingEntry) {
