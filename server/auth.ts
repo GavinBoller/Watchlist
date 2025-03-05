@@ -205,8 +205,11 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
 }
 
 // Middleware to check if the user has access to the requested watchlist
-// with enhanced security validation and logging
+// with enhanced security validation, production-aware logging, and session protection
 export function hasWatchlistAccess(req: Request, res: Response, next: NextFunction) {
+  // Environment detection for tailored behavior
+  const isProd = process.env.NODE_ENV === 'production';
+  
   // Skip this check for public endpoints
   if (req.path === '/api/users' || req.path.startsWith('/api/movies')) {
     return next();
@@ -217,12 +220,18 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
   
   // For watchlist specific operations
   if (req.path.includes('/watchlist')) {
+    // Set cache control headers to prevent stale sessions
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    
     // Double-check authentication (defensive programming)
     if (!req.isAuthenticated()) {
       console.log('[AUTH] Watchlist access denied: Session not authenticated');
+      
       return res.status(401).json({ 
-        message: 'Authentication error: Session expired, please login again',
-        code: 'SESSION_EXPIRED'
+        message: isProd ? 'Session expired' : 'Authentication error: Session expired, please login again',
+        code: 'SESSION_EXPIRED',
+        time: new Date().toISOString()
       });
     }
     
@@ -238,8 +247,9 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
       });
       
       return res.status(401).json({ 
-        message: 'Session error: User data corrupted. Please login again',
-        code: 'SESSION_CORRUPTED'
+        message: isProd ? 'Session expired' : 'Session error: User data corrupted. Please login again',
+        code: 'SESSION_CORRUPTED',
+        time: new Date().toISOString()
       });
     }
     
@@ -247,14 +257,25 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
     
     // For POST to /api/watchlist (creating watchlist entry)
     if (req.method === 'POST' && req.path === '/api/watchlist') {
+      // Log the request details for debugging
+      console.log('POST /api/watchlist - Request body:', req.body);
+      
+      // Log environment information
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`User authenticated: ${req.isAuthenticated()}`);
+      console.log(`Authenticated user: ${currentUser.id} ${currentUser.username}`);
+      
       // For watchlist creation, ensure userId in body matches authenticated user
       if (req.body && 'userId' in req.body) {
         const bodyUserId = parseInt(req.body.userId, 10);
+        console.log(`Checking if user exists - userId: ${bodyUserId} typeof: ${typeof bodyUserId}`);
         
         if (bodyUserId !== currentUser.id) {
           console.log(`[AUTH] Watchlist creation denied: User ${currentUser.id} tried to create entry for user ${bodyUserId}`);
           return res.status(403).json({ 
-            message: 'Access denied: You can only manage your own watchlist',
+            message: isProd 
+              ? 'Access denied' 
+              : 'Access denied: You can only manage your own watchlist',
             code: 'ACCESS_DENIED_CREATE',
             requestedId: bodyUserId,
             yourId: currentUser.id
@@ -294,7 +315,9 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
         console.log(`[AUTH] Watchlist access denied: User ${currentUser.id} tried to access watchlist ${pathUserId}`);
         // For this application, users can only access their own watchlists
         return res.status(403).json({ 
-          message: 'Access denied: You can only access your own watchlist',
+          message: isProd 
+            ? 'Access denied' 
+            : 'Access denied: You can only access your own watchlist',
           code: 'ACCESS_DENIED_VIEW',
           requestedId: pathUserId,
           yourId: currentUser.id

@@ -61,6 +61,10 @@ async function createSessionTable(dbPool: any) {
 
 // Configure session store based on database availability
 async function setupSessionStore() {
+  // Environment-specific configuration
+  const isProd = process.env.NODE_ENV === 'production';
+  console.log(`Setting up session store for ${isProd ? 'production' : 'development'} environment`);
+  
   // Use PostgreSQL session store whenever DATABASE_URL is available
   if (process.env.DATABASE_URL) {
     try {
@@ -71,16 +75,56 @@ async function setupSessionStore() {
         // Initialize Postgres session store with the pool from db.ts
         const PgSessionStore = connectPgSimple(session);
         
-        // Now create the session store with existing table
+        // Now create the session store with environment-specific settings
         sessionStore = new PgSessionStore({
           pool,
           tableName: 'session',
           // Table already created above, so we don't need this flag
           createTableIfMissing: false, 
-          // Add reconnect and error handling
-          errorLog: (err) => console.error('Session store error:', err),
-          pruneSessionInterval: 60 * 15 // Prune expired sessions every 15 min
+          // Add enhanced error handling for production
+          errorLog: (err) => {
+            console.error('Session store error:', err);
+            // Additional logging for production errors
+            if (isProd) {
+              console.error('Production session error details:', {
+                time: new Date().toISOString(),
+                name: err.name,
+                code: err.code,
+                stack: err.stack?.substring(0, 200) // Truncate for readability
+              });
+            }
+          },
+          // More frequent pruning in production for better performance
+          pruneSessionInterval: isProd ? 60 * 30 : 60 * 15, // 30 or 15 minutes
+          // Custom retry logic for production
+          retryStrategy: isProd ? {
+            retries: 5,              // Try harder in production
+            factor: 2,               // Exponential backoff
+            minTimeout: 1000,        // Start at 1 second
+            maxTimeout: 30000,       // Max 30 seconds between retries
+            randomize: true          // Add jitter to prevent thundering herd
+          } : undefined
         });
+        
+        // Test connection if in production to validate store
+        if (isProd) {
+          try {
+            const testSessionId = `test-${Date.now()}`;
+            await new Promise<void>((resolve, reject) => {
+              sessionStore.set(testSessionId, { test: true }, (err) => {
+                if (err) reject(err);
+                else {
+                  // Clean up test session immediately
+                  sessionStore.destroy(testSessionId, () => resolve());
+                }
+              });
+            });
+            console.log('PostgreSQL session store connection validated successfully');
+          } catch (testError) {
+            console.error('Session store validation failed:', testError);
+            // Continue anyway - we'll fall back below if needed
+          }
+        }
         
         // Indicate we're using postgres for session storage
         usePostgresSession = true;
@@ -98,10 +142,24 @@ async function setupSessionStore() {
   // If we reach here, use memory store as fallback
   const MemoryStoreSession = MemoryStore(session);
   sessionStore = new MemoryStoreSession({
-    checkPeriod: 86400000 // prune expired entries every 24h
+    checkPeriod: 86400000, // prune expired entries every 24h
+    // Additional memory store options for better reliability
+    stale: true,           // Return stale values if issue with cache
+    max: isProd ? 5000 : 1000, // More sessions in production (but limit to prevent memory issues)
+    ttl: 24 * 60 * 60 * 1000,  // 24 hour TTL for all sessions
+    dispose: (key) => {
+      // Log when sessions are removed (in dev only to avoid log spam)
+      if (!isProd) {
+        console.log(`Session disposed: ${key.substring(0, 6)}... (truncated)`);
+      }
+    }
   });
   
-  if (process.env.DATABASE_URL) {
+  // Explicitly warn in production about memory store
+  if (isProd) {
+    console.warn('⚠️ WARNING: Using memory session store in production!');
+    console.warn('⚠️ Sessions will be lost on service restart or deployment');
+  } else if (process.env.DATABASE_URL) {
     console.log('Using memory session store (fallback due to error)');
   } else {
     console.log('Using memory session store (no DATABASE_URL provided)');
