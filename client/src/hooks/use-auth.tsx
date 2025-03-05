@@ -42,6 +42,7 @@ type AuthContextType = {
 
 type LoginData = Pick<InsertUser, "username" | "password">;
 
+// Create context with default value - export it directly for compatibility
 export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
