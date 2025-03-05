@@ -18,23 +18,7 @@ export interface SessionCheckResult {
  */
 export function detectAutoLogoutPattern(): boolean {
   try {
-    // First, check if this is a known problematic user that needs special handling
-    const storedUsername = localStorage.getItem('movietracker_username');
-    if (storedUsername) {
-      // Special problematic usernames that require enhanced protection
-      const problematicUsers = ['Test30', 'Test31', 'Test32'];
-      if (problematicUsers.includes(storedUsername)) {
-        console.warn(`Detected problematic user ${storedUsername} - applying enhanced session protection`);
-        
-        // Record this for analytics and debugging
-        localStorage.setItem('movietracker_enhanced_protection', 'true');
-        localStorage.setItem('movietracker_enhanced_protection_ts', String(Date.now()));
-        localStorage.setItem('movietracker_enhanced_user', storedUsername);
-        
-        // Always return true for problematic users to ensure maximum protection
-        return true;
-      }
-    }
+    // We now apply consistent session protection to all users without special cases
     
     // Standard auto-logout detection for all users
     const recentLogoutsJSON = localStorage.getItem('movietracker_recent_logouts');
@@ -88,10 +72,9 @@ export function detectAutoLogoutPattern(): boolean {
       // Save it back to localStorage
       localStorage.setItem('movietracker_recent_logouts', JSON.stringify(recentLogouts));
       
-      // Different thresholds based on user type
-      // For test users: higher threshold (3+ rapid logouts)
-      // For regular users: only trigger on extremely rapid and frequent patterns (4+)
-      const threshold = isTestUser ? 3 : 4;
+      // Use a consistent threshold for all users
+      // Only trigger on confirmed rapid patterns to avoid false positives
+      const threshold = 4;
       
       if (recentLogouts.count >= threshold) {
         console.warn(`Detected potential auto-logout pattern: ${recentLogouts.count} attempts in 15s for ${isTestUser ? 'test user' : 'regular user'}`);
