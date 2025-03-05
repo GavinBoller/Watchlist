@@ -64,6 +64,10 @@ export function detectAutoLogoutPattern(): boolean {
         const userData = JSON.parse(cachedUser);
         cachedUsername = userData?.username || '';
         isTestUser = cachedUsername.toLowerCase().includes('test');
+        
+        // Special handling for Test30 and Test36 users - they need extra protection
+        const isSpecialTestUser = ['test30', 'test36', 'janes'].some(name => 
+          cachedUsername.toLowerCase() === name);
       } catch (e) {
         console.error('Error parsing cached user:', e);
       }
@@ -77,9 +81,13 @@ export function detectAutoLogoutPattern(): boolean {
       // Save it back to localStorage
       localStorage.setItem('movietracker_recent_logouts', JSON.stringify(recentLogouts));
       
-      // Use a consistent threshold for all users
-      // Only trigger on confirmed rapid patterns to avoid false positives
-      const threshold = 4;
+      // Determine threshold based on user - special test users get extra protection
+      const isSpecialTestUser = cachedUsername && ['test30', 'test36', 'janes'].some(name => 
+        cachedUsername.toLowerCase() === name);
+      
+      // Lower threshold for special test users (catches issues faster)
+      // Standard threshold for all other users (avoid false positives)
+      const threshold = isSpecialTestUser ? 2 : 4;
       
       if (recentLogouts.count >= threshold) {
         console.warn(`Detected potential auto-logout pattern: ${recentLogouts.count} attempts in 15s for ${isTestUser ? 'test user' : 'regular user'}`);
