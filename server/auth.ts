@@ -215,8 +215,31 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
     return next();
   }
   
-  // Debug logging for watchlist access checking
+  // Enhanced debug logging for watchlist access checking
   console.log(`[AUTH] Checking watchlist access for ${req.method} ${req.path}`);
+  console.log(`[AUTH] Request session ID: ${req.sessionID}`);
+  console.log(`[AUTH] IsAuthenticated status: ${req.isAuthenticated()}`);
+  
+  if (req.session) {
+    // Log session information for debugging
+    console.log(`[AUTH] Session data:`, {
+      id: req.sessionID,
+      authenticated: req.session.authenticated,
+      createdAt: req.session.createdAt,
+      cookie: req.session.cookie
+    });
+  } else {
+    console.log(`[AUTH] No session object available`);
+  }
+  
+  if (req.user) {
+    console.log(`[AUTH] User in request:`, {
+      id: (req.user as any).id,
+      username: (req.user as any).username
+    });
+  } else {
+    console.log(`[AUTH] No user object in request`);
+  }
   
   // For watchlist specific operations
   if (req.path.includes('/watchlist')) {

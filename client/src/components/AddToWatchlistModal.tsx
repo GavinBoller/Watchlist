@@ -99,6 +99,45 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
     try {
       console.log("Submitting watchlist data:", JSON.stringify(watchlistData, null, 2));
       
+      // First, check that we're authenticated before proceeding
+      try {
+        // Verify session before submitting
+        const sessionCheck = await fetch("/api/session", { 
+          credentials: "include",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+          }
+        });
+        
+        if (sessionCheck.ok) {
+          const sessionData = await sessionCheck.json();
+          console.log("Session verification before adding to watchlist:", sessionData);
+          
+          if (!sessionData.authenticated) {
+            console.error("User not authenticated when trying to add to watchlist");
+            throw new Error("Not authenticated");
+          }
+        } else {
+          console.error("Session check failed before adding to watchlist");
+          throw new Error("Session check failed");
+        }
+      } catch (sessionError) {
+        console.error("Session verification error:", sessionError);
+        toast({
+          title: "Authentication error",
+          description: "Please login again to add items to your watchlist",
+          variant: "destructive",
+        });
+        
+        // Force redirect to auth page
+        setTimeout(() => {
+          window.location.href = '/auth';
+        }, 1500);
+        
+        return;
+      }
+      
       // Try with max retries and cross-browser compatibility improvements
       const res = await apiRequest('POST', '/api/watchlist', watchlistData, apiOptions);
       
@@ -140,6 +179,9 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
       // Use array format for better cache invalidation
       queryClient.invalidateQueries({ queryKey: ['/api/watchlist', currentUser.id] });
       queryClient.invalidateQueries({ queryKey: [`/api/watchlist/${currentUser.id}`] });
+      
+      // Also refresh user data to ensure session is still valid
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       
       // Close the modal and reset form
       handleClose();
