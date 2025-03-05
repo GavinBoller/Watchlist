@@ -515,11 +515,12 @@ async function startServer() {
     // Register auth routes after passport setup and schema changes
     app.use('/api', authRoutes);
     
-    // Apply authentication middleware to all API routes except auth routes
-    // Apply the auth middleware globally to protected routes
-    app.use('/api/watchlist', isAuthenticated, hasWatchlistAccess);
-    
+    // Register all API routes first
     const server = await registerRoutes(app);
+    
+    // Apply authentication middleware to protected routes AFTER registering routes
+    // This ensures that the middleware is applied to all routes that need protection
+    app.use('/api/watchlist', isAuthenticated, hasWatchlistAccess);
 
     // Add error handling middleware
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
