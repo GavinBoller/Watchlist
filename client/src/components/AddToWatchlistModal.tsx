@@ -148,11 +148,28 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
           variant: "destructive",
         });
       } else if (error.status === 401) {
-        toast({
-          title: "Authentication error",
-          description: "Please log in again to add items to your watchlist",
-          variant: "destructive",
-        });
+        // Use error code if available for more specific error messages
+        const errorCode = errorData?.code;
+        const errorMessage = errorData?.message || "Please log in again to add items to your watchlist";
+        
+        // Handle session expiration specially
+        if (errorCode === 'SESSION_EXPIRED') {
+          // Force the user to the login page 
+          window.location.href = '/auth';
+        } else {
+          toast({
+            title: "Authentication error",
+            description: errorMessage,
+            variant: "destructive",
+          });
+          
+          // If we get an explicit AUTH_REQUIRED_WATCHLIST error, force a login reload
+          if (errorCode === 'AUTH_REQUIRED_WATCHLIST') {
+            setTimeout(() => {
+              window.location.href = '/auth';
+            }, 1500); // Small delay to allow toast to be seen
+          }
+        }
       } else if (error.status === 404) {
         // Handle user not found errors with specific message
         if (errorData?.message?.includes("User not found")) {

@@ -211,11 +211,11 @@ async function startServer() {
       resave: false,
       saveUninitialized: false,
       store: sessionStore,
-      proxy: isProd, // Trust the reverse proxy in production
+      proxy: true, // Always trust the reverse proxy
       rolling: true, // Reset expiration countdown on every response
       name: 'watchlist.sid', // Custom name to avoid conflicts
       cookie: {
-        secure: false, // More reliable across environments
+        secure: process.env.NODE_ENV === 'production', // Only secure in production
         httpOnly: true,
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         sameSite: 'lax', // This helps with CSRF protection

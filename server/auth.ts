@@ -58,7 +58,19 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
   if (req.isAuthenticated()) {
     return next();
   }
-  res.status(401).json({ message: 'Unauthorized' });
+  
+  // Provide a more descriptive error message for client-side handling
+  if (req.path.includes('/watchlist')) {
+    return res.status(401).json({ 
+      message: 'Authentication error: Please login again to add items to your watchlist',
+      code: 'AUTH_REQUIRED_WATCHLIST'
+    });
+  }
+  
+  res.status(401).json({ 
+    message: 'Unauthorized: Please login to access this feature',
+    code: 'AUTH_REQUIRED' 
+  });
 }
 
 // Middleware to check if the user has access to the requested watchlist
@@ -73,7 +85,10 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
     const currentUser = req.user as UserResponse;
     
     if (!currentUser) {
-      return res.status(401).json({ message: 'Unauthorized' });
+      return res.status(401).json({ 
+        message: 'Authentication error: Session expired, please login again',
+        code: 'SESSION_EXPIRED'
+      });
     }
     
     // Extract the userId from the path
@@ -92,7 +107,10 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
     
     // For this application, users can only access their own watchlists
     return res.status(403).json({ 
-      message: 'You can only access your own watchlist' 
+      message: 'Access denied: You can only access your own watchlist',
+      code: 'ACCESS_DENIED',
+      requestedId: pathUserId,
+      yourId: currentUser.id
     });
   } else {
     // For other endpoints
