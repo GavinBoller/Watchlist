@@ -41,7 +41,13 @@ export async function checkSessionStatus(): Promise<SessionCheckResult | null> {
       
       // Log detailed response info for debugging
       console.log('Session check response status:', sessionResponse.status);
-      console.log('Session check response headers:', JSON.stringify(Object.fromEntries([...sessionResponse.headers.entries()])));
+      
+      // Extract and log headers safely
+      const headers: Record<string, string> = {};
+      sessionResponse.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      console.log('Session check response headers:', JSON.stringify(headers));
       
       // Handle non-ok responses
       if (!sessionResponse.ok) {

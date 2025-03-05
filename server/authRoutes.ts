@@ -674,10 +674,10 @@ router.post('/register', async (req: Request, res: Response) => {
     // Return user without password
     const { password, ...userWithoutPassword } = newUser;
     
-    // Automatically log the user in after registration
-    req.login(userWithoutPassword, (err) => {
-      if (err) {
-        console.error('Login after registration error:', err);
+    // Automatically log the user in after registration with session saving
+    req.login(userWithoutPassword, (loginErr) => {
+      if (loginErr) {
+        console.error('Login after registration error:', loginErr);
         // Still return success since user was created, but with a note
         return res.status(201).json({
           message: 'Account created successfully, but automatic login failed. Please log in manually.',
@@ -686,11 +686,49 @@ router.post('/register', async (req: Request, res: Response) => {
         });
       }
       
-      return res.status(201).json({
-        message: 'Registration successful',
-        user: userWithoutPassword,
-        loginSuccessful: true
-      });
+      // Explicitly save the session to ensure persistence
+      if (req.session) {
+        // Mark session as authenticated
+        req.session.authenticated = true;
+        
+        // Add timestamp for session tracking
+        if (!req.session.createdAt) {
+          req.session.createdAt = Date.now();
+        }
+        
+        // Save the session explicitly to ensure it's persisted
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error('[REGISTER] Session save error:', saveErr);
+            return res.status(201).json({
+              message: 'Account created successfully, but session could not be saved. You may need to log in again.',
+              user: userWithoutPassword,
+              loginSuccessful: true,
+              sessionWarning: true
+            });
+          }
+          
+          console.log('[REGISTER] Session saved successfully with ID:', req.sessionID);
+          console.log(`[REGISTER] User ${userWithoutPassword.id} (${userWithoutPassword.username}) logged in after registration`);
+          
+          // Return success with session info for debugging
+          return res.status(201).json({
+            message: 'Registration successful',
+            user: userWithoutPassword,
+            loginSuccessful: true,
+            sessionId: req.sessionID
+          });
+        });
+      } else {
+        // No session object - this is unusual but handle it gracefully
+        console.error('[REGISTER] Session object missing after successful login');
+        return res.status(201).json({
+          message: 'Account created successfully, but session could not be established. You may need to log in manually.',
+          user: userWithoutPassword,
+          loginSuccessful: true,
+          sessionWarning: true
+        });
+      }
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
