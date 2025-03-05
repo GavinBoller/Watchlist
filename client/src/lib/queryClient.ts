@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { handleSessionExpiration, isSessionError } from './session-utils';
 
 // Enhanced error handling with detailed error information and HTML response detection
 async function throwIfResNotOk(res: Response) {
@@ -129,9 +130,21 @@ export async function apiRequest(
         console.log(`[API] Response status: ${res.status}, URL: ${url}`);
         
         // Special handling for auth errors if requested
-        if (res.status === 401 && ignoreAuthErrors) {
-          console.log(`[API] Ignoring 401 Unauthorized error as requested`);
-          return res; // Return the response without throwing
+        if (res.status === 401) {
+          if (ignoreAuthErrors) {
+            console.log(`[API] Ignoring 401 Unauthorized error as requested`);
+            return res; // Return the response without throwing
+          } else {
+            // Handle unauthorized responses globally using our utility
+            // This approach ensures a consistent user experience
+            console.log(`[API] Detected 401 Unauthorized response, handling with session utilities`);
+            
+            // We'll let the error propagate but also trigger the session handler
+            // This is non-blocking so the error will still be thrown below
+            handleSessionExpiration('401', 'Your session has expired. Please log in again.');
+            
+            // Continue to the error handling code below which will throw correctly
+          }
         }
         
         // For server errors (5xx), we might want to retry
@@ -163,6 +176,21 @@ export async function apiRequest(
           headers: { "Content-Type": "application/json" }
         });
         return mockResponse;
+      }
+      
+      // Handle session expiration globally for a consistent user experience
+      // Only if this isn't a special endpoint that ignores auth errors
+      if (!ignoreAuthErrors && (
+        (error as any)?.status === 401 || 
+        isSessionError(error)
+      )) {
+        console.log('[API] Detected session expiration, handling...');
+        // Don't await this so we don't block the promise rejection chain
+        // This will handle the UI feedback separately
+        handleSessionExpiration(
+          (error as any)?.status || 'auth_error',
+          (error as any)?.data?.message || (error as Error).message
+        );
       }
       
       // Don't retry client errors (4xx) or aborted requests
