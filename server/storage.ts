@@ -1155,8 +1155,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async hasWatchlistEntry(userId: number, movieId: number): Promise<boolean> {
+    // Environment detection for better error handling
+    const isProd = process.env.NODE_ENV === 'production';
+    
     try {
-      // Try using ORM first
+      console.log(`[DB] Checking if entry already exists for user ${userId} and movie ${movieId}`);
+      
+      // Try using ORM first with additional logging for production issues
       const entries = await db
         .select()
         .from(watchlistEntries)
@@ -1167,14 +1172,27 @@ export class DatabaseStorage implements IStorage {
           )
         );
       
-      return entries.length > 0;
+      const hasEntry = entries.length > 0;
+      console.log(`[DB] Entry exists check result: ${hasEntry}`);
+      return hasEntry;
     } catch (error) {
-      console.error("Database error in hasWatchlistEntry using ORM:", error);
+      // Enhanced error logging, particularly for production
+      if (isProd) {
+        console.error('Production database error checking watchlist entry:', {
+          error: error instanceof Error ? error.message : String(error),
+          userId,
+          movieId,
+          time: new Date().toISOString(),
+          errorCode: error instanceof Error && 'code' in error ? (error as any).code : 'unknown'
+        });
+      } else {
+        console.error("Database error in hasWatchlistEntry using ORM:", error);
+      }
       
       // Try direct SQL as fallback for connection issues
       if (this.shouldUseDirectSqlFallback(error)) {
         try {
-          console.log("Attempting direct SQL fallback for hasWatchlistEntry");
+          console.log(`[DB] Attempting direct SQL fallback for watchlist entry check`);
           const rows = await executeDirectSql<{count: number}>(
             'SELECT COUNT(*) as count FROM "watchlist_entries" WHERE "userId" = $1 AND "movieId" = $2',
             [userId, movieId],
@@ -1182,17 +1200,31 @@ export class DatabaseStorage implements IStorage {
           );
           
           if (rows.length > 0) {
-            return rows[0].count > 0;
+            const hasEntry = rows[0].count > 0;
+            console.log(`[DB] Direct SQL fallback successful, entry exists: ${hasEntry}`);
+            return hasEntry;
           }
         } catch (fallbackError) {
           console.error("Direct SQL fallback also failed:", fallbackError);
+          
+          // In production, provide more detailed logging
+          if (isProd) {
+            console.error('Production direct SQL fallback error:', {
+              error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+              userId,
+              movieId,
+              time: new Date().toISOString()
+            });
+          }
+          
           // Return false instead of throwing an error, as this is a check operation
           return false;
         }
       }
       
       // Return false for any error rather than throwing
-      // This won't break watchlist operations
+      // This won't break watchlist operations - better UX
+      console.log('[DB] Defaulting to false for watchlist entry check to ensure smooth operation');
       return false;
     }
   }

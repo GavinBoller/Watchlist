@@ -95,15 +95,8 @@ async function setupSessionStore() {
             }
           },
           // More frequent pruning in production for better performance
-          pruneSessionInterval: isProd ? 60 * 30 : 60 * 15, // 30 or 15 minutes
-          // Custom retry logic for production
-          retryStrategy: isProd ? {
-            retries: 5,              // Try harder in production
-            factor: 2,               // Exponential backoff
-            minTimeout: 1000,        // Start at 1 second
-            maxTimeout: 30000,       // Max 30 seconds between retries
-            randomize: true          // Add jitter to prevent thundering herd
-          } : undefined
+          pruneSessionInterval: isProd ? 60 * 30 : 60 * 15 // 30 or 15 minutes
+          // Note: retryStrategy was removed as it's not part of PGStoreOptions type
         });
         
         // Test connection if in production to validate store
@@ -111,7 +104,7 @@ async function setupSessionStore() {
           try {
             const testSessionId = `test-${Date.now()}`;
             await new Promise<void>((resolve, reject) => {
-              sessionStore.set(testSessionId, { test: true }, (err) => {
+              sessionStore.set(testSessionId, { test: true }, (err: Error | null) => {
                 if (err) reject(err);
                 else {
                   // Clean up test session immediately
