@@ -37,14 +37,26 @@ const execPromise = util.promisify(exec);
 // Initialize Express app
 const app = express();
 
-// Add production-specific middleware early in the stack
-// These help with debugging and fixing session issues specifically in production
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// Configure session with proper SESSION_SECRET
+const SESSION_SECRET = process.env.SESSION_SECRET || 'watchlist-app-secret';
+app.use(session({
+  secret: SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false
+}));
+
+// Initialize passport before any middleware that uses it
+app.use(passport.initialize());
+app.use(passport.session());
+configurePassport();
+
+// Add production-specific middleware after passport initialization
 app.use(productionLogging);         // Enhanced logging for production
 app.use(productionSessionRepair);   // Session repair mechanisms
 app.use(productionOptimizations);   // Performance optimizations
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 
 // Configure session storage based on environment
 const isProd = process.env.NODE_ENV === 'production';
