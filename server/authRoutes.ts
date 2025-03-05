@@ -2,7 +2,7 @@ import { Request, Response, Router } from 'express';
 import passport from 'passport';
 import bcrypt from 'bcryptjs';
 import { storage } from './storage';
-import { insertUserSchema, UserResponse } from '@shared/schema';
+import { insertUserSchema, UserResponse, User } from '@shared/schema';
 import { z } from 'zod';
 import 'express-session';
 
@@ -548,6 +548,66 @@ router.get('/user', (req: Request, res: Response) => {
 // Session validation and refresh endpoint
 // This endpoint can be called before performing important operations
 // to ensure the session is still valid and refresh it
+// Production-only diagnostic endpoint for session troubleshooting
+router.get('/diagnostics', (req: Request, res: Response) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  
+  // This endpoint should only be available in production
+  if (!isProd) {
+    return res.status(404).json({ message: 'Not found in development mode' });
+  }
+  
+  // Gather extensive diagnostic information
+  const diagnostics = {
+    // Basic info
+    isProduction: isProd,
+    nodeEnv: process.env.NODE_ENV,
+    
+    // Session info
+    hasSession: !!req.session,
+    sessionID: req.sessionID || 'none',
+    isAuthenticated: req.isAuthenticated(),
+    
+    // Cookie info
+    cookies: req.headers.cookie,
+    
+    // Headers
+    host: req.headers.host,
+    userAgent: req.headers['user-agent'],
+    
+    // Environment
+    databaseUrl: process.env.DATABASE_URL ? 'configured' : 'missing',
+    
+    // Session details (if available)
+    sessionDetails: req.session ? {
+      cookie: {
+        maxAge: req.session.cookie.maxAge,
+        originalMaxAge: req.session.cookie.originalMaxAge,
+        httpOnly: req.session.cookie.httpOnly,
+        secure: req.session.cookie.secure,
+        sameSite: req.session.cookie.sameSite
+      },
+      createdAt: req.session.createdAt,
+      authenticated: req.session.authenticated
+    } : 'No session',
+    
+    // User (if authenticated)
+    user: req.isAuthenticated() ? req.user : 'Not authenticated',
+    
+    // Database health check result (async but we'll return this separately)
+    databaseStatus: 'Checking...',
+    
+    // Time
+    timestamp: new Date().toISOString()
+  };
+  
+  // Log the diagnostic information server-side
+  console.log('[DIAGNOSTICS] Production diagnostic info:', JSON.stringify(diagnostics, null, 2));
+  
+  // Return diagnostics to client
+  return res.json(diagnostics);
+});
+
 router.get('/refresh-session', async (req: Request, res: Response) => {
   console.log("[SESSION REFRESH] Received request to refresh session");
   console.log(`[SESSION REFRESH] Authenticated: ${req.isAuthenticated()}, Session ID: ${req.sessionID || 'none'}`);
@@ -565,6 +625,8 @@ router.get('/refresh-session', async (req: Request, res: Response) => {
       
       if (user) {
         console.log(`[SESSION EMERGENCY] Found user for emergency recovery: ${user.username}`);
+        // Use Type Guard to ensure user is not undefined
+        const validUser: User = user;
         
         // Log the user in manually by regenerating session and using Passport login
         req.session.regenerate((regErr) => {
@@ -578,7 +640,7 @@ router.get('/refresh-session', async (req: Request, res: Response) => {
           }
           
           // Use Passport's login method to establish the session
-          req.login(user, (loginErr) => {
+          req.login(validUser, (loginErr) => {
             if (loginErr) {
               console.error("[SESSION EMERGENCY] Error logging in user:", loginErr);
               return res.status(500).json({
