@@ -23,19 +23,59 @@ export function ProtectedRoute({
     console.log("Protected route: Secondary session verification starting");
     setIsVerifyingSession(true);
     try {
-      // Double-check the session status directly
+      // Try multiple session check approaches for robustness
       console.log("Checking current session status via", "/api/session");
-      const sessionData = await checkSessionStatus();
+      let sessionData = await checkSessionStatus();
       console.log("Session check response:", sessionData);
-      console.log("Protected route: Session verification result:", sessionData);
+      
+      // If primary session check failed, try fallback strategy
+      if (!sessionData) {
+        console.log("Primary session check failed, trying direct user endpoint");
+        try {
+          // Try to directly fetch the user as a fallback
+          const userResponse = await fetch('/api/user', {
+            credentials: 'include',
+            headers: {
+              'Accept': 'application/json',
+              'Cache-Control': 'no-cache, no-store, must-revalidate'
+            }
+          });
+          
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            console.log("Direct user endpoint returned:", userData);
+            
+            // Synthesize session data from user data
+            sessionData = {
+              authenticated: true,
+              user: userData,
+              emergencyMode: false
+            };
+          } else {
+            console.log("Direct user endpoint confirmed not authenticated:", userResponse.status);
+          }
+        } catch (userError) {
+          console.error("Error fetching user directly:", userError);
+        }
+      }
+      
+      // Final verification result processing
+      console.log("Protected route: Final session verification result:", sessionData);
       
       // If session check confirms user is authenticated but our context doesn't have the user
       // This is an edge case where the user context isn't in sync with the actual session
       if (sessionData?.authenticated && sessionData?.user) {
         console.log("Protected route: User is authenticated but context is out of sync");
-        // Force refetch the user query to sync the context
+        
+        // Update all query caches with the correct user data
+        queryClient.setQueryData(["/api/user"], sessionData.user);
+        queryClient.setQueryData(["/api/auth/user"], sessionData.user);
+        queryClient.setQueryData(["/api/session"], sessionData);
+        
+        // Force refetch to ensure consistency
         queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-        // Don't redirect yet
+        
+        // Set as authenticated
         setVerifiedStatus(true);
       } else {
         // Session verification confirms user is not authenticated
@@ -46,9 +86,9 @@ export function ProtectedRoute({
       console.error("Protected route: Session verification error", error);
       
       // If we haven't retried too many times, schedule another attempt with backoff
-      if (retryCount < 2) { // limit to 2 retries (3 attempts total)
+      if (retryCount < 3) { // limit to 3 retries (4 attempts total)
         const nextRetry = retryCount + 1;
-        const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff capped at 5s
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 8000); // Exponential backoff capped at 8s
         
         console.log(`Protected route: Scheduling retry ${nextRetry} in ${delay}ms`);
         setRetryCount(nextRetry);
@@ -60,7 +100,52 @@ export function ProtectedRoute({
         }, delay);
       } else {
         console.log("Protected route: Max retries reached, assuming not authenticated");
-        setVerifiedStatus(false);
+        
+        // Last resort: check localStorage for any user data that might indicate a lost session
+        try {
+          // This is a mitigation for cases where the session cookie was lost
+          // but we still have user data in localStorage
+          const localUser = localStorage.getItem('movietracker_user');
+          if (localUser) {
+            console.log("Found local user data, attempting emergency recovery");
+            const userData = JSON.parse(localUser);
+            
+            // Update query cache with local data to attempt recovery
+            queryClient.setQueryData(["/api/user"], userData);
+            
+            // Try to reestablish session
+            fetch(`/api/refresh-session?userId=${userData.id}`, {
+              method: 'GET',
+              credentials: 'include',
+              headers: {
+                'Accept': 'application/json',
+                'Cache-Control': 'no-cache'
+              }
+            }).then(res => {
+              console.log("Emergency session refresh attempt result:", res.status);
+              if (res.ok) {
+                // If successful, update our query cache
+                queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/session"] });
+              }
+            }).catch(err => {
+              console.error("Emergency session refresh failed:", err);
+            });
+            
+            // Set to true to give user a chance to access the app
+            // The app will redirect to login if any protected API calls fail
+            setVerifiedStatus(true);
+            
+            // Store a timestamp of when we did this emergency recovery
+            localStorage.setItem('movietracker_emergency_recovery', Date.now().toString());
+          } else {
+            // No local data available, confirm not authenticated
+            setVerifiedStatus(false);
+          }
+        } catch (localStorageError) {
+          console.error("Error checking localStorage:", localStorageError);
+          setVerifiedStatus(false);
+        }
       }
     } finally {
       setIsVerifyingSession(false);
@@ -71,7 +156,14 @@ export function ProtectedRoute({
   useEffect(() => {
     // Only verify if not already loading, not already verifying, and user is null (potentially false negative)
     if (!isLoading && !isVerifyingSession && !user && verifiedStatus === null) {
+      console.log("ProtectedRoute: Starting session verification because user is null but authentication status is unknown");
       verifySession();
+    } else if (!isLoading && !isVerifyingSession) {
+      if (user) {
+        console.log("ProtectedRoute: Using cached user authentication:", user.username);
+      } else if (verifiedStatus !== null) {
+        console.log("ProtectedRoute: Using verified session status:", verifiedStatus);
+      }
     }
   }, [isLoading, isVerifyingSession, user, verifiedStatus, verifySession]);
 

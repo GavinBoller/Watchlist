@@ -245,13 +245,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: (userData: SelectUser) => {
-      // Update both cache keys to ensure both endpoint formats work
+      console.log("Login successful, updating cache with user data:", userData);
+      
+      // Update all possible query paths to ensure consistency
       queryClient.setQueryData(["/api/user"], userData);
       queryClient.setQueryData(["/api/auth/user"], userData);
+      queryClient.setQueryData(["/api/session"], {
+        authenticated: true,
+        user: userData,
+        sessionId: "active-session"
+      });
+      
+      // Force reload the authentication status to ensure it's properly updated
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/session"] });
+      
       toast({
         title: "Welcome back!",
         description: `You've successfully logged in as ${userData.username}`,
       });
+      
+      // Add a small delay to ensure session data is properly saved
+      setTimeout(() => {
+        // Double-check session after a short delay
+        queryClient.invalidateQueries({ queryKey: ["/api/session"] });
+      }, 500);
     },
     onError: (error: Error) => {
       toast({
@@ -352,13 +370,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: (userData: SelectUser) => {
-      // Update both cache keys to ensure both endpoint formats work
+      console.log("Registration successful, updating cache with user data:", userData);
+      
+      // Update all possible query paths to ensure consistency
       queryClient.setQueryData(["/api/user"], userData);
       queryClient.setQueryData(["/api/auth/user"], userData);
+      queryClient.setQueryData(["/api/session"], {
+        authenticated: true,
+        user: userData,
+        sessionId: "active-session"
+      });
+      
+      // Force reload the authentication status to ensure it's properly updated
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/session"] });
+      
       toast({
         title: "Account created",
         description: `Welcome to MovieTracker, ${userData.username}!`,
       });
+      
+      // Add a small delay to ensure session data is properly saved
+      setTimeout(() => {
+        // Double-check session after a short delay
+        queryClient.invalidateQueries({ queryKey: ["/api/session"] });
+      }, 500);
     },
     onError: (error: Error) => {
       toast({
@@ -415,11 +451,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: () => {
-      // Clear cache for both endpoint formats
+      console.log("Logout successful, clearing user data from cache");
+      
+      // Clear all query caches
       queryClient.setQueryData(["/api/user"], null);
       queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.setQueryData(["/api/session"], {
+        authenticated: false,
+        user: null,
+        sessionId: null
+      });
+      
+      // Invalidate all authentication-related queries
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/session"] }); 
       // Invalidate watchlist queries to clear user-specific data
       queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+      
       toast({
         title: "Logged out",
         description: "You have been successfully logged out",

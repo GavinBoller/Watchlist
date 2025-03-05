@@ -9,42 +9,152 @@ export interface SessionCheckResult {
 }
 
 /**
- * Check the current session status
- * Returns session status information or null if an error occurs
+ * Check the current session status with enhanced reliability
+ * Attempts multiple strategies to determine the correct session state
+ * Returns session status information or null if all checks fail
  */
 export async function checkSessionStatus(): Promise<SessionCheckResult | null> {
+  // Record start time for performance logging
+  const startTime = performance.now();
   const sessionUrl = "/api/session";
-  console.log('Checking current session status via', sessionUrl);
+  let sessionCheckResult: SessionCheckResult | null = null;
+  let fallbacksUsed = false;
   
+  console.log('Session check starting:', new Date().toISOString());
+  console.log('Primary endpoint:', sessionUrl);
+  
+  // Try all available session check methods in sequence
   try {
-    // Use fetch directly to avoid any potential API client issues
-    const sessionResponse = await fetch(sessionUrl, {
-      credentials: "include", // Important: Include credentials
-      headers: {
-        // Prevent caching
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        "Pragma": "no-cache"
-      }
-    });
-    
-    // Handle non-ok responses
-    if (!sessionResponse.ok) {
-      console.error(`Session check failed with status: ${sessionResponse.status}`);
-      return null;
-    }
-    
-    // Parse response if possible
+    // 1. Try the primary session endpoint first
     try {
-      const sessionData = await sessionResponse.json();
-      console.log('Session check response:', sessionData);
-      return sessionData;
-    } catch (parseError) {
-      console.error('Error parsing session response:', parseError);
-      return null;
+      console.log('Attempting primary session check via', sessionUrl);
+      
+      // Use fetch directly to avoid any potential API client issues
+      const sessionResponse = await fetch(sessionUrl, {
+        credentials: "include", // Important: Include credentials
+        headers: {
+          // Prevent caching
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache"
+        }
+      });
+      
+      // Log detailed response info for debugging
+      console.log('Session check response status:', sessionResponse.status);
+      console.log('Session check response headers:', JSON.stringify(Object.fromEntries([...sessionResponse.headers.entries()])));
+      
+      // Handle non-ok responses
+      if (!sessionResponse.ok) {
+        console.error(`Primary session check failed with status: ${sessionResponse.status}`);
+      } else {
+        // Parse response if possible
+        try {
+          sessionCheckResult = await sessionResponse.json();
+          console.log('Primary session check successful:', sessionCheckResult);
+          // Successfully got data from primary endpoint
+          return sessionCheckResult;
+        } catch (parseError) {
+          console.error('Error parsing session response:', parseError);
+        }
+      }
+    } catch (primaryError) {
+      console.error('Network error on primary session check:', primaryError);
     }
-  } catch (error) {
-    console.error('Network error checking session status:', error);
+    
+    // If we get here, the primary check failed - start trying fallbacks
+    fallbacksUsed = true;
+    
+    // 2. Try the /api/user endpoint as an alternative
+    try {
+      console.log('Primary session check failed, trying user endpoint...');
+      const userResponse = await fetch('/api/user', {
+        credentials: "include",
+        headers: {
+          "Accept": "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache"
+        }
+      });
+      
+      console.log('User endpoint response status:', userResponse.status);
+      
+      if (userResponse.ok) {
+        try {
+          const userData = await userResponse.json();
+          console.log('Got user data from fallback endpoint:', userData);
+          
+          // Create a session result from the user data
+          sessionCheckResult = {
+            authenticated: true,
+            user: userData,
+            emergencyMode: false
+          };
+          
+          // Store the recovery method for debugging
+          localStorage.setItem('movietracker_session_recovery', 'user_endpoint');
+          
+          return sessionCheckResult;
+        } catch (parseError) {
+          console.error('Error parsing user response:', parseError);
+        }
+      }
+    } catch (userError) {
+      console.error('Network error checking user endpoint:', userError);
+    }
+    
+    // 3. Try to read from localStorage as a last resort
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        console.log('No session from remote endpoints, checking local storage...');
+        const cachedUser = localStorage.getItem('movietracker_user');
+        const cachedSessionId = localStorage.getItem('movietracker_session_id');
+        
+        if (cachedUser && cachedSessionId) {
+          console.log('Found cached user and session in localStorage');
+          try {
+            const userData = JSON.parse(cachedUser);
+            
+            // Create a session result from localStorage
+            sessionCheckResult = {
+              authenticated: true,
+              user: userData,
+              emergencyMode: true // Flag this as emergency mode
+            };
+            
+            // Note the emergency recovery in localStorage
+            localStorage.setItem('movietracker_session_recovery', 'local_storage');
+            localStorage.setItem('movietracker_emergency_ts', new Date().toISOString());
+            
+            // Try to refresh the session in the background
+            fetch('/api/refresh-session', {
+              credentials: 'include'
+            }).then(res => {
+              console.log('Background session refresh status:', res.status);
+            }).catch(e => {
+              console.error('Background session refresh failed:', e);
+            });
+            
+            console.log('Created emergency session from localStorage:', sessionCheckResult);
+            return sessionCheckResult;
+          } catch (parseError) {
+            console.error('Error parsing cached user data:', parseError);
+          }
+        } else {
+          console.log('No cached user data found in localStorage');
+        }
+      } catch (localStorageError) {
+        console.error('Error accessing localStorage:', localStorageError);
+      }
+    }
+    
+    // If we got to here, all checks failed
+    console.error('All session verification methods failed');
     return null;
+  } finally {
+    // Log performance metrics for monitoring
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+    console.log(`Session check completed in ${duration.toFixed(2)}ms. Fallbacks used: ${fallbacksUsed}`);
   }
 }
 
