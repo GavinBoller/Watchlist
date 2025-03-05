@@ -487,6 +487,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sessionId: null
       });
       
+      // Clear temporary registration data if it exists
+      if (window.__tempRegistrationData) {
+        console.log("Clearing temporary registration data after logout");
+        window.__tempRegistrationData = undefined;
+      }
+      
+      // Clear localStorage user data
+      try {
+        localStorage.removeItem('movietracker_user');
+        localStorage.removeItem('movietracker_emergency_recovery');
+        console.log("Removed user data from localStorage");
+      } catch (e) {
+        console.error("Failed to clear localStorage:", e);
+      }
+      
       // Invalidate all authentication-related queries
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });

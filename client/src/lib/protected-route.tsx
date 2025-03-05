@@ -177,9 +177,31 @@ export function ProtectedRoute({
     }
   }, [isLoading, isVerifyingSession, user, verifiedStatus, verifySession]);
 
+  // Check for environment - production needs special handling
+  const isProduction = window.location.hostname.includes('.replit.app') || 
+                       !window.location.hostname.includes('localhost');
+                       
   // Check for cached registration data to prevent login page flash during registration
+  // In production, we use a longer timeout period to account for network delays
+  const registrationTimeTolerance = isProduction ? 10000 : 5000;
   const recentlyRegistered = window.__tempRegistrationData && 
-                             (Date.now() - window.__tempRegistrationData.timestamp < 5000);
+                             (Date.now() - window.__tempRegistrationData.timestamp < registrationTimeTolerance);
+                             
+  // Check for LocalStorage fallback user data from recent registration
+  const hasLocalStorageUser = (() => {
+    try {
+      const storedUser = localStorage.getItem('movietracker_user');
+      return !!storedUser;
+    } catch (e) {
+      return false;
+    }
+  })();
+  
+  // In production, if we have a recent registration (within last 10 seconds) and also
+  // have localStorage data, we can be more confident this is a valid registration
+  const isConfidentRecentRegistration = isProduction && 
+                                       recentlyRegistered && 
+                                       hasLocalStorageUser;
                              
   // If we're loading OR verifying session, show loading indicator
   if (isLoading || isVerifyingSession) {
@@ -196,15 +218,42 @@ export function ProtectedRoute({
   }
 
   // If user exists OR verified session says they're authenticated OR recently registered, render component
-  if (user || verifiedStatus === true || recentlyRegistered) {
-    // If this was triggered by recent registration, increase loading time to ensure auto-login completes
-    if (recentlyRegistered && !user && !verifiedStatus) {
+  if (user || verifiedStatus === true || recentlyRegistered || isConfidentRecentRegistration) {
+    // If this was triggered by recent registration (and we don't have a user yet), 
+    // increase loading time to ensure auto-login completes
+    if ((recentlyRegistered || isConfidentRecentRegistration) && !user && !verifiedStatus) {
       console.log("Auto-login still in progress, showing loading state");
+      
+      // In production, we may need to try to load user data from localStorage
+      // as a fallback while the session establishes
+      if (isProduction && hasLocalStorageUser) {
+        try {
+          console.log("In production with localStorage user data - attempting emergency authentication");
+          const storedUserData = JSON.parse(localStorage.getItem('movietracker_user')!);
+          
+          // Update caches with this data to buy time for the real session to establish
+          if (storedUserData) {
+            queryClient.setQueryData(["/api/user"], storedUserData);
+            
+            // Also try to trigger a session refresh
+            fetch('/api/refresh-session', {
+              method: 'GET',
+              credentials: 'include',
+              headers: { 'Cache-Control': 'no-cache' }
+            }).catch(err => console.warn("Failed to refresh session", err));
+          }
+        } catch (e) {
+          console.error("Failed to recover user from localStorage", e);
+        }
+      }
+      
       return (
         <Route path={path}>
           <div className="flex items-center justify-center min-h-screen">
             <Loader2 className="h-8 w-8 animate-spin text-border" />
-            <span className="ml-2 text-muted-foreground">Setting up your account...</span>
+            <span className="ml-2 text-muted-foreground">
+              {isProduction ? "Finalizing your registration..." : "Setting up your account..."}
+            </span>
           </div>
         </Route>
       );

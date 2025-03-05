@@ -444,11 +444,86 @@ router.get('/user', (req: Request, res: Response) => {
 // Session validation and refresh endpoint
 // This endpoint can be called before performing important operations
 // to ensure the session is still valid and refresh it
-router.get('/refresh-session', (req: Request, res: Response) => {
+router.get('/refresh-session', async (req: Request, res: Response) => {
   console.log("[SESSION REFRESH] Received request to refresh session");
   console.log(`[SESSION REFRESH] Authenticated: ${req.isAuthenticated()}, Session ID: ${req.sessionID || 'none'}`);
   
-  // Renew the session by updating timestamp and saving
+  // Check for userId param for emergency recovery
+  const userId = req.query.userId ? parseInt(req.query.userId as string, 10) : null;
+  
+  // Special handling for emergency recovery - used when client has lost session but has user data
+  if (userId && !req.isAuthenticated()) {
+    console.log(`[SESSION EMERGENCY] Attempting emergency session recovery for user ID: ${userId}`);
+    
+    try {
+      // Look up the user by ID
+      const user = await storage.getUser(userId);
+      
+      if (user) {
+        console.log(`[SESSION EMERGENCY] Found user for emergency recovery: ${user.username}`);
+        
+        // Log the user in manually by regenerating session and using Passport login
+        req.session.regenerate((regErr) => {
+          if (regErr) {
+            console.error("[SESSION EMERGENCY] Error regenerating session:", regErr);
+            return res.status(500).json({
+              success: false,
+              error: "Failed to regenerate session",
+              authenticated: false
+            });
+          }
+          
+          // Use Passport's login method to establish the session
+          req.login(user, (loginErr) => {
+            if (loginErr) {
+              console.error("[SESSION EMERGENCY] Error logging in user:", loginErr);
+              return res.status(500).json({
+                success: false,
+                error: "Failed to login user in emergency recovery",
+                authenticated: false
+              });
+            }
+            
+            // Now save the newly established session
+            req.session.authenticated = true;
+            req.session.lastChecked = Date.now();
+            
+            req.session.save((saveErr) => {
+              if (saveErr) {
+                console.error("[SESSION EMERGENCY] Error saving session after login:", saveErr);
+                return res.status(500).json({
+                  success: false,
+                  error: "Failed to save session after emergency login",
+                  authenticated: req.isAuthenticated()
+                });
+              }
+              
+              console.log(`[SESSION EMERGENCY] Successfully recovered session for user: ${user.username}`);
+              return res.status(200).json({
+                success: true,
+                message: "Emergency session recovery successful",
+                authenticated: true,
+                user: {
+                  id: user.id,
+                  username: user.username,
+                  displayName: user.displayName
+                }
+              });
+            });
+          });
+        });
+        
+        return; // Early return to avoid running the normal flow
+      } else {
+        console.log(`[SESSION EMERGENCY] User not found for ID: ${userId}`);
+      }
+    } catch (error) {
+      console.error("[SESSION EMERGENCY] Error during emergency recovery:", error);
+      // Continue with normal session refresh as fallback
+    }
+  }
+  
+  // Normal session refresh flow
   if (req.session) {
     // Add a lastChecked timestamp
     req.session.lastChecked = Date.now();

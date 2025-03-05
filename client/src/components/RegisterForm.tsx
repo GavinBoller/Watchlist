@@ -107,28 +107,71 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
                     username: username
                   };
                   
+                  // Also store user data in localStorage as a backup for production environments
+                  // This helps with session persistence across redirects
+                  try {
+                    localStorage.setItem('movietracker_user', JSON.stringify(user));
+                    console.log("Stored user data in localStorage for session persistence backup");
+                  } catch (storageError) {
+                    console.error("Failed to store user data in localStorage:", storageError);
+                  }
+                  
+                  // Increase auto-login delay in production to ensure session is properly established
+                  const isProduction = window.location.hostname.includes('.replit.app') || 
+                                      !window.location.hostname.includes('localhost');
+                  if (isProduction) {
+                    console.log("Production environment detected, adding additional session establishment delay");
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                  }
+                  
                   // First redirect to home page to prevent the flash of login screen
                   setLocation("/");
                   
-                  // Then perform the actual login in the background
+                  // Then perform the actual login in the background with multiple retries for production
                   // This ensures the session is properly established
-                  loginMutation.mutate(
-                    {
-                      username: username,
-                      password: originalPassword
-                    },
-                    {
-                      onSuccess: (userData) => {
+                  const performLoginWithRetries = async (maxRetries = 3) => {
+                    let loginSuccess = false;
+                    let lastError;
+                    
+                    for (let retry = 0; retry < maxRetries; retry++) {
+                      try {
+                        if (retry > 0) {
+                          console.log(`Auto-login retry ${retry+1}/${maxRetries}`);
+                          // Add increasing delay between retries
+                          await new Promise(resolve => setTimeout(resolve, 500 * retry));
+                        }
+                        
+                        const loginResult = await new Promise<any>((resolve, reject) => {
+                          loginMutation.mutate(
+                            {
+                              username: username,
+                              password: originalPassword
+                            },
+                            {
+                              onSuccess: (userData) => resolve(userData),
+                              onError: (error) => reject(error)
+                            }
+                          );
+                        });
+                        
                         console.log("Auto-login successful after registration");
-                        // The user is already on the home page
-                      },
-                      onError: (error) => {
-                        console.error("Auto-login failed after registration:", error);
-                        // Don't show an error toast since we already redirected
-                        // Just log the error and let the app's session refresh handle it
+                        loginSuccess = true;
+                        break;
+                      } catch (error) {
+                        lastError = error;
+                        console.error(`Auto-login attempt ${retry+1} failed:`, error);
                       }
                     }
-                  );
+                    
+                    if (!loginSuccess) {
+                      console.error("All auto-login attempts failed after registration:", lastError);
+                      // Don't show a visible error since we already redirected
+                    }
+                  };
+                  
+                  // Start the login process in the background but don't await it
+                  // so we can redirect the user immediately
+                  performLoginWithRetries(isProduction ? 5 : 3);
                 } catch (loginError) {
                   console.error("Error during auto-login:", loginError);
                   toast({
