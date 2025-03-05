@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { isAuthenticated, hasWatchlistAccess } from "./auth";
+import { isAuthenticated, hasWatchlistAccess, validateSession } from "./auth";
 import axios from "axios";
 import { z } from "zod";
 import { 
@@ -64,7 +64,8 @@ async function convertGenreIdsToNames(genreIds: number[] = [], mediaType: string
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Authentication middlewares are now imported at the top of the file
+  // Apply validateSession middleware to all routes to keep sessions fresh
+  app.use(validateSession);
   
   // User routes
   app.get("/api/users", async (req: Request, res: Response) => {

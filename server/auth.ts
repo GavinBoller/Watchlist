@@ -5,6 +5,15 @@ import bcrypt from 'bcryptjs';
 import { User, UserResponse } from '@shared/schema';
 import { storage } from './storage';
 
+// Custom type for enhanced session data
+declare module 'express-session' {
+  interface SessionData {
+    authenticated?: boolean;
+    createdAt?: number;
+    lastChecked?: number;
+  }
+}
+
 // Configure Passport with Local Strategy and robust error handling
 export function configurePassport() {
   passport.use(
@@ -202,6 +211,33 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
       method: req.method
     });
   }
+}
+
+// Custom session validation and maintenance middleware
+// This helps prevent session issues with frequent API calls
+export function validateSession(req: Request, res: Response, next: NextFunction) {
+  // Skip for unauthenticated sessions
+  if (!req.isAuthenticated()) {
+    return next();
+  }
+  
+  // Track when we last validated the session
+  if (req.session) {
+    if (!req.session.authenticated) {
+      req.session.authenticated = true;
+    }
+    if (!req.session.createdAt) {
+      req.session.createdAt = Date.now();
+    }
+    
+    // Update lastChecked timestamp to keep session fresh
+    req.session.lastChecked = Date.now();
+    
+    // Add X-Session-Id header to help with debugging
+    res.setHeader('X-Session-Id', req.sessionID);
+  }
+  
+  next();
 }
 
 // Middleware to check if the user has access to the requested watchlist
