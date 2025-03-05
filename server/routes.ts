@@ -67,6 +67,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Apply validateSession middleware to all routes to keep sessions fresh
   app.use(validateSession);
   
+  // Add a session diagnostics endpoint to help debug session issues
+  app.get("/api/diagnostics", (req: Request, res: Response) => {
+    // Gather comprehensive session information
+    const sessionId = req.sessionID || 'unknown';
+    const isAuthenticated = req.isAuthenticated();
+    const user = req.user ? {
+      id: (req.user as User).id,
+      username: (req.user as User).username,
+    } : null;
+    
+    // Gather session data with safety checks
+    const sessionData = req.session ? {
+      id: req.sessionID,
+      cookie: req.session.cookie ? {
+        expires: req.session.cookie.expires,
+        maxAge: req.session.cookie.maxAge,
+        secure: req.session.cookie.secure,
+        httpOnly: req.session.cookie.httpOnly,
+        sameSite: req.session.cookie.sameSite
+      } : 'No cookie data',
+      authenticated: req.session.authenticated,
+      createdAt: req.session.createdAt,
+      lastChecked: req.session.lastChecked,
+      repaired: req.session.repaired
+    } : 'No session data';
+    
+    // Gather request information
+    const requestInfo = {
+      ip: req.ip,
+      ips: req.ips,
+      secure: req.secure,
+      protocol: req.protocol,
+      hostname: req.hostname,
+      path: req.path,
+      headers: {
+        userAgent: req.headers['user-agent'],
+        cookie: req.headers.cookie,
+        referer: req.headers.referer,
+        accept: req.headers.accept
+      }
+    };
+    
+    // Gather environment information
+    const environment = {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      sessionSecret: process.env.SESSION_SECRET ? `Length: ${process.env.SESSION_SECRET.length}` : 'Not set',
+      databaseUrl: process.env.DATABASE_URL ? 'Set' : 'Not set'
+    };
+    
+    // Response with comprehensive diagnostic information
+    res.json({
+      success: true,
+      sessionId,
+      isAuthenticated,
+      user,
+      session: sessionData,
+      request: requestInfo,
+      environment
+    });
+  });
+  
+  // Add special refresh session endpoint that can recover sessions
+  app.get("/api/refresh-session", async (req: Request, res: Response) => {
+    const userId = req.query.userId ? parseInt(req.query.userId as string, 10) : null;
+    const sessionId = req.sessionID || 'unknown';
+    
+    console.log(`[SESSION-REFRESH] Refresh request received, session: ${sessionId}, userId: ${userId || 'none'}`);
+    
+    // If the user is already authenticated, just return the current user
+    if (req.isAuthenticated() && req.user) {
+      console.log(`[SESSION-REFRESH] User already authenticated as ${(req.user as User).username}`);
+      
+      // Mark session as authenticated
+      req.session.authenticated = true;
+      req.session.lastChecked = Date.now();
+      
+      // Return the current authenticated user
+      return res.json({
+        authenticated: true,
+        user: req.user,
+        sessionId: req.sessionID,
+        refreshed: true
+      });
+    }
+    
+    // If a user ID was provided and the user is not authenticated, attempt recovery
+    if (userId) {
+      try {
+        // Get the user from storage
+        const user = await storage.getUser(userId);
+        
+        if (!user) {
+          return res.status(404).json({ 
+            message: "User not found", 
+            authenticated: false 
+          });
+        }
+        
+        console.log(`[SESSION-REFRESH] Found user ${user.username} (ID: ${userId}), attempting login`);
+        
+        // Log the user in
+        req.login(user, (loginErr) => {
+          if (loginErr) {
+            console.error(`[SESSION-REFRESH] Login failed:`, loginErr);
+            return res.status(500).json({ 
+              message: "Login failed", 
+              error: loginErr.message, 
+              authenticated: false 
+            });
+          }
+          
+          // Mark session as authenticated
+          req.session.authenticated = true;
+          req.session.createdAt = Date.now();
+          req.session.lastChecked = Date.now();
+          
+          // Save the session
+          req.session.save((saveErr) => {
+            if (saveErr) {
+              console.error(`[SESSION-REFRESH] Session save failed:`, saveErr);
+              // Even if save fails, we can still return the user
+            } else {
+              console.log(`[SESSION-REFRESH] Session refreshed successfully for ${user.username}`);
+            }
+            
+            // Return the freshly authenticated user
+            return res.json({
+              authenticated: true,
+              user: user,
+              sessionId: req.sessionID,
+              refreshed: true
+            });
+          });
+        });
+      } catch (error) {
+        console.error(`[SESSION-REFRESH] Error refreshing session:`, error);
+        return res.status(500).json({ 
+          message: "Session refresh failed", 
+          error: error instanceof Error ? error.message : "Unknown error",
+          authenticated: false 
+        });
+      }
+    } else {
+      // No user ID and not authenticated, just return the current session state
+      return res.json({
+        authenticated: false,
+        user: null,
+        sessionId: req.sessionID
+      });
+    }
+  });
+  
   // User routes
   app.get("/api/users", async (req: Request, res: Response) => {
     try {
