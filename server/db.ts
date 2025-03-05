@@ -212,4 +212,31 @@ initializeDatabase().then(success => {
 });
 
 // Export the pool and db
+/**
+ * Direct SQL execution for critical operations when ORM fails
+ * This provides a low-level fallback when the Drizzle ORM encounters issues
+ */
+export async function executeDirectSql<T = any>(
+  sql: string, 
+  params: any[] = [],
+  errorMessage: string = 'Database operation failed'
+): Promise<T[]> {
+  if (!pool) {
+    throw new Error('Database pool not initialized');
+  }
+  
+  let client;
+  try {
+    client = await pool.connect();
+    const result = await client.query(sql, params);
+    return result.rows as T[];
+  } catch (error) {
+    console.error(`Direct SQL execution failed: ${errorMessage}`, error);
+    throw new Error(`${errorMessage}: ${getDbErrorMessage(error)}`);
+  } finally {
+    if (client) client.release();
+  }
+}
+
+// Export database access methods
 export { pool, db };

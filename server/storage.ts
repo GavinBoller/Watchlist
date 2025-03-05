@@ -613,46 +613,132 @@ export class MemStorage implements IStorage {
 
 // Switch from MemStorage to SQLiteStorage
 
+import { executeDirectSql } from './db';
+
 // DatabaseStorage implementation for PostgreSQL
 export class DatabaseStorage implements IStorage {
+  /**
+   * Helper method to determine if we should use direct SQL as fallback
+   * This is useful when ORM operations may fail due to connection issues
+   */
+  private shouldUseDirectSqlFallback(error: unknown): boolean {
+    if (!error) return false;
+    
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return errorMessage.includes('connection') || 
+           errorMessage.includes('timeout') || 
+           errorMessage.includes('ECONNREFUSED') || 
+           errorMessage.includes('terminated');
+  }
+  
   async getUser(id: number): Promise<User | undefined> {
     try {
+      // First attempt with Drizzle ORM
       const [user] = await db.select().from(users).where(eq(users.id, id));
       return user || undefined;
     } catch (error) {
-      console.error("Database error in getUser:", error);
+      console.error("Database error in getUser using ORM:", error);
+      
+      // Try direct SQL as fallback for connection issues
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          console.log("Attempting direct SQL fallback for getUser");
+          const rows = await executeDirectSql<User>(
+            'SELECT * FROM "users" WHERE "id" = $1 LIMIT 1',
+            [id],
+            'Failed to retrieve user'
+          );
+          return rows[0];
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback also failed:", fallbackError);
+          throw fallbackError;
+        }
+      }
+      
       throw new Error(`Failed to retrieve user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
+      // First attempt with Drizzle ORM
       const [user] = await db
         .select()
         .from(users)
         .where(eq(users.username, username));
       return user || undefined;
     } catch (error) {
-      console.error("Database error in getUserByUsername:", error);
+      console.error("Database error in getUserByUsername using ORM:", error);
+      
+      // Try direct SQL as fallback for connection issues
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          console.log("Attempting direct SQL fallback for getUserByUsername");
+          const rows = await executeDirectSql<User>(
+            'SELECT * FROM "users" WHERE "username" = $1 LIMIT 1',
+            [username],
+            'Failed to retrieve user by username'
+          );
+          return rows[0];
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback also failed:", fallbackError);
+          throw fallbackError;
+        }
+      }
+      
       throw new Error(`Failed to retrieve user by username: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     try {
+      // First attempt with Drizzle ORM
       const [user] = await db
         .insert(users)
         .values(insertUser)
         .returning();
       return user;
     } catch (error) {
-      console.error("Database error in createUser:", error);
+      console.error("Database error in createUser using ORM:", error);
       
       // Check for common error types
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
       if (errorMessage.includes('duplicate key') || errorMessage.includes('unique constraint')) {
         throw new Error('Username already exists');
+      }
+      
+      // Try direct SQL as fallback for connection issues
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          console.log("Attempting direct SQL fallback for createUser");
+          
+          // Direct SQL insertion with proper value escaping
+          const columns = Object.keys(insertUser).map(key => `"${key}"`).join(', ');
+          const placeholders = Object.keys(insertUser).map((_, index) => `$${index + 1}`).join(', ');
+          const values = Object.values(insertUser);
+          
+          const rows = await executeDirectSql<User>(
+            `INSERT INTO "users" (${columns}) VALUES (${placeholders}) RETURNING *`,
+            values,
+            'Failed to create user'
+          );
+          
+          if (rows.length === 0) {
+            throw new Error('User creation did not return any data');
+          }
+          
+          return rows[0];
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback also failed:", fallbackError);
+          
+          const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : 'Unknown error';
+          if (fallbackMessage.includes('duplicate key') || fallbackMessage.includes('unique constraint')) {
+            throw new Error('Username already exists');
+          }
+          
+          throw fallbackError;
+        }
       }
       
       if (errorMessage.includes('connection') || errorMessage.includes('timeout')) {
@@ -664,22 +750,78 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users);
+    try {
+      return await db.select().from(users);
+    } catch (error) {
+      console.error("Database error in getAllUsers using ORM:", error);
+      
+      // Try direct SQL as fallback for connection issues
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          console.log("Attempting direct SQL fallback for getAllUsers");
+          return await executeDirectSql<User>(
+            'SELECT * FROM "users"',
+            [],
+            'Failed to retrieve users'
+          );
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback also failed:", fallbackError);
+          throw fallbackError;
+        }
+      }
+      
+      throw new Error(`Failed to retrieve users: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
   
   async updateUser(id: number, updates: Partial<InsertUser>): Promise<User | undefined> {
-    // Check if user exists
-    const user = await this.getUser(id);
-    if (!user) return undefined;
-    
-    // Update only provided fields
-    const [updatedUser] = await db
-      .update(users)
-      .set(updates)
-      .where(eq(users.id, id))
-      .returning();
-    
-    return updatedUser;
+    try {
+      // Check if user exists
+      const user = await this.getUser(id);
+      if (!user) return undefined;
+      
+      // Update only provided fields
+      const [updatedUser] = await db
+        .update(users)
+        .set(updates)
+        .where(eq(users.id, id))
+        .returning();
+      
+      return updatedUser;
+    } catch (error) {
+      console.error("Database error in updateUser using ORM:", error);
+      
+      // Try direct SQL as fallback for connection issues
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          console.log("Attempting direct SQL fallback for updateUser");
+          
+          // Build SET clause for SQL update
+          const setClause = Object.entries(updates)
+            .map(([key, _], index) => `"${key}" = $${index + 2}`)
+            .join(', ');
+          
+          const params = [id, ...Object.values(updates)];
+          
+          const rows = await executeDirectSql<User>(
+            `UPDATE "users" SET ${setClause} WHERE "id" = $1 RETURNING *`,
+            params,
+            'Failed to update user'
+          );
+          
+          if (rows.length === 0) {
+            return undefined;
+          }
+          
+          return rows[0];
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback also failed:", fallbackError);
+          throw fallbackError;
+        }
+      }
+      
+      throw new Error(`Failed to update user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async getMovie(id: number): Promise<Movie | undefined> {
