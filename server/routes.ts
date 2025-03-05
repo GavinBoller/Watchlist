@@ -68,6 +68,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Apply validateSession middleware to all routes to keep sessions fresh
   app.use(validateSession);
   
+  // Auth routes are already registered in index.ts - don't register them twice
+  
   // Add a session diagnostics endpoint to help debug session issues
   app.get("/api/diagnostics", (req: Request, res: Response) => {
     // Gather comprehensive session information

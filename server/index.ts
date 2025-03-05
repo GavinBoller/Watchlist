@@ -54,10 +54,12 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'watchlist-app-secret';
 app.use(session({
   secret: SESSION_SECRET,
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true, // Changed to true to ensure session is created even for anonymous users
+  rolling: true, // Reset the maxAge on every response to keep the session active
   cookie: {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    httpOnly: true
+    httpOnly: true,
+    sameSite: 'lax' // Allow cross-site requests in specific cases for better UX
   }
 }));
 
