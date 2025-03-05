@@ -369,10 +369,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    onSuccess: (userData: SelectUser) => {
+    onSuccess: async (userData: SelectUser) => {
       console.log("Registration successful, updating cache with user data:", userData);
       
-      // Update all possible query paths to ensure consistency
+      // First round of updates to query cache
       queryClient.setQueryData(["/api/user"], userData);
       queryClient.setQueryData(["/api/auth/user"], userData);
       queryClient.setQueryData(["/api/session"], {
@@ -381,20 +381,97 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sessionId: "active-session"
       });
       
-      // Force reload the authentication status to ensure it's properly updated
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/session"] });
+      // Function to validate the session (make sure user is really logged in)
+      const validateSession = async (): Promise<boolean> => {
+        try {
+          console.log("Validating session after registration");
+          const response = await fetch("/api/session", {
+            credentials: "include",
+            headers: {
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              "Pragma": "no-cache"
+            }
+          });
+          
+          if (response.ok) {
+            const sessionData = await response.json();
+            console.log("Session validation result:", sessionData);
+            return sessionData.authenticated && sessionData.user !== null;
+          }
+          return false;
+        } catch (error) {
+          console.error("Session validation error:", error);
+          return false;
+        }
+      };
       
+      // Function to manually refresh the session
+      const refreshSession = async (): Promise<boolean> => {
+        try {
+          console.log("Attempting to refresh session");
+          const response = await fetch("/api/refresh-session", {
+            credentials: "include",
+            headers: {
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              "Pragma": "no-cache"
+            }
+          });
+          
+          if (response.ok) {
+            const refreshData = await response.json();
+            console.log("Session refresh result:", refreshData);
+            return refreshData.success === true;
+          }
+          return false;
+        } catch (error) {
+          console.error("Session refresh error:", error);
+          return false;
+        }
+      };
+      
+      // Show welcome toast
       toast({
         title: "Account created",
         description: `Welcome to MovieTracker, ${userData.username}!`,
       });
       
+      // First, force a session validation
+      const isSessionValid = await validateSession();
+      
+      // If session isn't valid, try refreshing it
+      if (!isSessionValid) {
+        console.log("Initial session validation failed, attempting refresh");
+        await refreshSession();
+        
+        // Force reload authentication status
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/session"] });
+        
+        // Store user data in localStorage as emergency backup
+        try {
+          localStorage.setItem('emergency_user', JSON.stringify({
+            user: userData,
+            timestamp: Date.now()
+          }));
+          console.log("Stored emergency user data in localStorage");
+        } catch (storageError) {
+          console.error("Failed to store emergency user data:", storageError);
+        }
+      } else {
+        console.log("Session validated successfully after registration");
+      }
+      
+      // Final round of cache updates after validation attempts
+      queryClient.setQueryData(["/api/user"], userData);
+      queryClient.setQueryData(["/api/auth/user"], userData);
+      
       // Add a small delay to ensure session data is properly saved
       setTimeout(() => {
+        console.log("Running delayed session checks");
         // Double-check session after a short delay
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
         queryClient.invalidateQueries({ queryKey: ["/api/session"] });
-      }, 500);
+      }, 1000);
     },
     onError: (error: Error) => {
       toast({

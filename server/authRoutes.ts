@@ -443,53 +443,69 @@ router.get('/user', (req: Request, res: Response) => {
 
 // Session validation and refresh endpoint
 // This endpoint can be called before performing important operations
-// to ensure the session is still valid and refresh its timeout
+// to ensure the session is still valid and refresh it
 router.get('/refresh-session', (req: Request, res: Response) => {
-  const sessionID = req.sessionID || 'no-session';
-  console.log(`[SESSION] Session refresh request for ID: ${sessionID}`);
+  console.log("[SESSION REFRESH] Received request to refresh session");
+  console.log(`[SESSION REFRESH] Authenticated: ${req.isAuthenticated()}, Session ID: ${req.sessionID || 'none'}`);
   
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ 
-      valid: false, 
-      message: 'Session expired or invalid',
-      sessionId: sessionID
-    });
-  }
-  
+  // Renew the session by updating timestamp and saving
   if (req.session) {
-    // Update session data to refresh its expiration
+    // Add a lastChecked timestamp
     req.session.lastChecked = Date.now();
-    if (!req.session.authenticated) {
-      req.session.authenticated = true;
-    }
     
-    // Force save the updated session
-    req.session.save((err) => {
-      if (err) {
-        console.error('[SESSION] Error saving refreshed session:', err);
-        return res.status(500).json({ 
-          valid: false, 
-          message: 'Failed to refresh session',
-          error: err.message
+    // For authenticated users, explicitly mark as authenticated
+    if (req.isAuthenticated()) {
+      req.session.authenticated = true;
+      
+      // Save the session with error handling
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error("[SESSION REFRESH] Error saving session:", saveErr);
+          return res.status(500).json({
+            success: false,
+            error: "Failed to refresh session",
+            authenticated: req.isAuthenticated()
+          });
+        }
+        
+        console.log(`[SESSION REFRESH] Session refreshed successfully for authenticated user`);
+        // Return detailed success information
+        return res.json({
+          success: true,
+          message: "Session refreshed successfully",
+          authenticated: true,
+          user: req.user,
+          sessionId: req.sessionID
         });
-      }
-      
-      const user = req.user as UserResponse;
-      console.log(`[SESSION] Session refreshed for user: ${user.username} (ID: ${user.id})`);
-      
-      return res.json({ 
-        valid: true, 
-        message: 'Session refreshed successfully',
-        user,
-        sessionId: req.sessionID
       });
-    });
+    } else {
+      // For non-authenticated users, just save the session
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error("[SESSION REFRESH] Error saving unauthenticated session:", saveErr);
+          return res.status(500).json({
+            success: false,
+            error: "Failed to refresh session",
+            authenticated: false
+          });
+        }
+        
+        console.log(`[SESSION REFRESH] Unauthenticated session refreshed successfully`);
+        return res.json({
+          success: true,
+          message: "Unauthenticated session refreshed",
+          authenticated: false,
+          sessionId: req.sessionID
+        });
+      });
+    }
   } else {
-    // This should never happen but handle it just in case
-    console.error('[SESSION] User authenticated but no session object available');
-    return res.status(500).json({ 
-      valid: false, 
-      message: 'Session error: No session object available'
+    // No session object available
+    console.log("[SESSION REFRESH] No session object available");
+    return res.status(400).json({
+      success: false,
+      error: "No session available to refresh",
+      authenticated: req.isAuthenticated()
     });
   }
 });
@@ -674,10 +690,13 @@ router.post('/register', async (req: Request, res: Response) => {
     // Return user without password
     const { password, ...userWithoutPassword } = newUser;
     
-    // Automatically log the user in after registration with session saving
-    req.login(userWithoutPassword, (loginErr) => {
+    // Automatically log the user in after registration with enhanced session saving
+    console.log('[REGISTER] Attempting to log in user after registration');
+    
+    // Use a custom login approach to ensure maximum reliability
+    req.login(userWithoutPassword, async (loginErr) => {
       if (loginErr) {
-        console.error('Login after registration error:', loginErr);
+        console.error('[REGISTER] Login after registration error:', loginErr);
         // Still return success since user was created, but with a note
         return res.status(201).json({
           message: 'Account created successfully, but automatic login failed. Please log in manually.',
@@ -686,39 +705,92 @@ router.post('/register', async (req: Request, res: Response) => {
         });
       }
       
+      console.log('[REGISTER] Login successful, now handling session');
+      
       // Explicitly save the session to ensure persistence
       if (req.session) {
-        // Mark session as authenticated
-        req.session.authenticated = true;
-        
-        // Add timestamp for session tracking
-        if (!req.session.createdAt) {
-          req.session.createdAt = Date.now();
-        }
-        
-        // Save the session explicitly to ensure it's persisted
-        req.session.save((saveErr) => {
-          if (saveErr) {
-            console.error('[REGISTER] Session save error:', saveErr);
+        try {
+          // Mark session as authenticated with multiple approaches
+          req.session.authenticated = true;
+          
+          // Add timestamp for session tracking
+          if (!req.session.createdAt) {
+            req.session.createdAt = Date.now();
+          }
+          
+          // Store user-related flags in session (not the full user object)
+          // This approach avoids TypeScript errors with session types
+          (req.session as any).userAuthenticated = true;
+          
+          // Force session regeneration for additional security
+          // This creates a new session ID and transfers data to the new session
+          const regenerateSession = () => {
+            return new Promise<void>((resolve, reject) => {
+              req.session.regenerate((regErr) => {
+                if (regErr) {
+                  console.error('[REGISTER] Session regeneration error:', regErr);
+                  reject(regErr);
+                } else {
+                  // After regeneration, re-add the important data
+                  req.session.authenticated = true;
+                  req.session.createdAt = Date.now();
+                  (req.session as any).userAuthenticated = true;
+                  resolve();
+                }
+              });
+            });
+          };
+          
+          // Save the session with robust error handling
+          const saveSession = () => {
+            return new Promise<void>((resolve, reject) => {
+              console.log('[REGISTER] Saving session with ID:', req.sessionID);
+              req.session.save((saveErr) => {
+                if (saveErr) {
+                  console.error('[REGISTER] Session save error:', saveErr);
+                  reject(saveErr);
+                } else {
+                  console.log('[REGISTER] Session saved successfully');
+                  resolve();
+                }
+              });
+            });
+          };
+          
+          // Execute the session operations with proper order and error handling
+          try {
+            await regenerateSession();
+            console.log('[REGISTER] Session regenerated with new ID:', req.sessionID);
+            await saveSession();
+            
+            console.log(`[REGISTER] User ${userWithoutPassword.id} (${userWithoutPassword.username}) logged in after registration`);
+            console.log('[REGISTER] Full registration process completed successfully');
+            
+            // Return success with session info for debugging
             return res.status(201).json({
-              message: 'Account created successfully, but session could not be saved. You may need to log in again.',
+              message: 'Registration successful',
+              user: userWithoutPassword,
+              loginSuccessful: true,
+              sessionId: req.sessionID
+            });
+          } catch (sessionErr) {
+            console.error('[REGISTER] Session handling error:', sessionErr);
+            return res.status(201).json({
+              message: 'Account created successfully, but there was an issue with your session. You may need to log in again.',
               user: userWithoutPassword,
               loginSuccessful: true,
               sessionWarning: true
             });
           }
-          
-          console.log('[REGISTER] Session saved successfully with ID:', req.sessionID);
-          console.log(`[REGISTER] User ${userWithoutPassword.id} (${userWithoutPassword.username}) logged in after registration`);
-          
-          // Return success with session info for debugging
+        } catch (sessionHandlingErr) {
+          console.error('[REGISTER] Unexpected session handling error:', sessionHandlingErr);
           return res.status(201).json({
-            message: 'Registration successful',
+            message: 'Account created successfully, but session handling failed. Please log in manually.',
             user: userWithoutPassword,
-            loginSuccessful: true,
-            sessionId: req.sessionID
+            loginSuccessful: false,
+            sessionError: true
           });
-        });
+        }
       } else {
         // No session object - this is unusual but handle it gracefully
         console.error('[REGISTER] Session object missing after successful login');

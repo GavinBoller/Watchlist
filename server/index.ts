@@ -21,6 +21,8 @@ declare module 'express-session' {
   interface SessionData {
     createdAt?: number;
     authenticated?: boolean;
+    userAuthenticated?: boolean;
+    lastChecked?: number;
   }
 }
 
