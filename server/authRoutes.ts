@@ -238,21 +238,20 @@ router.post('/login', (req: Request, res: Response, next) => {
   })();
 });
 
-// Logout route with comprehensive error handling and cross-environment support
+// Logout route with comprehensive error handling and consistent cross-environment support
 router.post('/logout', (req: Request, res: Response) => {
   // Environment configuration
   const isProd = process.env.NODE_ENV === 'production';
   const emergencyMode = isProd && isEmergencyModeActive();
-  const cookieName = isProd ? 'watchapp.sid' : 'watchlist.sid';
+  // Use a consistent cookie name across environments
+  const cookieName = 'watchlist.sid';
   
   // Log additional debug info for troubleshooting
   console.log(`Logout request. User authenticated: ${req.isAuthenticated()}, Emergency mode: ${emergencyMode}`);
   console.log(`Session ID: ${req.sessionID || 'none'}`);
   
-  // Production-specific logs
-  if (isProd) {
-    console.log(`Production cookie configuration: ${cookieName}, secure: true, sameSite: lax`);
-  }
+  // Environment-specific logs
+  console.log(`Session cookie configuration: ${cookieName}, secure: ${isProd}, sameSite: lax`);
   
   // Handle logout with comprehensive error handling
   req.logout((logoutErr) => {
@@ -287,21 +286,14 @@ router.post('/logout', (req: Request, res: Response) => {
             sameSite: 'lax'
           });
           
-          // Special cookie cleanup for production environments
-          if (isProd) {
-            res.clearCookie('watchapp.sid', {
-              path: '/',
-              httpOnly: true,
-              secure: true,
-              sameSite: 'lax'
-            });
-            
-            // Force-clear any potentially stuck cookies
-            res.setHeader('Set-Cookie', [
-              `watchapp.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
-              `connect.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
-            ]);
-          }
+          // Force-clear all potential cookie variations to ensure complete logout
+          // This addresses issues with inconsistent cookie naming between environments
+          res.setHeader('Set-Cookie', [
+            `watchlist.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
+            `connect.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
+            // Also clear legacy cookie names for complete cleanup
+            `watchapp.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
+          ]);
         } catch (cookieErr) {
           console.error('Error clearing cookies:', cookieErr);
           // Continue despite cookie error

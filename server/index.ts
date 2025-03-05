@@ -485,12 +485,12 @@ async function startServer() {
     
     app.use(session({
       secret: SESSION_SECRET,
-      resave: true, // Changed to true to ensure session is saved back to the store
-      saveUninitialized: true, // Changed to true to create session for all visitors
+      resave: false, // Don't save session if unmodified
+      saveUninitialized: false, // Don't create session until something stored
       store: sessionStore,
       proxy: true, // Always trust the reverse proxy
       rolling: true, // Reset expiration countdown on every response
-      name: isProd ? 'watchapp.sid' : 'watchlist.sid', // Different name for production
+      name: 'watchlist.sid', // Use consistent name across environments
       
       // Enhanced session generation with automatic timestamp and logging
       genid: function(req) {
@@ -500,17 +500,17 @@ async function startServer() {
         return sessionId;
       },
       
-      // Environment-specific cookie settings
+      // More consistent cookie settings with only necessary differences between environments
       cookie: {
         httpOnly: true,
-        // Use secure cookies in production, but allow insecure in development
-        secure: isProd ? true : false,
-        // Set a reasonable session timeout
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-        // Use safer lax mode in all environments
+        // Use secure attribute only in production (needed for HTTPS)
+        secure: isProd,
+        // Set a shorter but reasonable session timeout (7 days instead of 30)
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        // Use 'lax' for better security while still allowing redirects
         sameSite: 'lax',
         path: '/',
-        // No domain setting to work with any host
+        // No domain restriction to ensure compatibility with all hosts
         domain: undefined
       }
     }));
