@@ -416,6 +416,233 @@ export async function checkSessionStatus(): Promise<SessionCheckResult | null> {
 }
 
 /**
+ * Attempt to recover a broken session using server recovery mechanisms
+ * This implements multiple recovery strategies to try to restore a session
+ * without requiring the user to log in again
+ * 
+ * @param userId Optional user ID to try to recover specifically
+ * @returns A promise that resolves to the recovery result
+ */
+export async function attemptSessionRecovery(userId?: number): Promise<SessionCheckResult | null> {
+  console.log(`[SESSION-RECOVERY] Starting recovery${userId ? ` for user ID ${userId}` : ''}`);
+  
+  // First, check if auto-logout protection should be applied
+  const isAutoLogout = detectAutoLogoutPattern();
+  if (isAutoLogout) {
+    console.log('[SESSION-RECOVERY] Auto-logout pattern detected, applying protection');
+  }
+  
+  // Start with the stored user ID if none was provided
+  if (!userId) {
+    try {
+      const storedUser = localStorage.getItem('movietracker_user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        if (userData && userData.id) {
+          userId = userData.id;
+          console.log(`[SESSION-RECOVERY] Using stored user ID: ${userId}`);
+        }
+      }
+    } catch (error) {
+      console.error('[SESSION-RECOVERY] Error retrieving stored user ID:', error);
+    }
+  }
+  
+  // Try all available recovery methods
+  try {
+    // First try using the refresh-session endpoint
+    console.log('[SESSION-RECOVERY] Attempting server-side session refresh');
+    
+    const refreshUrl = `/api/refresh-session${userId ? `?userId=${userId}` : ''}`;
+    const refreshResponse = await fetch(refreshUrl, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
+      }
+    });
+    
+    if (refreshResponse.ok) {
+      const refreshData = await refreshResponse.json();
+      console.log('[SESSION-RECOVERY] Refresh response:', refreshData);
+      
+      if (refreshData.authenticated && refreshData.user) {
+        console.log('[SESSION-RECOVERY] Session successfully refreshed');
+        
+        // Update query client with the user data
+        queryClient.setQueryData(['/api/user'], refreshData.user);
+        
+        // Also store the user data for future emergency recovery
+        try {
+          localStorage.setItem('movietracker_user', JSON.stringify(refreshData.user));
+          localStorage.setItem('movietracker_session_id', refreshData.sessionId);
+          localStorage.setItem('movietracker_last_verified', new Date().toISOString());
+        } catch (storageError) {
+          console.error('[SESSION-RECOVERY] Error storing recovered user data:', storageError);
+        }
+        
+        // Return successful recovery result
+        return {
+          authenticated: true,
+          user: refreshData.user,
+          sessionId: refreshData.sessionId,
+          emergencyMode: false
+        };
+      }
+    } else {
+      console.warn(`[SESSION-RECOVERY] Refresh failed with status: ${refreshResponse.status}`);
+    }
+    
+    // If server-side refresh failed, try emergency self-recovery
+    if (isAutoLogout && userId) {
+      console.log('[SESSION-RECOVERY] Attempting emergency self-recovery for auto-logout prevention');
+      
+      // First try the /api/self-recover endpoint (for production)
+      try {
+        const emergencyResponse = await fetch(`/api/self-recover`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          }
+        });
+        
+        if (emergencyResponse.ok) {
+          const emergencyData = await emergencyResponse.json();
+          console.log('[SESSION-RECOVERY] Emergency response:', emergencyData);
+          
+          if (emergencyData.recovered && emergencyData.user) {
+            console.log('[SESSION-RECOVERY] Emergency recovery successful');
+            
+            // Update query client with the user data
+            queryClient.setQueryData(['/api/user'], emergencyData.user);
+            
+            return {
+              authenticated: true,
+              user: emergencyData.user,
+              emergencyMode: false,
+              autoLogoutDetected: true
+            };
+          }
+        } else {
+          console.log(`[SESSION-RECOVERY] Self-recover endpoint failed with status: ${emergencyResponse.status}. This is expected in development.`);
+        }
+      } catch (emergencyError) {
+        console.error('[SESSION-RECOVERY] Emergency recovery failed:', emergencyError);
+      }
+      
+      // If the first attempt failed, try using a username-based recovery 
+      // This works with both the emergency-recovery endpoint in production
+      // and has a fallback for development
+      try {
+        const username = localStorage.getItem('movietracker_username');
+        if (username) {
+          console.log(`[SESSION-RECOVERY] Attempting username-based recovery for: ${username}`);
+          
+          // Try user-specific emergency recovery (works in production)
+          const userRecoveryEndpoint = `/api/emergency-recovery/${username}`;
+          try {
+            const userRecoveryResponse = await fetch(userRecoveryEndpoint, {
+              method: 'GET',
+              credentials: 'include',
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate'
+              }
+            });
+            
+            if (userRecoveryResponse.ok) {
+              const recoveryData = await userRecoveryResponse.json();
+              console.log('[SESSION-RECOVERY] User-specific recovery response:', recoveryData);
+              
+              if (recoveryData.user) {
+                console.log('[SESSION-RECOVERY] User-specific recovery successful');
+                
+                // Update query client with the user data
+                queryClient.setQueryData(['/api/user'], recoveryData.user);
+                
+                return {
+                  authenticated: true,
+                  user: recoveryData.user,
+                  emergencyMode: false,
+                  autoLogoutDetected: true
+                };
+              }
+            } else {
+              console.log(`[SESSION-RECOVERY] User recovery endpoint failed with status: ${userRecoveryResponse.status}. This is expected in development.`);
+            }
+          } catch (userRecoveryError) {
+            console.error('[SESSION-RECOVERY] User-specific recovery failed:', userRecoveryError);
+          }
+          
+          // Development-specific fallback using refresh-session with username
+          try {
+            console.log(`[SESSION-RECOVERY] Attempting development fallback recovery for username: ${username}`);
+            const devFallbackResponse = await fetch(`/api/refresh-session?username=${encodeURIComponent(username)}`, {
+              method: 'GET',
+              credentials: 'include',
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate'
+              }
+            });
+            
+            if (devFallbackResponse.ok) {
+              const devFallbackData = await devFallbackResponse.json();
+              console.log('[SESSION-RECOVERY] Development fallback response:', devFallbackData);
+              
+              if (devFallbackData.authenticated && devFallbackData.user) {
+                console.log('[SESSION-RECOVERY] Development fallback recovery successful');
+                
+                // Update query client with the user data
+                queryClient.setQueryData(['/api/user'], devFallbackData.user);
+                
+                return {
+                  authenticated: true,
+                  user: devFallbackData.user,
+                  emergencyMode: false,
+                  autoLogoutDetected: true
+                };
+              }
+            }
+          } catch (devFallbackError) {
+            console.error('[SESSION-RECOVERY] Development fallback recovery failed:', devFallbackError);
+          }
+        }
+      } catch (usernameRecoveryError) {
+        console.error('[SESSION-RECOVERY] Username recovery attempts failed:', usernameRecoveryError);
+      }
+    }
+    
+    // If all server-side attempts failed, create a local emergency session as a last resort
+    const storedUser = localStorage.getItem('movietracker_user');
+    if (storedUser && isAutoLogout) {
+      console.log('[SESSION-RECOVERY] Creating emergency client-side session from stored data');
+      
+      try {
+        const userData = JSON.parse(storedUser);
+        
+        // Use stored data but mark as emergency mode
+        return {
+          authenticated: true,
+          user: userData,
+          emergencyMode: true,
+          autoLogoutDetected: true
+        };
+      } catch (parseError) {
+        console.error('[SESSION-RECOVERY] Error parsing stored user data:', parseError);
+      }
+    }
+    
+    // All recovery attempts failed
+    console.warn('[SESSION-RECOVERY] All recovery attempts failed, no session restored');
+    return null;
+    
+  } catch (error) {
+    console.error('[SESSION-RECOVERY] Unhandled error during session recovery:', error);
+    return null;
+  }
+}
+
+/**
  * Handle a session expiration event consistently across the application
  * Can be called from any component when a 401 error is received
  * 
@@ -523,56 +750,59 @@ export async function handleSessionExpiration(
   
   // Enhanced session verification with multiple checks to avoid false logouts
   
-  // First check: Try to recover the session using our robust recovery system
+  // First check: Try to recover the session using our enhanced recovery function
   try {
-    // Attempt session recovery with userId if we have cached user data
+    console.log('Attempting session recovery with enhanced recovery function');
+    
+    // Get userId from localStorage if available
+    let userId: number | undefined;
     const cachedUser = localStorage.getItem('movietracker_user');
     if (cachedUser) {
       try {
         const userData = JSON.parse(cachedUser);
         if (userData?.id) {
-          console.log('Attempting session recovery with stored user ID:', userData.id);
+          userId = userData.id;
           
           // Store username for potential emergency recovery
           if (userData.username) {
             localStorage.setItem('movietracker_username', userData.username);
           }
-          
-          // Try to recover the session using the user ID
-          const recoveryResponse = await fetch(`/api/refresh-session?userId=${userData.id}`, {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache'
-            }
-          });
-          
-          if (recoveryResponse.ok) {
-            const recoveryData = await recoveryResponse.json();
-            console.log('Session recovery attempt result:', recoveryData);
-            
-            if (recoveryData.authenticated && recoveryData.user) {
-              console.log('Session successfully recovered!');
-              
-              // Update the query cache with the recovered user
-              queryClient.setQueryData(["/api/user"], recoveryData.user);
-              
-              // Record successful recovery
-              localStorage.setItem('movietracker_recovery_successful', 'true');
-              localStorage.setItem('movietracker_recovery_time', new Date().toISOString());
-              
-              // No need to continue with session expiration
-              return;
-            }
-          }
         }
-      } catch (recoveryError) {
-        console.error('Error during recovery attempt:', recoveryError);
+      } catch (parseError) {
+        console.error('Error parsing cached user data:', parseError);
       }
     }
+    
+    // Attempt comprehensive session recovery
+    const recoveryResult = await attemptSessionRecovery(userId);
+    
+    if (recoveryResult?.authenticated && recoveryResult?.user) {
+      console.log('Session successfully recovered with enhanced system!', 
+                 recoveryResult.emergencyMode ? '(emergency mode)' : '');
+      
+      // Update the query cache with the recovered user
+      queryClient.setQueryData(["/api/user"], recoveryResult.user);
+      
+      // Record successful recovery
+      localStorage.setItem('movietracker_recovery_successful', 'true');
+      localStorage.setItem('movietracker_recovery_time', new Date().toISOString());
+      localStorage.setItem('movietracker_recovery_type', 
+                          recoveryResult.emergencyMode ? 'emergency' : 'standard');
+      
+      // Show a toast if this was an emergency recovery
+      if (recoveryResult.emergencyMode) {
+        toast({
+          title: "Session restored",
+          description: "Your session has been restored in emergency mode.",
+          duration: 3000,
+        });
+      }
+      
+      // No need to continue with session expiration
+      return;
+    }
   } catch (e) {
-    console.error('Error during initial recovery attempt:', e);
+    console.error('Error during enhanced recovery attempt:', e);
   }
   
   // Second check: try session endpoint
