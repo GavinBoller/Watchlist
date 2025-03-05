@@ -1,6 +1,7 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { isAuthenticated, hasWatchlistAccess } from "./auth";
 import axios from "axios";
 import { z } from "zod";
 import { 
@@ -63,6 +64,8 @@ async function convertGenreIdsToNames(genreIds: number[] = [], mediaType: string
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Authentication middlewares are now imported at the top of the file
+  
   // User routes
   app.get("/api/users", async (req: Request, res: Response) => {
     try {
@@ -182,8 +185,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Watchlist routes
-  app.get("/api/watchlist/:userId", async (req: Request, res: Response) => {
+  // Watchlist routes - protect all with isAuthenticated middleware
+  app.get("/api/watchlist/:userId", isAuthenticated, hasWatchlistAccess, async (req: Request, res: Response) => {
     try {
       const userId = parseInt(req.params.userId, 10);
       
@@ -203,7 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/watchlist", async (req: Request, res: Response) => {
+  app.post("/api/watchlist", isAuthenticated, hasWatchlistAccess, async (req: Request, res: Response) => {
     console.log("POST /api/watchlist - Request body:", JSON.stringify(req.body, null, 2));
     console.log("Environment:", process.env.NODE_ENV || 'development');
     
@@ -501,7 +504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/watchlist/:id", async (req: Request, res: Response) => {
+  app.put("/api/watchlist/:id", isAuthenticated, hasWatchlistAccess, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id, 10);
       const { watchedDate, notes, status } = req.body;
@@ -552,7 +555,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/watchlist/:id", async (req: Request, res: Response) => {
+  app.delete("/api/watchlist/:id", isAuthenticated, hasWatchlistAccess, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id, 10);
       
