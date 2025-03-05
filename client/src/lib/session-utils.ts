@@ -374,11 +374,24 @@ export async function checkSessionStatus(): Promise<SessionCheckResult | null> {
             localStorage.setItem('movietracker_session_recovery', 'local_storage');
             localStorage.setItem('movietracker_emergency_ts', new Date().toISOString());
             
-            // Try to recover the session via the refresh endpoint with the user ID
-            if (userData.id) {
+            // Try to recover the session via the refresh endpoint with both user ID and username if available
+            if (userData.id || userData.username) {
               try {
-                console.log('Attempting emergency session recovery with userId:', userData.id);
-                const recoveryResponse = await fetch(`/api/refresh-session?userId=${userData.id}`, {
+                // Build the recovery URL with any available identifiers
+                let recoveryUrl = '/api/refresh-session';
+                const params = new URLSearchParams();
+                if (userData.id) {
+                  params.append('userId', userData.id.toString());
+                }
+                if (userData.username) {
+                  params.append('username', userData.username);
+                  // Also store username for potential future recovery
+                  localStorage.setItem('movietracker_username', userData.username);
+                }
+                recoveryUrl += `?${params.toString()}`;
+                
+                console.log('Attempting emergency session recovery with:', recoveryUrl);
+                const recoveryResponse = await fetch(recoveryUrl, {
                   method: 'GET',
                   credentials: 'include',
                   headers: {
@@ -454,6 +467,14 @@ export async function attemptSessionRecovery(userId?: number, username?: string)
   const isAutoLogout = detectAutoLogoutPattern();
   if (isAutoLogout) {
     console.log('[SESSION-RECOVERY] Auto-logout pattern detected, applying protection');
+    
+    // Record this for analytics - only log once per session
+    const autoLogoutDetectionTime = localStorage.getItem('movietracker_auto_logout_detected_time');
+    const now = Date.now();
+    if (!autoLogoutDetectionTime || (now - parseInt(autoLogoutDetectionTime)) > 3600000) { // Once per hour
+      localStorage.setItem('movietracker_auto_logout_detected_time', String(now));
+      console.warn('[SESSION-RECOVERY] Auto-logout protection activated at:', new Date().toISOString());
+    }
   }
   
   // Start with the stored user info if none was provided
