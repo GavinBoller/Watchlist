@@ -14,7 +14,13 @@ import { exec } from "child_process";
 import util from "util";
 import fs from "fs";
 import crypto from "crypto";
-import { productionSessionRepair, productionLogging, productionOptimizations, registerEmergencyEndpoints } from "./productionFixes";
+import { 
+  productionSessionRepair, 
+  productionLogging, 
+  productionOptimizations, 
+  registerEmergencyEndpoints,
+  preventAutoLogout 
+} from "./productionFixes";
 
 // Extend the Express Session interface to include our custom properties
 // This ensures TypeScript recognizes our custom session data
@@ -60,6 +66,7 @@ configurePassport();
 app.use(productionLogging);         // Enhanced logging for production
 app.use(productionSessionRepair);   // Session repair mechanisms
 app.use(productionOptimizations);   // Performance optimizations
+app.use(preventAutoLogout);         // Prevent automatic logout issues for all users
 
 // Setup session store with fallback
 let sessionStore: any; // Using any type here since we'll be assigning different types of stores
