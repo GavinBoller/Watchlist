@@ -1,0 +1,643 @@
+// Define global window properties
+declare global {
+  interface Window {
+    __tempRegistrationData?: {
+      timestamp: number;
+      username: string;
+    };
+  }
+}
+
+import { createContext, ReactNode, useContext } from "react";
+import {
+  useQuery,
+  useMutation,
+  UseMutationResult,
+} from "@tanstack/react-query";
+import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
+import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { detectAutoLogoutPattern } from "@/lib/session-utils";
+
+// Extended User type with confirmPassword for registration
+type RegisterData = Omit<InsertUser, 'confirmPassword'> & {
+  confirmPassword: string;
+};
+
+// Define the type for our logout mutation result
+type LogoutResult = { 
+  autoLogoutPrevented?: boolean;
+  success?: boolean;
+  clientSideOnly?: boolean;
+};
+
+type AuthContextType = {
+  user: SelectUser | null;
+  isLoading: boolean;
+  error: Error | null;
+  loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
+  logoutMutation: UseMutationResult<LogoutResult, Error, void>;
+  registerMutation: UseMutationResult<SelectUser, Error, RegisterData>;
+};
+
+type LoginData = Pick<InsertUser, "username" | "password">;
+
+// Create context with default value - export it directly for compatibility
+export const AuthContext = createContext<AuthContextType | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const { toast } = useToast();
+  
+  // Use a query to fetch the current user if there's an active session
+  const {
+    data: user,
+    error,
+    isLoading,
+    refetch: refetchUser
+  } = useQuery<SelectUser | null, Error>({
+    queryKey: ["/api/user"],
+    queryFn: async () => {
+      try {
+        // First try the standard user endpoint
+        const primaryRes = await apiRequest("GET", "/api/user", null, {timeout: 5000});
+        if (primaryRes.ok) {
+          const userData = await primaryRes.json();
+          console.log("User authenticated via primary endpoint:", userData?.username || 'unknown');
+          return userData;
+        }
+        
+        // If primary fails, try session endpoint as fallback
+        console.log("Primary authentication check failed, trying session endpoint...");
+        const sessionRes = await apiRequest("GET", "/api/session", null, {timeout: 5000});
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          if (sessionData?.authenticated && sessionData?.user) {
+            console.log("User authenticated via session endpoint:", sessionData.user?.username || 'unknown');
+            return sessionData.user;
+          }
+        }
+        
+        // If both checks fail, the user is not authenticated
+        console.log("Auth check failed on all endpoints - user not authenticated");
+        return null;
+        
+        for(let attempt = 0; attempt < maxAttempts; attempt++) {
+          try {
+            // Add delay between retries
+            if(attempt > 0) {
+              console.log(`Retry attempt ${attempt+1}/${maxAttempts} for auth check`);
+              await new Promise(r => setTimeout(r, 1000 * attempt));
+            }
+            
+            // Try both endpoint formats to handle redeployment and backward compatibility
+            // First try the newer directly on /api endpoint with improved timeout handling
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+              
+              const userRes = await fetch("/api/user", {
+                credentials: "include",
+                signal: controller.signal,
+                headers: {
+                  "Cache-Control": "no-cache, no-store, must-revalidate",
+                  "Pragma": "no-cache" 
+                }
+              });
+              
+              clearTimeout(timeoutId);
+              
+              if (userRes.ok) {
+                const userData = await userRes.json();
+                console.log("Auth check successful via /api/user", userData);
+                return userData;
+              }
+            } catch (directError) {
+              console.log("Direct user endpoint error, trying session endpoint");
+            }
+            
+            // If that fails, try the session endpoint with timeout handling
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+              
+              const sessionRes = await fetch("/api/session", {
+                credentials: "include",
+                signal: controller.signal,
+                headers: {
+                  "Cache-Control": "no-cache, no-store, must-revalidate",
+                  "Pragma": "no-cache" 
+                }
+              });
+              
+              clearTimeout(timeoutId);
+              
+              if (sessionRes.ok) {
+                const data = await sessionRes.json();
+                console.log("Auth check successful via /api/session", data);
+                if (data.authenticated && data.user) {
+                  return data.user;
+                }
+              }
+            } catch (sessionError) {
+              console.log("Session endpoint error, trying legacy user endpoint");
+            }
+            
+            // Fall back to the user endpoint with timeout handling
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+              
+              const userRes = await fetch("/api/auth/user", {
+                credentials: "include",
+                signal: controller.signal,
+                headers: {
+                  "Cache-Control": "no-cache, no-store, must-revalidate",
+                  "Pragma": "no-cache" 
+                }
+              });
+              
+              clearTimeout(timeoutId);
+              
+              if (userRes.ok) {
+                const userData = await userRes.json();
+                console.log("Auth check successful via /api/auth/user", userData);
+                if (userData && userData.id) {
+                  return userData;
+                }
+              }
+            } catch (legacyError) {
+              console.log("Legacy user endpoint error");
+            }
+            
+            // If all endpoints failed but didn't throw (returned unsuccessful response codes)
+            // We can consider the user not authenticated
+            console.log("All auth endpoints returned unsuccessful responses - user not authenticated");
+            return null;
+          } catch (attemptError) {
+            // Store the error and try again
+            lastError = attemptError;
+            console.error(`Auth check attempt ${attempt+1} failed:`, attemptError);
+          }
+        }
+        
+        // If we've tried all attempts and all failed with errors, return null
+        console.error(`All ${maxAttempts} auth check attempts failed. Last error:`, lastError);
+        return null;
+      } catch (error) {
+        console.error("Failed to fetch user session:", error);
+        return null;
+      }
+    },
+    staleTime: 1000 * 60 * 10, // 10 minutes instead of 5
+    gcTime: 1000 * 60 * 15,    // 15 minutes instead of 10
+    refetchOnWindowFocus: false, // Don't refetch on window focus as it can cause excess 401 errors
+    retry: 2, // Additional retries at the React Query level
+  });
+
+  const loginMutation = useMutation({
+    mutationFn: async (credentials: LoginData) => {
+      // Try the new endpoint first
+      try {
+        const res = await apiRequest("POST", "/api/login", credentials);
+        
+        // Check for success before trying to parse JSON
+        if (res.ok) {
+          try {
+            const contentType = res.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const data = await res.json();
+              console.log("Login successful with /api/login endpoint", data);
+              return data.user || data; // Handle both response formats
+            } else {
+              console.log("Response is not JSON, returning credentials username as fallback");
+              // If we got a successful response but not JSON, create a minimal user object
+              return { username: credentials.username, id: -1 };
+            }
+          } catch (jsonError) {
+            console.error("JSON parsing error from /api/login:", jsonError);
+            // If JSON parsing fails but login was successful, create a minimal user object
+            return { username: credentials.username, id: -1 };
+          }
+        }
+        
+        // For error responses, don't try to parse JSON right away
+        console.log("Login error with /api/login endpoint, status:", res.status);
+        
+        // Only try to parse JSON errors if the content type is correct
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await res.json();
+            throw new Error(errorData.message || `Login failed with status ${res.status}`);
+          } catch (jsonParseError) {
+            throw new Error(`Login failed with status ${res.status}. Unable to parse error response.`);
+          }
+        } else {
+          throw new Error(`Login failed with status ${res.status}. Response was not JSON.`);
+        }
+      } catch (directError) {
+        console.log("Direct login endpoint error, trying legacy endpoint", directError);
+        
+        // Try the old endpoint as fallback
+        try {
+          const res = await apiRequest("POST", "/api/auth/login", credentials);
+          
+          // Check for success before trying to parse JSON
+          if (res.ok) {
+            try {
+              const contentType = res.headers.get('content-type');
+              if (contentType && contentType.includes('application/json')) {
+                const data = await res.json();
+                console.log("Login successful with /api/auth/login endpoint", data);
+                return data.user || data; // Handle both response formats
+              } else {
+                console.log("Response is not JSON, returning credentials username as fallback");
+                // If we got a successful response but not JSON, create a minimal user object
+                return { username: credentials.username, id: -1 };
+              }
+            } catch (jsonError) {
+              console.error("JSON parsing error from /api/auth/login:", jsonError);
+              // If JSON parsing fails but login was successful, create a minimal user object
+              return { username: credentials.username, id: -1 };
+            }
+          }
+          
+          // For error responses, handle carefully
+          console.log("Login error with /api/auth/login endpoint, status:", res.status);
+          
+          // Only try to parse JSON errors if the content type is correct
+          const contentType = res.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            try {
+              const errorData = await res.json();
+              throw new Error(errorData.message || `Login failed with status ${res.status}`);
+            } catch (jsonParseError) {
+              throw new Error(`Login failed with status ${res.status}. Unable to parse error response.`);
+            }
+          } else {
+            throw new Error(`Login failed with status ${res.status}. Response was not JSON.`);
+          }
+        } catch (legacyError) {
+          console.error("Both login endpoints failed", legacyError);
+          throw new Error("Login failed. Please try again later.");
+        }
+      }
+    },
+    onSuccess: (userData: SelectUser) => {
+      console.log("Login successful, updating cache with user data:", userData);
+      
+      // Update all possible query paths to ensure consistency
+      queryClient.setQueryData(["/api/user"], userData);
+      queryClient.setQueryData(["/api/auth/user"], userData);
+      queryClient.setQueryData(["/api/session"], {
+        authenticated: true,
+        user: userData,
+        sessionId: "active-session"
+      });
+      
+      // Clear temporary registration data if it exists
+      if (window.__tempRegistrationData) {
+        console.log("Clearing temporary registration data after successful login");
+        window.__tempRegistrationData = undefined;
+      }
+      
+      // Force reload the authentication status to ensure it's properly updated
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/session"] });
+      
+      toast({
+        title: "Welcome back!",
+        description: `You've successfully logged in as ${userData.username}`,
+      });
+      
+      // Store user in localStorage as a backup for emergency recovery
+      try {
+        localStorage.setItem('movietracker_user', JSON.stringify(userData));
+      } catch (error) {
+        console.error("Could not store user in localStorage:", error);
+      }
+      
+      // Add a small delay to ensure session data is properly saved
+      setTimeout(() => {
+        // Double-check session after a short delay
+        queryClient.invalidateQueries({ queryKey: ["/api/session"] });
+      }, 500);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Login failed",
+        description: error.message || "There was a problem logging in",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: async (userData: RegisterData) => {
+      // Try the new endpoint first
+      try {
+        const res = await apiRequest("POST", "/api/register", userData);
+        
+        // Check for success before trying to parse JSON
+        if (res.ok) {
+          try {
+            const contentType = res.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const data = await res.json();
+              console.log("Registration successful with /api/register endpoint", data);
+              return data.user || data; // Handle both response formats
+            } else {
+              console.log("Response is not JSON, returning username as fallback");
+              // If we got a successful response but not JSON, create a minimal user object
+              return { username: userData.username, id: -1 };
+            }
+          } catch (jsonError) {
+            console.error("JSON parsing error from /api/register:", jsonError);
+            // If JSON parsing fails but registration was successful, create a minimal user object
+            return { username: userData.username, id: -1 };
+          }
+        }
+        
+        // For error responses, don't try to parse JSON right away
+        console.log("Registration error with /api/register endpoint, status:", res.status);
+        
+        // Only try to parse JSON errors if the content type is correct
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await res.json();
+            throw new Error(errorData.message || `Registration failed with status ${res.status}`);
+          } catch (jsonParseError) {
+            throw new Error(`Registration failed with status ${res.status}. Unable to parse error response.`);
+          }
+        } else {
+          throw new Error(`Registration failed with status ${res.status}. Response was not JSON.`);
+        }
+      } catch (directError) {
+        console.log("Direct register endpoint error, trying legacy endpoint", directError);
+        
+        // Try the old endpoint as fallback
+        try {
+          const res = await apiRequest("POST", "/api/auth/register", userData);
+          
+          // Check for success before trying to parse JSON
+          if (res.ok) {
+            try {
+              const contentType = res.headers.get('content-type');
+              if (contentType && contentType.includes('application/json')) {
+                const data = await res.json();
+                console.log("Registration successful with /api/auth/register endpoint", data);
+                return data.user || data; // Handle both response formats
+              } else {
+                console.log("Response is not JSON, returning username as fallback");
+                // If we got a successful response but not JSON, create a minimal user object
+                return { username: userData.username, id: -1 };
+              }
+            } catch (jsonError) {
+              console.error("JSON parsing error from /api/auth/register:", jsonError);
+              // If JSON parsing fails but registration was successful, create a minimal user object
+              return { username: userData.username, id: -1 };
+            }
+          }
+          
+          // For error responses, handle carefully
+          console.log("Registration error with /api/auth/register endpoint, status:", res.status);
+          
+          // Only try to parse JSON errors if the content type is correct
+          const contentType = res.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            try {
+              const errorData = await res.json();
+              throw new Error(errorData.message || `Registration failed with status ${res.status}`);
+            } catch (jsonParseError) {
+              throw new Error(`Registration failed with status ${res.status}. Unable to parse error response.`);
+            }
+          } else {
+            throw new Error(`Registration failed with status ${res.status}. Response was not JSON.`);
+          }
+        } catch (legacyError) {
+          console.error("Both registration endpoints failed", legacyError);
+          throw new Error("Registration failed. Please try again later.");
+        }
+      }
+    },
+    onSuccess: async (userData: SelectUser) => {
+      console.log("Registration successful, updating cache with user data:", userData);
+      
+      // Show welcome toast
+      toast({
+        title: "Account created",
+        description: `Welcome to MovieTracker, ${userData.username}!`,
+      });
+      
+      // Update query cache with user data
+      queryClient.setQueryData(["/api/user"], userData);
+      queryClient.setQueryData(["/api/auth/user"], userData);
+      queryClient.setQueryData(["/api/session"], {
+        authenticated: true,
+        user: userData,
+        sessionId: "active-session"
+      });
+      
+      // Force immediate cache invalidation to refresh auth state
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/session"] });
+      
+      // Store the original password in memory temporarily (not in localStorage)
+      // The RegisterForm component will use this for auto-login
+      window.__tempRegistrationData = {
+        timestamp: Date.now(),
+        username: userData.username
+      };
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Registration failed",
+        description: error.message || "There was a problem creating your account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      // Record timestamp for auto-logout protection
+      const logoutTimestamp = Date.now();
+      const username = user?.username || 'unknown';
+      
+      // Check if this might be an auto-logout situation using our shared utility
+      const isAutoLogout = detectAutoLogoutPattern();
+      
+      // If we detect auto-logout pattern, don't actually call the server logout 
+      // but pretend success while retaining the session
+      if (isAutoLogout) {
+        console.log("Auto-logout pattern detected - preventing server logout but allowing client-side state clear");
+        
+        // Store user in emergency recovery for later restoration
+        try {
+          localStorage.setItem('movietracker_emergency_user', JSON.stringify(user));
+          localStorage.setItem('movietracker_emergency_ts', String(Date.now()));
+        } catch (e) {
+          console.error("Error storing emergency recovery data:", e);
+        }
+        
+        // Return success without actually logging out on server
+        return { autoLogoutPrevented: true };
+      }
+      
+      // Normal logout path - try the new endpoint first
+      try {
+        const res = await apiRequest("POST", "/api/logout");
+        
+        if (res.ok) {
+          console.log("Logout successful with /api/logout endpoint");
+          
+          // Check if server prevented the logout due to auto-logout detection
+          try {
+            const data = await res.json();
+            if (data && data.autoLogoutPrevented) {
+              console.log("Server prevented logout due to auto-logout detection");
+              return { autoLogoutPrevented: true };
+            }
+          } catch (e) {
+            // If not JSON or parsing fails, that's fine - just a normal logout
+          }
+          
+          return { success: true };
+        }
+        
+        console.log("Direct logout endpoint returned status:", res.status);
+      } catch (directError) {
+        console.log("Direct logout endpoint error, trying legacy endpoint", directError);
+      }
+      
+      // Try the old endpoint as fallback
+      try {
+        const res = await apiRequest("POST", "/api/auth/logout");
+        
+        if (res.ok) {
+          console.log("Logout successful with /api/auth/logout endpoint");
+          return { success: true };
+        }
+        
+        // If we get here, neither endpoint worked
+        console.log("Legacy logout endpoint returned status:", res.status);
+        
+        // Special handling for production errors: if we get any non-5xx status,
+        // consider the logout "successful" since we'll clear the local state anyway
+        if (res.status < 500) {
+          console.log("Non-server error status received, treating as successful logout");
+          return { success: true };
+        }
+        
+        throw new Error(`Logout failed with status ${res.status}`);
+      } catch (legacyError) {
+        console.error("Both logout endpoints failed", legacyError);
+        
+        // Even if server-side logout fails, we can still clear client state
+        // This provides a better UX in case of server issues
+        console.log("Treating as successful logout despite server errors");
+        return { success: true, clientSideOnly: true };
+      }
+    },
+    onSuccess: (result: any) => {
+      // Check if auto-logout prevention was activated
+      if (result && result.autoLogoutPrevented) {
+        console.log("Auto-logout prevention activated - preserving session on server but clearing UI state");
+        
+        // Create backup recovery data in case user needs to relogin
+        try {
+          localStorage.setItem('movietracker_auto_logout_detected', 'true');
+          localStorage.setItem('movietracker_session_preserved', 'true');
+          localStorage.setItem('movietracker_auto_logout_ts', String(Date.now()));
+        } catch (e) {
+          console.error("Failed to store auto-logout metadata:", e);
+        }
+        
+        // Clear UI state but don't invalidate server sessions
+        queryClient.setQueryData(["/api/user"], null);
+        queryClient.setQueryData(["/api/auth/user"], null);
+        
+        // Notice we're not invalidating the queries to prevent refetching
+        // that could trigger additional auto-logouts
+        
+        toast({
+          title: "Session Management",
+          description: "Your session was maintained but you've been logged out of this device. You can log back in anytime.",
+        });
+        
+        return;
+      }
+      
+      // Standard logout success handling
+      console.log("Logout successful, clearing user data from cache");
+      
+      // Clear all query caches
+      queryClient.setQueryData(["/api/user"], null);
+      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.setQueryData(["/api/session"], {
+        authenticated: false,
+        user: null,
+        sessionId: null
+      });
+      
+      // Clear temporary registration data if it exists
+      if (window.__tempRegistrationData) {
+        console.log("Clearing temporary registration data after logout");
+        window.__tempRegistrationData = undefined;
+      }
+      
+      // Clear localStorage user data
+      try {
+        localStorage.removeItem('movietracker_user');
+        localStorage.removeItem('movietracker_emergency_recovery');
+        console.log("Removed user data from localStorage");
+      } catch (e) {
+        console.error("Failed to clear localStorage:", e);
+      }
+      
+      // Invalidate all authentication-related queries
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/session"] }); 
+      // Invalidate watchlist queries to clear user-specific data
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+      
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Logout failed",
+        description: error.message || "There was a problem logging out",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user: user ?? null,
+        isLoading,
+        error,
+        loginMutation,
+        logoutMutation,
+        registerMutation,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+// Export a hook that simplifies access to the auth context
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+}
