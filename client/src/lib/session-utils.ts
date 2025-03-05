@@ -421,10 +421,11 @@ export async function checkSessionStatus(): Promise<SessionCheckResult | null> {
  * without requiring the user to log in again
  * 
  * @param userId Optional user ID to try to recover specifically
+ * @param username Optional username to try to recover specifically
  * @returns A promise that resolves to the recovery result
  */
-export async function attemptSessionRecovery(userId?: number): Promise<SessionCheckResult | null> {
-  console.log(`[SESSION-RECOVERY] Starting recovery${userId ? ` for user ID ${userId}` : ''}`);
+export async function attemptSessionRecovery(userId?: number, username?: string): Promise<SessionCheckResult | null> {
+  console.log(`[SESSION-RECOVERY] Starting recovery${userId ? ` for user ID ${userId}` : ''}${username ? ` for username ${username}` : ''}`);
   
   // First, check if auto-logout protection should be applied
   const isAutoLogout = detectAutoLogoutPattern();
@@ -432,19 +433,31 @@ export async function attemptSessionRecovery(userId?: number): Promise<SessionCh
     console.log('[SESSION-RECOVERY] Auto-logout pattern detected, applying protection');
   }
   
-  // Start with the stored user ID if none was provided
-  if (!userId) {
+  // Start with the stored user info if none was provided
+  if (!userId && !username) {
     try {
       const storedUser = localStorage.getItem('movietracker_user');
       if (storedUser) {
         const userData = JSON.parse(storedUser);
-        if (userData && userData.id) {
-          userId = userData.id;
-          console.log(`[SESSION-RECOVERY] Using stored user ID: ${userId}`);
+        if (userData) {
+          if (userData.id) {
+            userId = userData.id;
+            console.log(`[SESSION-RECOVERY] Using stored user ID: ${userId}`);
+          }
+          if (userData.username) {
+            username = userData.username;
+            console.log(`[SESSION-RECOVERY] Using stored username: ${username}`);
+          }
         }
       }
+      
+      // Also check for temporary registration data
+      if (window.__tempRegistrationData?.username && !username) {
+        username = window.__tempRegistrationData.username;
+        console.log(`[SESSION-RECOVERY] Using temp registration username: ${username}`);
+      }
     } catch (error) {
-      console.error('[SESSION-RECOVERY] Error retrieving stored user ID:', error);
+      console.error('[SESSION-RECOVERY] Error retrieving stored user information:', error);
     }
   }
   
@@ -453,7 +466,15 @@ export async function attemptSessionRecovery(userId?: number): Promise<SessionCh
     // First try using the refresh-session endpoint
     console.log('[SESSION-RECOVERY] Attempting server-side session refresh');
     
-    const refreshUrl = `/api/refresh-session${userId ? `?userId=${userId}` : ''}`;
+    // Build the URL with the available parameters
+    let refreshUrl = '/api/refresh-session';
+    const params = new URLSearchParams();
+    if (userId) params.append('userId', userId.toString());
+    if (username) params.append('username', username);
+    if (params.toString()) refreshUrl += `?${params.toString()}`;
+    
+    console.log(`[SESSION-RECOVERY] Refresh URL: ${refreshUrl}`);
+    
     const refreshResponse = await fetch(refreshUrl, {
       method: 'GET',
       credentials: 'include',
@@ -765,27 +786,35 @@ export async function handleSessionExpiration(
   try {
     console.log('Attempting session recovery with enhanced recovery function');
     
-    // Get userId from localStorage if available
+    // Get userId and username from localStorage if available
     let userId: number | undefined;
+    let username: string | undefined;
     const cachedUser = localStorage.getItem('movietracker_user');
     if (cachedUser) {
       try {
         const userData = JSON.parse(cachedUser);
         if (userData?.id) {
           userId = userData.id;
-          
+        }
+        
+        if (userData?.username) {
+          username = userData.username;
           // Store username for potential emergency recovery
-          if (userData.username) {
-            localStorage.setItem('movietracker_username', userData.username);
-          }
+          localStorage.setItem('movietracker_username', userData.username);
         }
       } catch (parseError) {
         console.error('Error parsing cached user data:', parseError);
       }
     }
     
-    // Attempt comprehensive session recovery
-    const recoveryResult = await attemptSessionRecovery(userId);
+    // Also check for temporary registration data
+    if (window.__tempRegistrationData?.username && !username) {
+      username = window.__tempRegistrationData.username;
+      console.log('Using temporary registration username for recovery:', username);
+    }
+    
+    // Attempt comprehensive session recovery with both userId and username
+    const recoveryResult = await attemptSessionRecovery(userId, username);
     
     if (recoveryResult?.authenticated && recoveryResult?.user) {
       console.log('Session successfully recovered with enhanced system!', 
