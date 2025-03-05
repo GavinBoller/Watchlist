@@ -14,6 +14,7 @@ import { exec } from "child_process";
 import util from "util";
 import fs from "fs";
 import crypto from "crypto";
+import { productionSessionRepair, productionLogging, productionOptimizations } from "./productionFixes";
 
 // Extend the Express Session interface to include our custom properties
 // This ensures TypeScript recognizes our custom session data
@@ -23,6 +24,7 @@ declare module 'express-session' {
     authenticated?: boolean;
     userAuthenticated?: boolean;
     lastChecked?: number;
+    repaired?: boolean;
   }
 }
 
@@ -34,6 +36,13 @@ const execPromise = util.promisify(exec);
 
 // Initialize Express app
 const app = express();
+
+// Add production-specific middleware early in the stack
+// These help with debugging and fixing session issues specifically in production
+app.use(productionLogging);         // Enhanced logging for production
+app.use(productionSessionRepair);   // Session repair mechanisms
+app.use(productionOptimizations);   // Performance optimizations
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

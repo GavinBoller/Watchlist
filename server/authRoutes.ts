@@ -220,7 +220,16 @@ router.post('/login', (req: Request, res: Response, next) => {
                   } 
                   
                   // Manually re-login the user after regeneration
-                  req.login(req.user, (loginErr) => {
+                  // Make sure we have a valid user before attempting to re-login
+                  if (!req.user) {
+                    console.error('[AUTH] Cannot re-login: user object is undefined');
+                    return res.status(500).json({
+                      message: 'Login successful but session recovery failed. Please try again.'
+                    });
+                  }
+                  
+                  const validUser = req.user as User;
+                  req.login(validUser, (loginErr) => {
                     if (loginErr) {
                       console.error('[AUTH] Re-login error during recovery:', loginErr);
                       return res.status(500).json({
