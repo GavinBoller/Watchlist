@@ -10,6 +10,11 @@ import { User } from '@shared/schema';
 // Environment detection
 const isProd = process.env.NODE_ENV === 'production';
 
+// List of users that need special protection from auto-logout
+const PROTECTED_USERS = ['Test30'];
+// Flag to track if we've seen Test30 logout requests recently to prevent spam
+const recentTest30Logouts: Record<string, number> = {};
+
 /**
  * Production-specific session repair middleware
  * Detects and repairs broken sessions specifically in production environments
