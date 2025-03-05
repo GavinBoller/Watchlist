@@ -394,9 +394,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Creating watchlist entry with status:", validStatus);
       
       try {
-        // Create watchlist entry
+        // Create watchlist entry - ensure we use the validated userIdNum
         const entryData = {
-          userId,
+          userId: userIdNum,
           movieId: movie.id,
           watchedDate: watchedDate || null,
           notes: notes || null,
@@ -434,8 +434,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (errorMessage.includes('duplicate') || errorMessage.includes('unique constraint')) {
           console.log("Detected duplicate entry error, retrieving existing entry");
           
-          // Try to find the existing entry
-          const entries = await storage.getWatchlistEntries(userId);
+          // Try to find the existing entry - use the validated userIdNum
+          const entries = await storage.getWatchlistEntries(userIdNum);
           const existingEntry = entries.find(entry => entry.movieId === movie.id);
           
           if (existingEntry) {

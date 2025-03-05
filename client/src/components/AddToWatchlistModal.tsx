@@ -121,20 +121,25 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
     } catch (error: any) {
       console.error('Error adding to watchlist:', error);
       
+      // Get response data where available for better error messages
+      const errorData = error.data || {};
+      
       // Check for different error types and provide specific messages
-      if (error.status === 409) {
+      if (error.status === 409 || (errorData?.message === "Already in watchlist")) {
         toast({
           title: "Already Added",
-          description: error.data?.details || `You've already added "${title}" to your list`,
+          description: errorData?.details || `You've already added "${title}" to your list`,
           variant: "default",
         });
       } else if (error.status === 400) {
         // Handle validation errors
         let errorMsg = "There was a problem with the data submitted";
-        if (error.data?.errors) {
-          errorMsg = Object.values(error.data.errors)
+        if (errorData?.errors) {
+          errorMsg = Object.values(errorData.errors)
             .map((e: any) => e.message || e)
             .join(", ");
+        } else if (errorData?.details) {
+          errorMsg = errorData.details;
         }
         
         toast({
@@ -148,10 +153,32 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
           description: "Please log in again to add items to your watchlist",
           variant: "destructive",
         });
+      } else if (error.status === 404) {
+        // Handle user not found errors with specific message
+        if (errorData?.message?.includes("User not found")) {
+          toast({
+            title: "User not found",
+            description: errorData?.details || "The selected user account could not be found. Please try selecting a different user.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Not found",
+            description: errorData?.message || "The requested resource was not found",
+            variant: "destructive",
+          });
+        }
+      } else if (error.isHtmlResponse) {
+        // Special case for HTML responses (typically from error pages)
+        toast({
+          title: "Server error",
+          description: "The server returned an unexpected response. Please try again later.",
+          variant: "destructive",
+        });
       } else {
         toast({
           title: "Failed to add item",
-          description: error.message || "There was an error adding the item to your list",
+          description: error.message || errorData?.message || "There was an error adding the item to your list",
           variant: "destructive",
         });
       }
