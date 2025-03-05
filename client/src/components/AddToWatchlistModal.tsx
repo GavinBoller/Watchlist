@@ -14,6 +14,7 @@ import { queryClient } from '@/lib/queryClient';
 import { format } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { handleSessionExpiration, isSessionError } from '@/lib/session-utils';
 
 interface AddToWatchlistModalProps {
   item: TMDBMovie | null;
@@ -174,84 +175,15 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
           description: errorMsg,
           variant: "destructive",
         });
-      } else if (error.status === 401) {
-        // Production-optimized auth error handling
+      } else if (error.status === 401 || isSessionError(error)) {
+        // Use our centralized session expiration handler
         const errorCode = errorData?.code;
         const errorMessage = errorData?.message || "Please log in again to add items to your watchlist";
         
         console.log('Authentication error detected:', errorCode, errorMessage);
         
-        // Display a simpler, more stable error message
-        toast({
-          title: "Session expired",
-          description: "Please log in again to continue",
-          variant: "destructive",
-        });
-        
-        // Get session status in a single API call
-        const sessionUrl = "/api/session";
-        console.log('Checking current session status via', sessionUrl);
-        
-        try {
-          // Use fetch directly to avoid any potential API client issues
-          const sessionResponse = await fetch(sessionUrl, {
-            credentials: "include", // Important: Include credentials
-            headers: {
-              // Prevent caching
-              "Cache-Control": "no-cache, no-store, must-revalidate",
-              "Pragma": "no-cache"
-            }
-          });
-          
-          // Parse response if possible
-          try {
-            const sessionData = await sessionResponse.json();
-            console.log('Session check response:', sessionData);
-            
-            if (sessionData.authenticated) {
-              console.log('User is authenticated according to /api/session');
-              
-              // If emergency mode is active, show a special message
-              if (sessionData.emergencyMode) {
-                toast({
-                  title: "Emergency Mode Active",
-                  description: "The server is in maintenance mode. Some features may be limited.",
-                  variant: "destructive",
-                });
-                
-                // Special handling for emergency mode - reload page to update UI
-                setTimeout(() => {
-                  window.location.reload();
-                }, 2000);
-                return;
-              }
-              
-              // If supposedly authenticated but still getting errors, try refreshing the page
-              toast({
-                title: "Session Issue",
-                description: "Please try again or refresh the page",
-                variant: "destructive",
-              });
-            } else {
-              // Not authenticated - always redirect to login
-              console.log('User is not authenticated, redirecting to auth page...');
-              setTimeout(() => {
-                window.location.href = '/auth';
-              }, 1000);
-            }
-          } catch (parseError) {
-            console.error('Error parsing session response:', parseError);
-            // On parse error, assume session is invalid and redirect
-            window.location.href = '/auth';
-          }
-        } catch (sessionError) {
-          console.error('Error checking session status:', sessionError);
-          
-          // On network error, direct user to login
-          setTimeout(() => {
-            window.location.href = '/auth';
-          }, 1000);
-        }
+        // Let the utility handle all aspects of session expiration
+        await handleSessionExpiration(errorCode, errorMessage);
       } else if (error.status === 404) {
         // Handle user not found errors with specific message
         if (errorData?.message?.includes("User not found")) {
