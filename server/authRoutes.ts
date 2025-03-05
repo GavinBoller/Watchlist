@@ -17,28 +17,96 @@ const resetPasswordSchema = z.object({
 
 const router = Router();
 
-// Login route
-router.post('/login', (req: Request, res: Response, next) => {
-  passport.authenticate('local', (err: Error, user: UserResponse, info: { message: string }) => {
-    if (err) {
-      return next(err);
-    }
-    
-    if (!user) {
-      return res.status(401).json({ message: info.message || 'Invalid credentials' });
-    }
-    
-    req.login(user, (err) => {
-      if (err) {
-        return next(err);
+// Helper function for retrying operations with backoff
+const retryOperation = async <T>(operation: () => Promise<T>, maxRetries: number = 3, retryDelay: number = 1000): Promise<T> => {
+  let lastError;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Add a small delay between retries, but not on first attempt
+      if (attempt > 0) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
+      }
+      return await operation();
+    } catch (error) {
+      console.error(`Database operation failed (attempt ${attempt + 1}/${maxRetries}):`, error);
+      lastError = error;
+      
+      // Only retry on connection issues, not on logical errors
+      if (!(error instanceof Error && 
+          (error.message.includes('connection') || 
+            error.message.includes('timeout') || 
+            error.message.includes('unavailable')))) {
+        throw error;
       }
       
+      console.log(`Retrying operation in ${retryDelay * (attempt + 1)}ms...`);
+    }
+  }
+  throw lastError;
+};
+
+// Login route with improved error handling and retry logic
+router.post('/login', (req: Request, res: Response, next) => {
+  // Custom authenticate function with retry logic
+  const authenticateWithRetry = async () => {
+    return new Promise<void>((resolve, reject) => {
+      passport.authenticate('local', async (err: Error, user: UserResponse, info: { message: string }) => {
+        if (err) {
+          // For database connection errors, we might want to retry
+          if (err.message && (err.message.includes('connection') || err.message.includes('timeout'))) {
+            console.error('Database connection error during authentication:', err);
+            return reject({
+              status: 503,
+              message: 'Service temporarily unavailable. Please try again later.'
+            });
+          }
+          return reject(err);
+        }
+        
+        if (!user) {
+          return reject({
+            status: 401,
+            message: info.message || 'Invalid credentials'
+          });
+        }
+        
+        req.login(user, (loginErr) => {
+          if (loginErr) {
+            return reject(loginErr);
+          }
+          
+          return resolve();
+        });
+      })(req, res, next);
+    });
+  };
+  
+  // Execute with retry logic
+  (async () => {
+    try {
+      // Configure retry settings based on environment
+      const isProd = process.env.NODE_ENV === 'production';
+      const maxRetries = isProd ? 3 : 1;
+      
+      await retryOperation(authenticateWithRetry, maxRetries);
+      
+      // If we reach here, authentication was successful
       return res.json({
         message: 'Login successful',
-        user
+        user: req.user
       });
-    });
-  })(req, res, next);
+    } catch (error) {
+      console.error('Authentication error:', error);
+      
+      if (error && typeof error === 'object' && 'status' in error && 'message' in error) {
+        return res.status(error.status as number).json({ message: error.message });
+      }
+      
+      return res.status(500).json({ 
+        message: 'Login failed due to server error. Please try again later.' 
+      });
+    }
+  })();
 });
 
 // Logout route
@@ -54,14 +122,26 @@ router.post('/logout', (req: Request, res: Response) => {
   });
 });
 
-// Check authentication status and get current user
-router.get('/session', (req: Request, res: Response) => {
-  if (req.isAuthenticated()) {
-    const user = req.user as UserResponse;
-    return res.json({ authenticated: true, user });
+// Check authentication status and get current user with retry logic
+router.get('/session', async (req: Request, res: Response) => {
+  try {
+    // If user is already authenticated in session, return immediately
+    if (req.isAuthenticated()) {
+      const user = req.user as UserResponse;
+      return res.json({ authenticated: true, user });
+    }
+    
+    // Nothing to retry for unauthenticated users
+    return res.json({ authenticated: false, user: null });
+  } catch (error) {
+    console.error('Session check error:', error);
+    // Even if there's an error, don't fail the request - just return unauthenticated
+    return res.json({ 
+      authenticated: false, 
+      user: null,
+      error: 'Failed to verify authentication status'
+    });
   }
-  
-  return res.json({ authenticated: false, user: null });
 });
 
 // Register a new user
@@ -81,12 +161,21 @@ router.post('/register', async (req: Request, res: Response) => {
     
     const validatedData = registerSchema.parse(req.body);
     
-    // Check if username already exists - catch and log database connection issues
+    // Track if we're in production mode for different error handling strategies
+    const isProd = process.env.NODE_ENV === 'production';
+    
+    // Define retry settings based on environment
+    const MAX_RETRIES = isProd ? 3 : 1;
+    const RETRY_DELAY = 1000; // ms between retries
+    
+    // Check if username already exists with retry logic
     let existingUser;
     try {
-      existingUser = await storage.getUserByUsername(validatedData.username);
+      existingUser = await retryOperation(async () => {
+        return await storage.getUserByUsername(validatedData.username);
+      });
     } catch (dbError) {
-      console.error('Database error checking user existence:', dbError);
+      console.error('Database error checking user existence after retries:', dbError);
       return res.status(503).json({ 
         message: 'Service temporarily unavailable. Please try again later.',
         error: 'database_error'
@@ -111,13 +200,26 @@ router.post('/register', async (req: Request, res: Response) => {
     
     let newUser;
     try {
-      newUser = await storage.createUser({
-        ...userData,
-        password: passwordHash,
-        displayName: userData.displayName || userData.username
+      newUser = await retryOperation(async () => {
+        return await storage.createUser({
+          ...userData,
+          password: passwordHash,
+          displayName: userData.displayName || userData.username
+        });
       });
     } catch (createError) {
-      console.error('User creation error:', createError);
+      console.error('User creation error after retries:', createError);
+      
+      // Provide more informative error message with fallback timeout
+      if (createError instanceof Error && 
+          (createError.message.includes('connect') || 
+           createError.message.includes('timeout'))) {
+        return res.status(503).json({ 
+          message: 'Database connection issue. Please try again in a few minutes.',
+          error: 'connection_timeout'
+        });
+      }
+      
       return res.status(503).json({ 
         message: 'Unable to create user account. Please try again later.',
         error: 'create_user_error'
