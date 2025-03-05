@@ -75,70 +75,62 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
 
     setIsSubmitting(true);
     
-    // First, verify and refresh the session to ensure it's valid before continuing
+    // Check if a user is selected before proceeding
+    if (!currentUser || !currentUser.id) {
+      console.error("User data is not available:", currentUser);
+      toast({
+        title: "Authentication Required",
+        description: "Please login or select a user to add items to your watchlist.",
+        variant: "destructive",
+      });
+      onClose();
+      
+      // Forcibly clear user data to make sure the app updates correctly
+      queryClient.setQueryData(["/api/user"], null);
+      
+      // Redirect to auth page
+      setTimeout(() => {
+        window.location.href = '/auth';
+      }, 1000);
+      
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Verify session before continuing
     try {
-      console.log("Refreshing session before watchlist operation");
-      const sessionResponse = await fetch("/api/auth/refresh-session", {
+      const sessionResponse = await fetch("/api/refresh-session", {
         credentials: "include",
         headers: {
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          "Pragma": "no-cache"
+          "Cache-Control": "no-cache, no-store, must-revalidate"
         }
       });
       
       if (!sessionResponse.ok) {
         console.error("Session refresh failed with status:", sessionResponse.status);
         
-        if (sessionResponse.status === 401) {
-          // If session is invalid, show toast and redirect to login
-          toast({
-            title: "Session expired",
-            description: "Your session has expired. Please login again to continue.",
-            variant: "destructive",
-          });
-          
-          // Update auth state
-          queryClient.setQueryData(["/api/user"], null);
-          
-          // Close modal and redirect
-          onClose();
-          setTimeout(() => {
-            window.location.href = '/auth';
-          }, 1500);
-          
-          setIsSubmitting(false);
-          return;
-        }
+        // If session refresh fails, we need to re-authenticate
+        toast({
+          title: "Session expired",
+          description: "Your session has expired. Please login again to continue.",
+          variant: "destructive",
+        });
         
-        // For other errors, try to proceed anyway
-        console.warn("Session refresh failed but proceeding with watchlist operation");
-      } else {
-        // Session refreshed successfully
-        const refreshData = await sessionResponse.json();
-        console.log("Session refreshed successfully:", refreshData);
+        // Force logout
+        queryClient.setQueryData(["/api/user"], null);
+        
+        // Redirect to auth
+        onClose();
+        setTimeout(() => {
+          window.location.href = '/auth';
+        }, 1000);
+        
+        setIsSubmitting(false);
+        return;
       }
-    } catch (sessionError) {
-      console.error("Error during session refresh:", sessionError);
-      // Continue despite error - the main request will handle auth issues if they exist
-    }
-    
-    // Check currentUser before proceeding
-    if (!currentUser || !currentUser.id) {
-      console.error("User data is not available:", currentUser);
-      toast({
-        title: "Authentication Error",
-        description: "Your user data could not be verified. Please try logging in again.",
-        variant: "destructive",
-      });
-      onClose();
-      
-      // Force redirect to auth page
-      setTimeout(() => {
-        window.location.href = '/auth';
-      }, 1500);
-      
-      setIsSubmitting(false);
-      return;
+    } catch (error) {
+      console.error("Error during session refresh:", error);
+      // Continue despite error - the API request will handle auth issues
     }
     
     // Log user information for debugging
@@ -174,121 +166,40 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
     try {
       console.log("Submitting watchlist data:", JSON.stringify(watchlistData, null, 2));
       
-      // Enhanced pre-submission session verification with multiple checks
+      // Execute a simple auth check directly before continuing
       try {
-        console.log("Performing comprehensive session verification before watchlist operation");
-        
-        // Try multiple endpoints to verify authentication status
-        // This creates redundancy in case one endpoint has issues
-        const verifications = [];
-        
-        // First verification using /api/session (primary)
-        try {
-          const sessionCheck = await fetch("/api/session", { 
-            credentials: "include",
-            headers: {
-              "Cache-Control": "no-cache, no-store, must-revalidate",
-              "Pragma": "no-cache"
-            }
-          });
-          
-          if (sessionCheck.ok) {
-            const sessionData = await sessionCheck.json();
-            console.log("Primary session verification result:", sessionData);
-            verifications.push({
-              source: "session-api",
-              authenticated: sessionData.authenticated,
-              data: sessionData
-            });
-          } else {
-            console.warn("Primary session check failed with status:", sessionCheck.status);
-            verifications.push({
-              source: "session-api",
-              authenticated: false,
-              error: `Status ${sessionCheck.status}`
-            });
+        const userCheck = await fetch("/api/user", { 
+          credentials: "include",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
           }
-        } catch (error) {
-          console.error("Primary session check error:", error);
-          verifications.push({
-            source: "session-api",
-            authenticated: false,
-            error: String(error)
-          });
-        }
-        
-        // Second verification using /api/user (backup)
-        try {
-          const userCheck = await fetch("/api/user", { 
-            credentials: "include",
-            headers: {
-              "Cache-Control": "no-cache, no-store, must-revalidate",
-              "Pragma": "no-cache"
-            }
-          });
-          
-          if (userCheck.status === 200) {
-            const userData = await userCheck.json();
-            console.log("Secondary user verification succeeded:", !!userData);
-            verifications.push({
-              source: "user-api",
-              authenticated: true,
-              data: userData
-            });
-          } else if (userCheck.status === 401) {
-            console.warn("Secondary user verification indicates not authenticated");
-            verifications.push({
-              source: "user-api",
-              authenticated: false,
-              error: "Unauthorized"
-            });
-          } else {
-            console.warn("Secondary user check failed with status:", userCheck.status);
-            verifications.push({
-              source: "user-api",
-              authenticated: false,
-              error: `Status ${userCheck.status}`
-            });
-          }
-        } catch (error) {
-          console.error("Secondary user check error:", error);
-          verifications.push({
-            source: "user-api",
-            authenticated: false,
-            error: String(error)
-          });
-        }
-        
-        console.log("Session verification results:", verifications);
-        
-        // Determine authentication status from all verification attempts
-        const authenticated = verifications.some(v => v.authenticated);
-        
-        if (!authenticated) {
-          console.error("User not authenticated when trying to add to watchlist");
-          throw new Error("Comprehensive verification confirms not authenticated");
-        } else {
-          console.log("Pre-submission authentication verified successfully");
-        }
-      } catch (sessionError) {
-        console.error("Session verification error:", sessionError);
-        toast({
-          title: "Authentication error",
-          description: "Please login again to add items to your watchlist",
-          variant: "destructive",
         });
         
-        // Invalid the auth queries to ensure fresh data
-        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-        
-        // Force redirect to auth page with a short delay to allow toast to be seen
-        setTimeout(() => {
-          window.location.href = '/auth';
-        }, 1500);
-        
-        setIsSubmitting(false);
-        onClose();
-        return;
+        if (userCheck.status === 401) {
+          console.error("User not authenticated when trying to add to watchlist");
+          toast({
+            title: "Authentication required",
+            description: "Please login again to add items to your watchlist",
+            variant: "destructive",
+          });
+          
+          // Force a re-fetch of user data
+          queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+          queryClient.setQueryData(["/api/user"], null);
+          
+          // Redirect to auth page after showing toast
+          setTimeout(() => {
+            window.location.href = '/auth';
+          }, 1000);
+          
+          setIsSubmitting(false);
+          onClose();
+          return;
+        }
+      } catch (error) {
+        console.error("Auth check error:", error);
+        // Continue despite error - the main request will handle auth issues
       }
       
       // Try with max retries and cross-browser compatibility improvements
