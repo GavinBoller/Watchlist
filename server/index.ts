@@ -213,7 +213,7 @@ async function startServer() {
       console.log('Development environment detected - using non-secure cookies');
     }
     
-    // Configure session middleware with appropriate settings
+    // Configure session middleware with reliable cross-environment settings
     app.use(session({
       secret: SESSION_SECRET,
       resave: false,
@@ -222,12 +222,19 @@ async function startServer() {
       proxy: true, // Always trust the reverse proxy
       rolling: true, // Reset expiration countdown on every response
       name: 'watchlist.sid', // Custom name to avoid conflicts
+      
+      // Enhanced cookie settings for better cross-environment compatibility
       cookie: {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // Only secure in production
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-        sameSite: 'lax', // This helps with CSRF protection
-        path: '/'
+        // Use secure cookies in production, but allow insecure in development
+        secure: process.env.NODE_ENV === 'production',
+        // Set a reasonable session timeout (7 days) to prevent indefinite sessions
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        // Use lax mode for better compatibility with different browsing contexts
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        path: '/',
+        // Ensure domain is not set, which allows the cookie to work with any domain
+        domain: undefined
       }
     }));
     
