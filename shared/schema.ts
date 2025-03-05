@@ -5,12 +5,12 @@ import { z } from "zod";
 // Define the session table to match connect-pg-simple's structure
 // This is important to avoid it being deleted during migrations
 export const sessions = pgTable("session", {
-  // Use varchar to match PostgreSQL's native type
-  sid: text("sid", { length: 255 }).notNull().primaryKey(),
-  // Using json type for sess as that's what connect-pg-simple uses
-  sess: text("sess", { mode: 'json' }).notNull(),
-  // Using timestamp with time zone to match PostgreSQL's timestamp(6) type
-  expire: timestamp("expire", { mode: 'date', precision: 6, withTimezone: true }).notNull(),
+  // Standard varchar column
+  sid: text("sid").notNull().primaryKey(),
+  // JSON data column
+  sess: text("sess").notNull(),
+  // Timestamp column
+  expire: timestamp("expire", { mode: 'date' }).notNull(),
 });
 
 export const users = pgTable("users", {
