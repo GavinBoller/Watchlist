@@ -8,6 +8,11 @@ export interface SessionCheckResult {
   error?: string;
   sessionId?: string;
   autoLogoutDetected?: boolean;
+  specialUserProtection?: boolean;
+  sessionRecovered?: boolean;
+  fallbackUsed?: boolean;
+  sessionInfo?: any;
+  sessionRepairNeeded?: boolean;
 }
 
 /**
@@ -747,7 +752,7 @@ export async function attemptSessionRecovery(userId?: number, username?: string)
           emergencyMode: true,
           autoLogoutDetected: true,
           specialUserProtection: isSpecialUser
-        };
+        } as SessionCheckResult;
       } catch (parseError) {
         console.error('[SESSION-RECOVERY] Error parsing stored user data:', parseError);
       }
