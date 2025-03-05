@@ -1,3 +1,13 @@
+// Define global window properties
+declare global {
+  interface Window {
+    __tempRegistrationData?: {
+      timestamp: number;
+      username: string;
+    };
+  }
+}
+
 import { createContext, ReactNode, useContext } from "react";
 import {
   useQuery,
@@ -378,69 +388,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: `Welcome to MovieTracker, ${userData.username}!`,
       });
       
-      // CRITICAL FIX: Instead of just updating the cache, we'll now
-      // perform a complete login after registration to ensure session consistency
-      console.log("Performing automatic login after registration");
+      // Update query cache with user data
+      queryClient.setQueryData(["/api/user"], userData);
+      queryClient.setQueryData(["/api/auth/user"], userData);
+      queryClient.setQueryData(["/api/session"], {
+        authenticated: true,
+        user: userData,
+        sessionId: "active-session"
+      });
       
-      try {
-        // Use the login endpoint to establish a proper session
-        const loginRes = await apiRequest("POST", "/api/login", {
-          username: userData.username,
-          password: userData.password || "" // Password may not be in the response
-        });
-        
-        if (loginRes.ok) {
-          console.log("Auto-login after registration successful");
-          
-          // Update all cache entries to ensure consistency
-          queryClient.setQueryData(["/api/user"], userData);
-          queryClient.setQueryData(["/api/auth/user"], userData);
-          queryClient.setQueryData(["/api/session"], {
-            authenticated: true,
-            user: userData,
-            sessionId: "active-session"
-          });
-          
-          // Force reload authentication status
-          queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/session"] });
-          
-          // Give the server a moment to save the session
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Verify session is established
-          try {
-            const sessionRes = await fetch("/api/session", {
-              credentials: "include",
-              headers: {
-                "Cache-Control": "no-cache, no-store, must-revalidate"
-              }
-            });
-            
-            if (sessionRes.ok) {
-              const sessionData = await sessionRes.json();
-              console.log("Final session check result:", sessionData);
-              
-              if (!sessionData.authenticated) {
-                console.warn("Session still not authenticated after auto-login");
-                // Fallback: store in localStorage
-                localStorage.setItem('authFallbackUser', JSON.stringify(userData));
-              }
-            }
-          } catch (verifyErr) {
-            console.error("Error verifying final session state:", verifyErr);
-          }
-          
-        } else {
-          console.error("Auto-login after registration failed:", loginRes.status);
-          // Update query cache anyway
-          queryClient.setQueryData(["/api/user"], userData);
-        }
-      } catch (loginError) {
-        console.error("Error during auto-login after registration:", loginError);
-        // Update query cache anyway as fallback
-        queryClient.setQueryData(["/api/user"], userData);
-      }
+      // Force immediate cache invalidation to refresh auth state
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/session"] });
+      
+      // Store the original password in memory temporarily (not in localStorage)
+      // The RegisterForm component will use this for auto-login
+      window.__tempRegistrationData = {
+        timestamp: Date.now(),
+        username: userData.username
+      };
     },
     onError: (error: Error) => {
       toast({
