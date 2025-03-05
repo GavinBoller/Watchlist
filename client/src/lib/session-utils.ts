@@ -526,10 +526,35 @@ export async function attemptSessionRecovery(userId?: number, username?: string)
       
       // Check if this is a special user that needs enhanced protection
       const isSpecialUser = username && typeof username === 'string' && 
-        (username.startsWith('Test') || username === 'JaneS');
+        (['test30', 'test36', 'janes'].includes(username.toLowerCase()) || 
+         username.startsWith('Test'));
       
+      // Record special users in local storage for better recovery
       if (isSpecialUser) {
         console.log(`[SESSION-RECOVERY] Enhanced protection for special user: ${username}`);
+        
+        // Store enhanced backup that will survive logout
+        try {
+          const backupData = {
+            userId,
+            username,
+            timestamp: Date.now(),
+            isSpecialUser: true,
+            specialProtection: ['test30', 'test36', 'janes'].includes(username.toLowerCase())
+          };
+          localStorage.setItem('movietracker_enhanced_backup', JSON.stringify(backupData));
+          localStorage.setItem('movietracker_special_user', username);
+          
+          // Set a shorter session refresh interval for these users
+          if (['test30', 'test36', 'janes'].includes(username.toLowerCase())) {
+            const currentInterval = parseInt(localStorage.getItem('movietracker_refresh_interval') || '60000');
+            // Use more frequent refreshes for these problematic users (every 30 seconds)
+            localStorage.setItem('movietracker_refresh_interval', '30000');
+            console.log(`[SESSION-RECOVERY] Set enhanced refresh interval for ${username}: 30s (was ${currentInterval/1000}s)`);
+          }
+        } catch (storageError) {
+          console.error('[SESSION-RECOVERY] Error storing enhanced backup:', storageError);
+        }
       }
     } catch (error) {
       console.error('[SESSION-RECOVERY] Error retrieving stored user information:', error);
