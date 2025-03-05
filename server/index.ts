@@ -14,7 +14,7 @@ import { exec } from "child_process";
 import util from "util";
 import fs from "fs";
 import crypto from "crypto";
-import { productionSessionRepair, productionLogging, productionOptimizations } from "./productionFixes";
+import { productionSessionRepair, productionLogging, productionOptimizations, registerEmergencyEndpoints } from "./productionFixes";
 
 // Extend the Express Session interface to include our custom properties
 // This ensures TypeScript recognizes our custom session data
@@ -579,6 +579,11 @@ async function startServer() {
     
     // Register auth routes after passport setup and schema changes
     app.use('/api', authRoutes);
+    
+    // Register emergency recovery endpoints for production
+    // These provide special recovery mechanisms for user accounts that
+    // are experiencing persistent session issues in production
+    registerEmergencyEndpoints(app);
     
     // Register all API routes first
     const server = await registerRoutes(app);
