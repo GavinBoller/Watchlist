@@ -266,6 +266,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sessionId: "active-session"
       });
       
+      // Clear temporary registration data if it exists
+      if (window.__tempRegistrationData) {
+        console.log("Clearing temporary registration data after successful login");
+        window.__tempRegistrationData = undefined;
+      }
+      
       // Force reload the authentication status to ensure it's properly updated
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/session"] });
@@ -274,6 +280,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Welcome back!",
         description: `You've successfully logged in as ${userData.username}`,
       });
+      
+      // Store user in localStorage as a backup for emergency recovery
+      try {
+        localStorage.setItem('movietracker_user', JSON.stringify(userData));
+      } catch (error) {
+        console.error("Could not store user in localStorage:", error);
+      }
       
       // Add a small delay to ensure session data is properly saved
       setTimeout(() => {
