@@ -193,22 +193,42 @@ export async function apiRequest(
 type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
+  preventCaching?: boolean;
 }) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
+  ({ on401: unauthorizedBehavior, preventCaching = true }) =>
   async ({ queryKey }) => {
     try {
-      const res = await fetch(queryKey[0] as string, {
-        credentials: "include",
+      // Use the enhanced apiRequest function with improved error handling
+      // and cache-busting for better reliability in production
+      const baseUrl = queryKey[0] as string;
+      
+      // Add cache-busting query parameter for better reliability
+      let url = baseUrl;
+      if (preventCaching) {
+        const separator = url.includes('?') ? '&' : '?';
+        url = `${url}${separator}_t=${Date.now()}`;
+      }
+      
+      const res = await apiRequest('GET', url, undefined, { 
+        ignoreAuthErrors: unauthorizedBehavior === "returnNull",
+        retries: 2, // Retry up to 2 times (3 attempts total)
       });
 
       if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        console.log(`[API] Returning null for unauthorized request to ${baseUrl}`);
         return null;
       }
 
-      await throwIfResNotOk(res);
+      // apiRequest already validates the response
       return await res.json();
     } catch (error) {
-      console.error(`Query fetch error for ${queryKey[0]}:`, error);
+      // Only log full errors in development - in production, be more concise
+      if (process.env.NODE_ENV === 'development') {
+        console.error(`Query fetch error for ${queryKey[0]}:`, error);
+      } else {
+        console.error(`Query fetch error for ${queryKey[0]}: ${(error as Error).message}`);
+      }
+      
       throw error;
     }
   };

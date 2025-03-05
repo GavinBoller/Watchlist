@@ -213,7 +213,16 @@ async function startServer() {
       console.log('Development environment detected - using non-secure cookies');
     }
     
-    // Configure session middleware with reliable cross-environment settings
+    // Configure session middleware with environment-specific settings 
+    const isProd = process.env.NODE_ENV === 'production';
+    console.log(`Configuring session for ${isProd ? 'production' : 'development'} environment`);
+    
+    if (isProd) {
+      console.log('Using production-optimized session settings with secure cookies');
+    } else {
+      console.log('Using development-friendly session settings');
+    }
+    
     app.use(session({
       secret: SESSION_SECRET,
       resave: false,
@@ -221,19 +230,19 @@ async function startServer() {
       store: sessionStore,
       proxy: true, // Always trust the reverse proxy
       rolling: true, // Reset expiration countdown on every response
-      name: 'watchlist.sid', // Custom name to avoid conflicts
+      name: isProd ? 'watchapp.sid' : 'watchlist.sid', // Different name for production
       
-      // Enhanced cookie settings for better cross-environment compatibility
+      // Environment-specific cookie settings
       cookie: {
         httpOnly: true,
         // Use secure cookies in production, but allow insecure in development
-        secure: process.env.NODE_ENV === 'production',
-        // Set a reasonable session timeout (7 days) to prevent indefinite sessions
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        // Use lax mode for better compatibility with different browsing contexts
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        secure: isProd ? true : false,
+        // Set a reasonable session timeout
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        // Use safer lax mode in all environments
+        sameSite: 'lax',
         path: '/',
-        // Ensure domain is not set, which allows the cookie to work with any domain
+        // No domain setting to work with any host
         domain: undefined
       }
     }));

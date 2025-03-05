@@ -175,55 +175,82 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
           variant: "destructive",
         });
       } else if (error.status === 401) {
-        // Enhanced error handling for auth errors with retry
+        // Production-optimized auth error handling
         const errorCode = errorData?.code;
         const errorMessage = errorData?.message || "Please log in again to add items to your watchlist";
         
         console.log('Authentication error detected:', errorCode, errorMessage);
         
-        // Create a more specific error message for auth errors
+        // Display a simpler, more stable error message
         toast({
-          title: "Authentication error",
-          description: "Your session may have expired. Please try again or log in again to continue.",
+          title: "Session expired",
+          description: "Please log in again to continue",
           variant: "destructive",
         });
         
-        // Attempt to refresh the authentication status
+        // Get session status in a single API call
+        const sessionUrl = "/api/session";
+        console.log('Checking current session status via', sessionUrl);
+        
         try {
-          const userCheck = await apiRequest('GET', '/api/user', undefined, {
-            ignoreAuthErrors: true // Don't throw on 401
+          // Use fetch directly to avoid any potential API client issues
+          const sessionResponse = await fetch(sessionUrl, {
+            credentials: "include", // Important: Include credentials
+            headers: {
+              // Prevent caching
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              "Pragma": "no-cache"
+            }
           });
           
-          if (userCheck.status === 401) {
-            console.log('User is not authenticated, redirecting to login...');
+          // Parse response if possible
+          try {
+            const sessionData = await sessionResponse.json();
+            console.log('Session check response:', sessionData);
             
-            toast({
-              title: "Authentication required",
-              description: "Please log in to continue",
-              variant: "destructive",
-            });
-            
-            // Use a short delay to allow the toast to show before redirecting
-            setTimeout(() => {
-              window.location.href = '/auth';
-            }, 1500);
-          } else {
-            // User is actually authenticated but something else went wrong
-            console.log('User is authenticated but watchlist operation failed');
-            
-            toast({
-              title: "Server error",
-              description: "Please try again or refresh the page",
-              variant: "destructive",
-            });
+            if (sessionData.authenticated) {
+              console.log('User is authenticated according to /api/session');
+              
+              // If emergency mode is active, show a special message
+              if (sessionData.emergencyMode) {
+                toast({
+                  title: "Emergency Mode Active",
+                  description: "The server is in maintenance mode. Some features may be limited.",
+                  variant: "destructive",
+                });
+                
+                // Special handling for emergency mode - reload page to update UI
+                setTimeout(() => {
+                  window.location.reload();
+                }, 2000);
+                return;
+              }
+              
+              // If supposedly authenticated but still getting errors, try refreshing the page
+              toast({
+                title: "Session Issue",
+                description: "Please try again or refresh the page",
+                variant: "destructive",
+              });
+            } else {
+              // Not authenticated - always redirect to login
+              console.log('User is not authenticated, redirecting to auth page...');
+              setTimeout(() => {
+                window.location.href = '/auth';
+              }, 1000);
+            }
+          } catch (parseError) {
+            console.error('Error parsing session response:', parseError);
+            // On parse error, assume session is invalid and redirect
+            window.location.href = '/auth';
           }
-        } catch (authCheckError) {
-          console.error('Error checking authentication status:', authCheckError);
+        } catch (sessionError) {
+          console.error('Error checking session status:', sessionError);
           
-          // Fallback to simple redirect
+          // On network error, direct user to login
           setTimeout(() => {
             window.location.href = '/auth';
-          }, 1500);
+          }, 1000);
         }
       } else if (error.status === 404) {
         // Handle user not found errors with specific message

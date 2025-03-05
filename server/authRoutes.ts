@@ -185,16 +185,23 @@ router.post('/login', (req: Request, res: Response, next) => {
   })();
 });
 
-// Logout route with emergency mode support and enhanced reliability
+// Logout route with comprehensive error handling and cross-environment support
 router.post('/logout', (req: Request, res: Response) => {
-  // Check if we're in emergency mode
+  // Environment configuration
   const isProd = process.env.NODE_ENV === 'production';
   const emergencyMode = isProd && isEmergencyModeActive();
+  const cookieName = isProd ? 'watchapp.sid' : 'watchlist.sid';
   
-  // Log additional debug info
+  // Log additional debug info for troubleshooting
   console.log(`Logout request. User authenticated: ${req.isAuthenticated()}, Emergency mode: ${emergencyMode}`);
+  console.log(`Session ID: ${req.sessionID || 'none'}`);
   
-  // Handle logout with error handling
+  // Production-specific logs
+  if (isProd) {
+    console.log(`Production cookie configuration: ${cookieName}, secure: true, sameSite: lax`);
+  }
+  
+  // Handle logout with comprehensive error handling
   req.logout((logoutErr) => {
     if (logoutErr) {
       console.error('Error during logout:', logoutErr);
@@ -209,41 +216,85 @@ router.post('/logout', (req: Request, res: Response) => {
           return res.status(500).json({ message: 'Error clearing session' });
         }
         
-        // Clear cookie and return success
+        // Clear ALL potential cookies to ensure clean logout
         try {
+          // Clear the main session cookie with proper configuration
+          res.clearCookie(cookieName, {
+            path: '/',
+            httpOnly: true,
+            secure: isProd,
+            sameSite: 'lax'
+          });
+          
+          // Also clear legacy cookie names to prevent issues
           res.clearCookie('connect.sid', {
             path: '/',
             httpOnly: true,
             secure: isProd,
             sameSite: 'lax'
           });
+          
+          // Special cookie cleanup for production environments
+          if (isProd) {
+            res.clearCookie('watchapp.sid', {
+              path: '/',
+              httpOnly: true,
+              secure: true,
+              sameSite: 'lax'
+            });
+            
+            // Force-clear any potentially stuck cookies
+            res.setHeader('Set-Cookie', [
+              `watchapp.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
+              `connect.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
+            ]);
+          }
         } catch (cookieErr) {
-          console.error('Error clearing cookie:', cookieErr);
+          console.error('Error clearing cookies:', cookieErr);
           // Continue despite cookie error
         }
         
         return res.json({ 
           message: 'Logout successful',
-          emergencyMode: emergencyMode || undefined
+          emergencyMode: emergencyMode || undefined,
+          time: new Date().toISOString() // Add timestamp for debugging
         });
       });
     } else {
-      // If session is already gone, just clear cookie and return
+      // If session is already gone, just clear cookies and return
       try {
+        // Clear all potential cookies
+        res.clearCookie(cookieName, {
+          path: '/',
+          httpOnly: true,
+          secure: isProd,
+          sameSite: 'lax'
+        });
+        
         res.clearCookie('connect.sid', {
           path: '/',
           httpOnly: true,
           secure: isProd,
           sameSite: 'lax'
         });
+        
+        // Special cookie cleanup for production
+        if (isProd) {
+          // Force-clear any potentially stuck cookies
+          res.setHeader('Set-Cookie', [
+            `watchapp.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
+            `connect.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
+          ]);
+        }
       } catch (cookieErr) {
-        console.error('Error clearing cookie when session is null:', cookieErr);
+        console.error('Error clearing cookies when session is null:', cookieErr);
         // Continue despite cookie error
       }
       
       return res.json({ 
         message: 'Logout successful (no active session)',
-        emergencyMode: emergencyMode || undefined
+        emergencyMode: emergencyMode || undefined,
+        time: new Date().toISOString() // Add timestamp for debugging
       });
     }
   });

@@ -120,8 +120,11 @@ export function configurePassport() {
   });
 }
 
-// Middleware to check if user is authenticated with enhanced debugging
+// Middleware to check if user is authenticated with enhanced production-ready debugging
 export function isAuthenticated(req: Request, res: Response, next: NextFunction) {
+  // Environment detection 
+  const isProd = process.env.NODE_ENV === 'production';
+  
   // Log authentication check for debugging
   console.log(`[AUTH] Checking authentication for ${req.method} ${req.path}`);
   console.log(`[AUTH] Session ID: ${req.sessionID}, Authenticated: ${req.isAuthenticated()}`);
@@ -139,9 +142,15 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
       req.logout((err) => {
         if (err) console.error('[AUTH] Error during forced logout:', err);
       });
+      
+      // Set cache control headers to prevent stale sessions
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      
       return res.status(401).json({ 
-        message: 'Session error: Please login again',
-        code: 'SESSION_CORRUPTED'
+        message: isProd ? 'Session expired' : 'Session error: Please login again',
+        code: 'SESSION_CORRUPTED',
+        time: new Date().toISOString()
       });
     }
     
@@ -149,21 +158,50 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
     return next();
   }
   
+  // Set cache control headers for all auth errors to prevent stale responses
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  
   // Handle unauthenticated access attempts with context-specific messages
   if (req.path.includes('/watchlist')) {
     console.log('[AUTH] Watchlist access denied: Not authenticated');
-    return res.status(401).json({ 
-      message: 'Authentication error: Please login again to add items to your watchlist',
-      code: 'AUTH_REQUIRED_WATCHLIST'
-    });
+    
+    // Simpler message in production
+    if (isProd) {
+      return res.status(401).json({ 
+        message: 'Session expired',
+        code: 'SESSION_EXPIRED',
+        time: new Date().toISOString()
+      });
+    } else {
+      // More detailed in development
+      return res.status(401).json({ 
+        message: 'Authentication error: Please login again to add items to your watchlist',
+        code: 'AUTH_REQUIRED_WATCHLIST',
+        path: req.path,
+        method: req.method
+      });
+    }
   }
   
   // Generic case for unauthenticated access
   console.log('[AUTH] Access denied: Not authenticated');
-  return res.status(401).json({ 
-    message: 'Unauthorized: Please login to access this feature',
-    code: 'AUTH_REQUIRED' 
-  });
+  
+  // Different messaging based on environment
+  if (isProd) {
+    return res.status(401).json({ 
+      message: 'Session expired',
+      code: 'SESSION_EXPIRED',
+      time: new Date().toISOString()
+    });
+  } else {
+    return res.status(401).json({ 
+      message: 'Unauthorized: Please login to access this feature',
+      code: 'AUTH_REQUIRED',
+      path: req.path,
+      method: req.method
+    });
+  }
 }
 
 // Middleware to check if the user has access to the requested watchlist
