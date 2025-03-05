@@ -10,7 +10,6 @@ import MemoryStore from "memorystore";
 import connectPgSimple from "connect-pg-simple";
 import path from "path";
 import { pool, db } from "./db";
-import { migrator } from "drizzle-orm/neon-serverless/migrator";
 import { exec } from "child_process";
 import util from "util";
 import fs from "fs";
