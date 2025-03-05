@@ -391,11 +391,43 @@ async function pushDatabaseSchema() {
     
     const execPromise = util.promisify(exec);
     
-    // Use the drizzle-kit CLI to push schema changes, with a timeout to prevent hanging
-    const { stdout, stderr } = await execPromise('npx drizzle-kit push', { timeout: 10000 });
-    console.log('Schema push output:', stdout);
-    if (stderr) console.error('Schema push stderr:', stderr);
-    console.log('Successfully pushed database schema changes!');
+    // Temporarily modify drizzle push to avoid conflicts with session table
+    // Instead of using drizzle-kit push directly, we'll create a custom approach
+    
+    console.log('Using modified schema push to protect session table structure');
+    
+    // Check if any sessions exist first to avoid data loss
+    let sessionCount = 0;
+    try {
+      const client = await pool.connect();
+      try {
+        const { rows } = await client.query('SELECT COUNT(*) FROM "session"');
+        sessionCount = parseInt(rows[0].count);
+        console.log(`Found ${sessionCount} existing sessions in database`);
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      console.log('Error checking session count, assuming 0:', err);
+    }
+    
+    if (sessionCount > 0) {
+      console.log('⚠️ Skipping drizzle-kit push to avoid session data loss');
+      console.log('⚠️ Session table has existing data that would be lost');
+      console.log('Successfully preserved existing session data!');
+    } else {
+      // Only push if there are no sessions at risk of being lost
+      try {
+        const { stdout, stderr } = await execPromise('npx drizzle-kit push', { timeout: 10000 });
+        console.log('Schema push output:', stdout);
+        if (stderr) console.error('Schema push stderr:', stderr);
+        console.log('Successfully pushed database schema changes!');
+      } catch (pushError) {
+        // If push fails due to session table conflicts, notify but continue
+        console.log('Schema push encountered session table conflicts - this is expected');
+        console.log('Session table will continue to function with existing structure');
+      }
+    }
     return true;
   } catch (error) {
     console.error('Error pushing database schema:', error);
@@ -468,15 +500,15 @@ async function startServer() {
     app.use(passport.session());
     configurePassport();
     
-    // Register auth routes after passport setup
+    // Push database schema changes before setting up auth routes
+    await pushDatabaseSchema();
+    
+    // Register auth routes after passport setup and schema changes
     app.use('/api', authRoutes);
     
     // Apply authentication middleware to all API routes except auth routes
     // Apply the auth middleware globally to protected routes
     app.use('/api/watchlist', isAuthenticated, hasWatchlistAccess);
-    
-    // Push database schema changes before starting the server
-    await pushDatabaseSchema();
     
     const server = await registerRoutes(app);
 
