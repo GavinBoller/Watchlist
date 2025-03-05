@@ -13,6 +13,7 @@ import { pool, db } from "./db";
 import { exec } from "child_process";
 import util from "util";
 import fs from "fs";
+import crypto from "crypto";
 
 // Extend the Express Session interface to include our custom properties
 // This ensures TypeScript recognizes our custom session data
@@ -489,6 +490,14 @@ async function startServer() {
       rolling: true, // Reset expiration countdown on every response
       name: isProd ? 'watchapp.sid' : 'watchlist.sid', // Different name for production
       
+      // Enhanced session generation with automatic timestamp and logging
+      genid: function(req) {
+        // Generate a UUID-style session ID for better tracking
+        const sessionId = crypto.randomUUID();
+        console.log(`[SESSION] Creating new session with ID: ${sessionId}`);
+        return sessionId;
+      },
+      
       // Environment-specific cookie settings
       cookie: {
         httpOnly: true,
@@ -508,6 +517,38 @@ async function startServer() {
     app.use(passport.initialize());
     app.use(passport.session());
     configurePassport();
+    
+    // Add middleware to track session activity and authentication state
+    app.use((req, res, next) => {
+      // Skip session tracking for static assets to reduce noise
+      if (req.path.startsWith('/assets/') || req.path.endsWith('.ico') || req.path.endsWith('.svg')) {
+        return next();
+      }
+      
+      const sessionId = req.sessionID || 'unknown';
+      
+      // Track session creation time if not already set
+      if (!req.session.createdAt) {
+        req.session.createdAt = Date.now();
+        console.log(`[SESSION] New session initialized: ${sessionId}`);
+      }
+      
+      // Log authentication state changes
+      if (req.isAuthenticated()) {
+        const userId = (req.user as any)?.id || 'unknown';
+        const username = (req.user as any)?.username || 'unknown';
+        if (!req.session.authenticated) {
+          console.log(`[SESSION] User authenticated in session ${sessionId}: User ID ${userId} (${username})`);
+          req.session.authenticated = true;
+        }
+      } else if (req.session.authenticated) {
+        // User was authenticated but isn't anymore
+        console.log(`[SESSION] Authentication lost in session ${sessionId}`);
+        req.session.authenticated = false;
+      }
+      
+      next();
+    });
     
     // Push database schema changes before setting up auth routes
     await pushDatabaseSchema();
