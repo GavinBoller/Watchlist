@@ -211,6 +211,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log("User authenticated:", req.isAuthenticated());
     if (req.isAuthenticated()) {
       console.log("Authenticated user:", (req.user as any)?.id, (req.user as any)?.username);
+    } else {
+      console.warn("WARNING: User not authenticated when accessing watchlist POST endpoint");
+      // We should not reach here because of the middleware, but just in case:
+      return res.status(401).json({ message: "You must be logged in to add items to your watchlist" });
     }
     
     try {

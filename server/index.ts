@@ -4,7 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { config } from "dotenv";
 import session from "express-session";
 import passport from "passport";
-import { configurePassport } from "./auth";
+import { configurePassport, isAuthenticated, hasWatchlistAccess } from "./auth";
 import authRoutes from "./authRoutes";
 import MemoryStore from "memorystore";
 import connectPgSimple from "connect-pg-simple";
@@ -230,6 +230,10 @@ async function startServer() {
     
     // Register auth routes after passport setup
     app.use('/api', authRoutes);
+    
+    // Apply authentication middleware to all API routes except auth routes
+    // Apply the auth middleware globally to protected routes
+    app.use('/api/watchlist', isAuthenticated, hasWatchlistAccess);
     
     // Push database schema changes before starting the server
     await pushDatabaseSchema();
