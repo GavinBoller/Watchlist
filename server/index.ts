@@ -34,11 +34,16 @@ let sessionStore: any; // Using any type here since we'll be assigning different
 let usePostgresSession = false;
 
 // Create session table if needed
-async function createSessionTable() {
+async function createSessionTable(dbPool: any) {
+  if (!dbPool) {
+    console.error("Cannot create session table: database pool is undefined");
+    return false;
+  }
+  
   try {
     // Execute direct SQL to create the session table if it doesn't exist
     // This matches the exact structure from connect-pg-simple
-    await pool.query(`
+    await dbPool.query(`
       CREATE TABLE IF NOT EXISTS "session" (
         "sid" varchar NOT NULL COLLATE "default",
         "sess" json NOT NULL,
@@ -60,7 +65,7 @@ async function setupSessionStore() {
   if (process.env.DATABASE_URL) {
     try {
       // First, make sure the session table exists
-      const tableCreated = await createSessionTable();
+      const tableCreated = await createSessionTable(pool);
       
       if (tableCreated) {
         // Initialize Postgres session store with the pool from db.ts
@@ -105,8 +110,7 @@ async function setupSessionStore() {
   return sessionStore;
 }
 
-// Register auth routes directly at /api for backward compatibility
-app.use('/api', authRoutes);
+// Auth routes will be registered after passport and session setup
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -193,6 +197,11 @@ async function pushDatabaseSchema() {
 // Main initialization function
 async function startServer() {
   try {
+    // We need to ensure the db connection is ready before we try to use it
+    console.log("Waiting for database connection to be ready...");
+    // Short timeout to make sure the database connection is ready
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
     // Initialize the session store
     await setupSessionStore();
     
@@ -218,6 +227,9 @@ async function startServer() {
     app.use(passport.initialize());
     app.use(passport.session());
     configurePassport();
+    
+    // Register auth routes after passport setup
+    app.use('/api', authRoutes);
     
     // Push database schema changes before starting the server
     await pushDatabaseSchema();
