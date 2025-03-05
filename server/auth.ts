@@ -60,12 +60,20 @@ export function configurePassport() {
   // User serialization for session with enhanced debugging
   passport.serializeUser((user, done) => {
     try {
-      const userId = (user as UserResponse).id;
+      const userData = user as UserResponse;
+      const userId = userData.id;
       console.log(`[AUTH] Serializing user ID: ${userId} to session`);
+      
+      // Store user information in session for better resilience
+      const sessionUser = {
+        id: userId,
+        username: userData.username,
+        displayName: userData.displayName
+      };
       
       // Add explicit delay to ensure session is saved properly
       setTimeout(() => {
-        done(null, userId);
+        done(null, sessionUser);
       }, 10);
     } catch (error) {
       console.error('[AUTH] Error serializing user:', error);
@@ -74,18 +82,30 @@ export function configurePassport() {
   });
   
   // User deserialization with enhanced error handling and logging
-  passport.deserializeUser(async (id: number, done) => {
+  passport.deserializeUser(async (userData: any, done) => {
     try {
-      console.log(`[AUTH] Deserializing user from session. ID: ${id}`);
+      // Handle both formats - object format from our new serializer and ID-only format from legacy sessions
+      const isObjectFormat = userData && typeof userData === 'object';
+      const userId = isObjectFormat && userData.id ? userData.id : userData;
       
-      // Add retry logic for transient database issues
+      console.log(`[AUTH] Deserializing user from session. Type: ${isObjectFormat ? 'Object' : 'ID'}, ID: ${userId}`);
+      
+      // If we have complete user data already, use it directly - improves performance by avoiding DB lookups
+      if (isObjectFormat && userData.id && userData.username) {
+        console.log(`[AUTH] Using cached user data from session: ${userData.username} (ID: ${userData.id})`);
+        
+        // Return complete user object
+        return done(null, userData);
+      }
+      
+      // Otherwise, look up from database with retry logic for transient database issues
       let retries = 2;
       let user = null;
       let lastError = null;
       
       for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-          user = await storage.getUser(id);
+          user = await storage.getUser(userId);
           break; // If successful, exit the retry loop
         } catch (fetchError) {
           console.error(`[AUTH] Error fetching user on attempt ${attempt + 1}/${retries + 1}:`, fetchError);
@@ -115,7 +135,7 @@ export function configurePassport() {
           return done(null, false);
         }
         
-        console.log(`[AUTH] User not found during session deserialization. ID: ${id}`);
+        console.log(`[AUTH] User not found during session deserialization. ID: ${userId}`);
         return done(null, false);
       }
       
