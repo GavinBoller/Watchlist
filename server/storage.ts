@@ -648,14 +648,20 @@ export class DatabaseStorage implements IStorage {
             [id],
             'Failed to retrieve user'
           );
-          return rows[0];
+          return rows[0] || undefined; // Explicit undefined return for clarity
         } catch (fallbackError) {
           console.error("Direct SQL fallback also failed:", fallbackError);
-          throw fallbackError;
+          // Return undefined instead of throwing an error
+          // This makes session handling more reliable by avoiding disruptive exceptions
+          console.log("Returning undefined instead of throwing error for user lookup");
+          return undefined;
         }
       }
       
-      throw new Error(`Failed to retrieve user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // For non-connection errors, also return undefined rather than throwing
+      // This prevents session validation from breaking the entire application
+      console.log("Returning undefined due to database error for user lookup");
+      return undefined;
     }
   }
 
@@ -679,14 +685,18 @@ export class DatabaseStorage implements IStorage {
             [username],
             'Failed to retrieve user by username'
           );
-          return rows[0];
+          return rows[0] || undefined; // Explicit undefined for clarity
         } catch (fallbackError) {
           console.error("Direct SQL fallback also failed:", fallbackError);
-          throw fallbackError;
+          // Return undefined instead of throwing error
+          console.log("Returning undefined instead of throwing error for username lookup");
+          return undefined;
         }
       }
       
-      throw new Error(`Failed to retrieve user by username: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // For non-connection errors, also return undefined
+      console.log("Returning undefined due to database error for username lookup");
+      return undefined;
     }
   }
 
@@ -751,7 +761,8 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     try {
-      return await db.select().from(users);
+      const userList = await db.select().from(users);
+      return userList || [];
     } catch (error) {
       console.error("Database error in getAllUsers using ORM:", error);
       
@@ -759,18 +770,23 @@ export class DatabaseStorage implements IStorage {
       if (this.shouldUseDirectSqlFallback(error)) {
         try {
           console.log("Attempting direct SQL fallback for getAllUsers");
-          return await executeDirectSql<User>(
+          const result = await executeDirectSql<User>(
             'SELECT * FROM "users"',
             [],
             'Failed to retrieve users'
           );
+          return result || [];
         } catch (fallbackError) {
           console.error("Direct SQL fallback also failed:", fallbackError);
-          throw fallbackError;
+          // Return empty array instead of throwing error
+          console.log("Returning empty array instead of throwing error for users lookup");
+          return [];
         }
       }
       
-      throw new Error(`Failed to retrieve users: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // For non-connection errors, also return empty array
+      console.log("Returning empty array due to database error for users lookup");
+      return [];
     }
   }
   

@@ -185,16 +185,67 @@ router.post('/login', (req: Request, res: Response, next) => {
   })();
 });
 
-// Logout route
+// Logout route with emergency mode support and enhanced reliability
 router.post('/logout', (req: Request, res: Response) => {
-  req.logout(() => {
-    req.session.destroy((err) => {
-      if (err) {
-        return res.status(500).json({ message: 'Error logging out' });
+  // Check if we're in emergency mode
+  const isProd = process.env.NODE_ENV === 'production';
+  const emergencyMode = isProd && isEmergencyModeActive();
+  
+  // Log additional debug info
+  console.log(`Logout request. User authenticated: ${req.isAuthenticated()}, Emergency mode: ${emergencyMode}`);
+  
+  // Handle logout with error handling
+  req.logout((logoutErr) => {
+    if (logoutErr) {
+      console.error('Error during logout:', logoutErr);
+      return res.status(500).json({ message: 'Error during logout process' });
+    }
+    
+    // Destroy session with error handling
+    if (req.session) {
+      req.session.destroy((sessionErr) => {
+        if (sessionErr) {
+          console.error('Error destroying session:', sessionErr);
+          return res.status(500).json({ message: 'Error clearing session' });
+        }
+        
+        // Clear cookie and return success
+        try {
+          res.clearCookie('connect.sid', {
+            path: '/',
+            httpOnly: true,
+            secure: isProd,
+            sameSite: 'lax'
+          });
+        } catch (cookieErr) {
+          console.error('Error clearing cookie:', cookieErr);
+          // Continue despite cookie error
+        }
+        
+        return res.json({ 
+          message: 'Logout successful',
+          emergencyMode: emergencyMode || undefined
+        });
+      });
+    } else {
+      // If session is already gone, just clear cookie and return
+      try {
+        res.clearCookie('connect.sid', {
+          path: '/',
+          httpOnly: true,
+          secure: isProd,
+          sameSite: 'lax'
+        });
+      } catch (cookieErr) {
+        console.error('Error clearing cookie when session is null:', cookieErr);
+        // Continue despite cookie error
       }
-      res.clearCookie('connect.sid');
-      return res.json({ message: 'Logout successful' });
-    });
+      
+      return res.json({ 
+        message: 'Logout successful (no active session)',
+        emergencyMode: emergencyMode || undefined
+      });
+    }
   });
 });
 
