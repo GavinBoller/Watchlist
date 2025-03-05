@@ -9,7 +9,11 @@ import authRoutes from "./authRoutes";
 import MemoryStore from "memorystore";
 import connectPgSimple from "connect-pg-simple";
 import path from "path";
-import { pool } from "./db";
+import { pool, db } from "./db";
+import { migrator } from "drizzle-orm/neon-serverless/migrator";
+import { exec } from "child_process";
+import util from "util";
+import fs from "fs";
 
 // Load environment variables from .env file
 config();
@@ -121,7 +125,32 @@ app.use((req, res, next) => {
   next();
 });
 
+// Function to push database schema changes
+async function pushDatabaseSchema() {
+  if (!process.env.DATABASE_URL) {
+    console.log('Skipping database schema push: No DATABASE_URL provided');
+    return;
+  }
+  
+  try {
+    console.log('Attempting to push database schema changes...');
+    const execPromise = util.promisify(exec);
+    
+    // Use the drizzle-kit CLI to push schema changes
+    await execPromise('npx drizzle-kit push');
+    console.log('Successfully pushed database schema changes!');
+    return true;
+  } catch (error) {
+    console.error('Error pushing database schema:', error);
+    console.log('Continuing application startup despite schema push failure.');
+    return false;
+  }
+}
+
 (async () => {
+  // Push database schema changes before starting the server
+  await pushDatabaseSchema();
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

@@ -1271,27 +1271,89 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateWatchlistEntry(id: number, updates: Partial<InsertWatchlistEntry>): Promise<WatchlistEntry | undefined> {
-    // Check if entry exists
-    const entry = await this.getWatchlistEntry(id);
-    if (!entry) return undefined;
-    
-    // Update only provided fields
-    const [updatedEntry] = await db
-      .update(watchlistEntries)
-      .set(updates)
-      .where(eq(watchlistEntries.id, id))
-      .returning();
-    
-    return updatedEntry;
+    try {
+      // Check if entry exists
+      const entry = await this.getWatchlistEntry(id);
+      if (!entry) return undefined;
+      
+      // Update only provided fields using ORM
+      const [updatedEntry] = await db
+        .update(watchlistEntries)
+        .set(updates)
+        .where(eq(watchlistEntries.id, id))
+        .returning();
+      
+      return updatedEntry;
+    } catch (error) {
+      console.error("Database error in updateWatchlistEntry using ORM:", error);
+      
+      // Try direct SQL as fallback for connection issues
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          console.log("Attempting direct SQL fallback for updateWatchlistEntry");
+          
+          // Build SET clause for SQL update
+          const setClause = Object.entries(updates)
+            .map(([key, _], index) => `"${key}" = $${index + 2}`)
+            .join(', ');
+          
+          const values = [id, ...Object.values(updates)];
+          
+          const rows = await executeDirectSql<WatchlistEntry>(
+            `UPDATE "watchlist_entries" SET ${setClause} WHERE "id" = $1 RETURNING *`,
+            values,
+            'Failed to update watchlist entry'
+          );
+          
+          if (rows.length === 0) {
+            return undefined;
+          }
+          
+          return rows[0];
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback also failed:", fallbackError);
+          throw fallbackError;
+        }
+      }
+      
+      throw new Error(`Failed to update watchlist entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async deleteWatchlistEntry(id: number): Promise<boolean> {
-    const result = await db
-      .delete(watchlistEntries)
-      .where(eq(watchlistEntries.id, id))
-      .returning({ id: watchlistEntries.id });
-    
-    return result.length > 0;
+    try {
+      // Delete entry using ORM
+      const result = await db
+        .delete(watchlistEntries)
+        .where(eq(watchlistEntries.id, id))
+        .returning({ id: watchlistEntries.id });
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error("Database error in deleteWatchlistEntry using ORM:", error);
+      
+      // Try direct SQL as fallback for connection issues
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          console.log("Attempting direct SQL fallback for deleteWatchlistEntry");
+          const rows = await executeDirectSql<{id: number}>(
+            'DELETE FROM "watchlist_entries" WHERE "id" = $1 RETURNING "id"',
+            [id],
+            'Failed to delete watchlist entry'
+          );
+          
+          return rows.length > 0;
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback also failed:", fallbackError);
+          // Return false instead of throwing an error to avoid breaking the UI
+          return false;
+        }
+      }
+      
+      // Return false for any other error rather than throwing
+      console.warn("Error deleting watchlist entry, returning false:", error);
+      return false;
+    }
   }
 }
 
