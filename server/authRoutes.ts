@@ -438,7 +438,8 @@ function enableEmergencyMode() {
 }
 
 function isEmergencyModeActive() {
-  return emergencyMemoryStorage.isUsingEmergencyMode;
+  // Always return false to disable emergency mode since it's causing issues
+  return false;
 }
 
 // Register a new user with ultra-reliable fallback options

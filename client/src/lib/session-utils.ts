@@ -78,20 +78,8 @@ export async function handleSessionExpiration(
   // Check if session is actually expired
   const sessionData = await checkSessionStatus();
   
-  // Handle special cases
-  if (sessionData?.emergencyMode) {
-    toast({
-      title: "Emergency Mode Active",
-      description: "The server is in maintenance mode. Some features may be limited.",
-      variant: "destructive",
-    });
-    
-    // Special handling for emergency mode - reload page to update UI
-    setTimeout(() => {
-      window.location.reload();
-    }, 2000);
-    return;
-  }
+  // We've disabled emergency mode due to problems it causes
+  // Just proceed with normal session handling
   
   // If session check shows user is still authenticated, it might be a temporary issue
   if (sessionData?.authenticated) {
