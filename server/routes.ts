@@ -9,7 +9,8 @@ import {
   insertMovieSchema, 
   insertWatchlistEntrySchema,
   type TMDBSearchResponse,
-  type TMDBMovie
+  type TMDBMovie,
+  type User
 } from "@shared/schema";
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "79d177894334dec45f251ff671833a50";
@@ -73,8 +74,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const sessionId = req.sessionID || 'unknown';
     const isAuthenticated = req.isAuthenticated();
     const user = req.user ? {
-      id: (req.user as User).id,
-      username: (req.user as User).username,
+      id: (req.user as any).id,
+      username: (req.user as any).username,
     } : null;
     
     // Gather session data with safety checks
@@ -137,7 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // If the user is already authenticated, just return the current user
     if (req.isAuthenticated() && req.user) {
-      console.log(`[SESSION-REFRESH] User already authenticated as ${(req.user as User).username}`);
+      console.log(`[SESSION-REFRESH] User already authenticated as ${(req.user as any).username}`);
       
       // Mark session as authenticated
       req.session.authenticated = true;
