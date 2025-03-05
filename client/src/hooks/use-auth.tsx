@@ -88,17 +88,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!res.ok) {
           throw new Error(`Login failed with status ${res.status}`);
         }
-        return await res.json();
+        const data = await res.json();
+        console.log("Login response data:", data);
+        
+        // Extract the user object based on response structure
+        const user = data.user || data;
+        return user;
       } catch (error) {
         console.error("Login error:", error);
         throw error;
       }
     },
     onSuccess: (userData: SelectUser) => {
+      console.log("Login successful, user data:", userData);
       queryClient.setQueryData(["/api/user"], userData);
+      
+      // Safety check for username
+      const displayName = userData?.username || userData?.displayName || "user";
+      
       toast({
         title: "Welcome back!",
-        description: `You've successfully logged in as ${userData.username}`,
+        description: `You've successfully logged in as ${displayName}`,
       });
     },
     onError: (error: Error) => {
@@ -117,17 +127,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!res.ok) {
           throw new Error(`Registration failed with status ${res.status}`);
         }
-        return await res.json();
+        const data = await res.json();
+        console.log("Registration response data:", data);
+        
+        // Extract the user object based on response structure
+        const user = data.user || data;
+        return user;
       } catch (error) {
         console.error("Registration error:", error);
         throw error;
       }
     },
     onSuccess: (userData: SelectUser) => {
+      console.log("Registration successful, user data:", userData);
       queryClient.setQueryData(["/api/user"], userData);
+      
+      // Safety check for username
+      const displayName = userData?.username || userData?.displayName || "user";
+      
       toast({
         title: "Account created",
-        description: `Welcome to MovieTracker, ${userData.username}!`,
+        description: `Welcome to MovieTracker, ${displayName}!`,
       });
     },
     onError: (error: Error) => {

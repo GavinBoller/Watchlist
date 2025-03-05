@@ -122,6 +122,28 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
       // Continue despite error - the main request will handle auth issues if they exist
     }
     
+    // Check currentUser before proceeding
+    if (!currentUser || !currentUser.id) {
+      console.error("User data is not available:", currentUser);
+      toast({
+        title: "Authentication Error",
+        description: "Your user data could not be verified. Please try logging in again.",
+        variant: "destructive",
+      });
+      onClose();
+      
+      // Force redirect to auth page
+      setTimeout(() => {
+        window.location.href = '/auth';
+      }, 1500);
+      
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Log user information for debugging
+    console.log("Current user data:", currentUser);
+    
     // Prepare watchlist entry data with proper validation
     const watchlistData = {
       userId: currentUser.id,
