@@ -17,6 +17,7 @@ import {
 import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { detectAutoLogoutPattern } from "@/lib/session-utils";
 
 // Extended User type with confirmPassword for registration
 type RegisterData = Omit<InsertUser, 'confirmPassword'> & {
@@ -443,46 +444,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const logoutTimestamp = Date.now();
       const username = user?.username || 'unknown';
       
-      // Check localStorage for recent logout attempts to detect auto-logout patterns
-      const checkForAutoLogout = () => {
-        try {
-          // Get the recent logout history from localStorage
-          const recentLogoutsJSON = localStorage.getItem('movietracker_recent_logouts');
-          let recentLogouts: {timestamp: number, count: number} = recentLogoutsJSON ? 
-            JSON.parse(recentLogoutsJSON) : { timestamp: 0, count: 0 };
-          
-          // Check if we have multiple rapid logout attempts
-          const now = Date.now();
-          const withinTimeWindow = (now - recentLogouts.timestamp) < 30000; // 30 seconds
-          
-          if (withinTimeWindow) {
-            // Increment the counter for tracking
-            recentLogouts.count++;
-            recentLogouts.timestamp = now;
-            
-            // Save it back to localStorage
-            localStorage.setItem('movietracker_recent_logouts', JSON.stringify(recentLogouts));
-            
-            // If we've seen too many logout attempts in a short window, this looks like auto-logout
-            if (recentLogouts.count >= 3) {
-              console.warn(`Detected potential auto-logout pattern for user ${username}: ${recentLogouts.count} attempts in 30s`);
-              return true;
-            }
-          } else {
-            // Reset the counter if outside time window
-            recentLogouts = { timestamp: now, count: 1 };
-            localStorage.setItem('movietracker_recent_logouts', JSON.stringify(recentLogouts));
-          }
-          
-          return false;
-        } catch (e) {
-          console.error("Error checking for auto-logout pattern:", e);
-          return false;
-        }
-      };
-      
-      // Check if this might be an auto-logout situation
-      const isAutoLogout = checkForAutoLogout();
+      // Check if this might be an auto-logout situation using our shared utility
+      const isAutoLogout = detectAutoLogoutPattern();
       
       // If we detect auto-logout pattern, don't actually call the server logout 
       // but pretend success while retaining the session
