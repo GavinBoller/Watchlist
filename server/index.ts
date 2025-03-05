@@ -532,17 +532,19 @@ async function startServer() {
     app.use(session({
       secret: SESSION_SECRET,
       resave: false, // Don't save session if unmodified
-      saveUninitialized: false, // Don't create session until something stored
+      saveUninitialized: true, // Changed to true to ensure session cookie is always created
       store: sessionStore,
-      proxy: true, // Always trust the reverse proxy
+      proxy: isProd, // Only trust proxies in production
       rolling: true, // Reset expiration countdown on every response
       name: 'watchlist.sid', // Use consistent name across environments
       
       // Enhanced session generation with automatic timestamp and logging
       genid: function(req) {
-        // Generate a UUID-style session ID for better tracking
-        const sessionId = crypto.randomUUID();
-        console.log(`[SESSION] Creating new session with ID: ${sessionId}`);
+        // Generate a more reliable session ID
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substring(2, 15);
+        const sessionId = `${timestamp}-${random}`;
+        console.log(`[SESSION] New session initialized: ${sessionId}`);
         return sessionId;
       },
       
