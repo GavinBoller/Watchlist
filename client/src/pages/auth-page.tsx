@@ -13,9 +13,27 @@ export default function AuthPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
 
+  // Check if this is a preload request from the logout process
+  // This helps with immediate loading without blank screen
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isPreload = urlParams.get('preload') === 'true';
+    
+    // If this is a preload request, we don't need to do anything
+    // Just let the page load in the background
+    if (isPreload) {
+      console.log("Auth page preloaded for faster logout transition");
+      // Load any assets or data needed to render the page
+    }
+  }, []);
+
   // Redirect to home if already logged in
   useEffect(() => {
-    if (user) {
+    // Check if this is a preload request, don't redirect in that case
+    const urlParams = new URLSearchParams(window.location.search);
+    const isPreload = urlParams.get('preload') === 'true';
+    
+    if (user && !isPreload) {
       setLocation("/");
     }
   }, [user, setLocation]);

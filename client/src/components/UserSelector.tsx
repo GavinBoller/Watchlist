@@ -73,38 +73,75 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     }
   }, [actualIsMobile]);
 
-  // Direct hard logout for immediate effect without waiting
+  // Advanced preload technique for instant logout with zero delay
   const handleLogout = () => {
-    // Clear all toast notifications first
-    // This prevents any residual UI from remaining visible
-    queryClient.clear();
+    // TECHNIQUE 1: PRELOAD THE AUTH PAGE
+    // This creates an iframe to load the auth page in the background
+    // before we navigate to it, eliminating the blank screen
+    const preloadFrame = document.createElement('iframe');
+    preloadFrame.style.position = 'absolute';
+    preloadFrame.style.width = '0';
+    preloadFrame.style.height = '0';
+    preloadFrame.style.border = 'none';
+    preloadFrame.style.opacity = '0';
+    preloadFrame.style.pointerEvents = 'none';
+    preloadFrame.src = '/auth?preload=true&t=' + Date.now();
+    document.body.appendChild(preloadFrame);
     
+    // TECHNIQUE 2: CLEAR ALL DATA IMMEDIATELY
     // 1. Mark intentional logout in localStorage
     localStorage.setItem('movietracker_intentional_logout_time', Date.now().toString());
     
     // 2. Clear all session-related data from localStorage
-    localStorage.removeItem('movietracker_user');
-    localStorage.removeItem('movietracker_session_id');
-    localStorage.removeItem('movietracker_enhanced_backup');
-    localStorage.removeItem('movietracker_username');
-    localStorage.removeItem('movietracker_last_verified');
-    localStorage.removeItem('movietracker_session_heartbeat');
+    for (const key of [
+      'movietracker_user', 
+      'movietracker_session_id',
+      'movietracker_enhanced_backup',
+      'movietracker_username',
+      'movietracker_last_verified',
+      'movietracker_session_heartbeat'
+    ]) {
+      localStorage.removeItem(key);
+    }
     
-    // 3. Clear React Query cache immediately
+    // 3. Clear React Query cache
+    queryClient.clear();
     queryClient.setQueryData(["/api/user"], null);
-    queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/session"] });
     
-    // 4. Set a cookie to indicate logout (helps with session clearing)
-    document.cookie = "logout_time=" + Date.now() + "; path=/; max-age=5";
+    // TECHNIQUE 3: SET UP VISUAL TRANSITION
+    // Create a transition overlay to prevent seeing blank screen
+    const transitionOverlay = document.createElement('div');
+    transitionOverlay.style.position = 'fixed';
+    transitionOverlay.style.top = '0';
+    transitionOverlay.style.left = '0';
+    transitionOverlay.style.width = '100%';
+    transitionOverlay.style.height = '100%';
+    transitionOverlay.style.backgroundColor = '#141414';
+    transitionOverlay.style.zIndex = '10000';
+    transitionOverlay.style.transition = 'opacity 0.2s';
+    transitionOverlay.style.opacity = '0';
+    document.body.appendChild(transitionOverlay);
     
-    // 5. Send a background logout request to the server
-    const logoutRequest = new XMLHttpRequest();
-    logoutRequest.open('POST', '/api/logout', true); // async=true
-    logoutRequest.send();
+    // Fade in the overlay
+    setTimeout(() => {
+      transitionOverlay.style.opacity = '1';
+    }, 10);
     
-    // 6. Redirect immediately to auth page with hard navigation
-    window.location.href = '/auth?timestamp=' + Date.now(); // Add timestamp to prevent caching
+    // TECHNIQUE 4: INITIATE LOGOUT IN BACKGROUND
+    // Send background logout request to server
+    fetch('/api/logout', {
+      method: 'POST',
+      credentials: 'include',
+    }).catch(() => {
+      // Ignore errors
+    });
+    
+    // TECHNIQUE 5: NAVIGATE AFTER SHORT DELAY
+    // Wait for preload frame to do its work (200-300ms is enough)
+    // Then navigate to the auth page
+    setTimeout(() => {
+      window.location.href = '/auth?source=logout&t=' + Date.now();
+    }, 300);
   };
 
   // Handle login modal
