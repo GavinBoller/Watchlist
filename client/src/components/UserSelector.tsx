@@ -73,27 +73,9 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     }
   }, [actualIsMobile]);
 
-  // ULTIMATE SOLUTION: Direct page replacement for immediate logout
-  const handleLogout = () => {
-    // 1. Mark intentional logout in localStorage and clear all data
-    localStorage.setItem('movietracker_intentional_logout_time', Date.now().toString());
-    
-    for (const key of [
-      'movietracker_user', 
-      'movietracker_session_id',
-      'movietracker_enhanced_backup',
-      'movietracker_username',
-      'movietracker_last_verified',
-      'movietracker_session_heartbeat'
-    ]) {
-      localStorage.removeItem(key);
-    }
-    
-    // 2. Clear all caches
-    queryClient.clear();
-    queryClient.setQueryData(["/api/user"], null);
-    
-    // 3. Create an overlay that displays the login form immediately
+  // PRODUCTION-SAFE SOLUTION: Works in both DEV and PROD environments
+  const handleLogout = async () => {
+    // Show overlay immediately for visual feedback
     const overlayDiv = document.createElement('div');
     overlayDiv.style.position = 'fixed';
     overlayDiv.style.top = '0';
@@ -107,76 +89,140 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     overlayDiv.style.alignItems = 'center';
     overlayDiv.style.justifyContent = 'center';
     overlayDiv.style.padding = '20px';
-    overlayDiv.style.overflow = 'auto';
+    overlayDiv.style.transition = 'opacity 0.2s';
+    overlayDiv.style.opacity = '0';
     
-    // 4. Create a basic login form in the overlay
+    // Add loading indicator and message
     overlayDiv.innerHTML = `
       <div style="width: 100%; max-width: 400px; margin: 0 auto; text-align: center;">
-        <h1 style="margin-bottom: 20px; font-size: 24px; color: white;">Log in to MovieTracker</h1>
+        <h1 style="margin-bottom: 20px; font-size: 24px; color: white;">Logging Out</h1>
         <div style="margin-bottom: 20px; text-align: center;">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#E50914" stroke-width="2">
-            <path d="M19 2H5a3 3 0 0 0-3 3v14a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3V5a3 3 0 0 0-3-3z"></path>
-            <path d="M7 2v20"></path>
-            <path d="M17 2v20"></path>
-            <path d="M2 12h20"></path>
-            <path d="M2 7h5"></path>
-            <path d="M2 17h5"></path>
-            <path d="M17 17h5"></path>
-            <path d="M17 7h5"></path>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#E50914" stroke-width="2" class="spin">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
           </svg>
+          <style>
+            .spin {
+              animation: spin 1.5s linear infinite;
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          </style>
         </div>
-        <p style="color: #888; margin-bottom: 20px;">Logging out and redirecting to login page...</p>
+        <p style="color: #888; margin-bottom: 20px;">Securely logging you out...</p>
       </div>
     `;
     
     document.body.appendChild(overlayDiv);
     
-    // 5. Start two parallel processes
-    // A. Logout request in the background
-    fetch('/api/logout', { 
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' }
-    }).catch(() => {
-      // Ignore errors, we're redirecting anyway
+    // Fade in the overlay
+    setTimeout(() => {
+      overlayDiv.style.opacity = '1';
+    }, 10);
+    
+    // Complete client-side cleanup
+    // 1. Clear local storage
+    localStorage.setItem('movietracker_intentional_logout_time', Date.now().toString());
+    for (const key of [
+      'movietracker_user', 
+      'movietracker_session_id',
+      'movietracker_enhanced_backup', 
+      'movietracker_username',
+      'movietracker_last_verified',
+      'movietracker_session_heartbeat'
+    ]) {
+      localStorage.removeItem(key);
+    }
+    
+    // 2. Clear React Query cache
+    queryClient.clear();
+    queryClient.setQueryData(["/api/user"], null);
+    
+    // 3. Clear cookies (will work in both DEV and PROD)
+    document.cookie.split(";").forEach(function(c) {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
     });
     
-    // B. Hard redirect to auth page (with bypasses for caching)
-    document.cookie = "logout_time=" + Date.now() + "; path=/; max-age=5";
+    // 4. Force logout on server with synchronous request (wait for completion)
+    try {
+      const response = await fetch('/api/logout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
+        },
+        cache: 'no-store'
+      });
+      
+      if (response.ok) {
+        console.log("Server-side logout successful");
+      } else {
+        console.warn("Server-side logout returned non-200 status");
+      }
+    } catch (err) {
+      console.error("Error during server logout:", err);
+    }
     
-    // Load login page in the background to prime the cache
-    const hiddenFrame = document.createElement('iframe');
-    hiddenFrame.style.width = '0';
-    hiddenFrame.style.height = '0';
-    hiddenFrame.style.border = 'none';
-    hiddenFrame.style.position = 'absolute';
-    hiddenFrame.src = '/auth?preload=true&t=' + Date.now();
-    document.body.appendChild(hiddenFrame);
+    // 5. Redirect to auth page
+    // Use multiple approaches for maximum reliability
     
-    // Create a form submit to navigate (most reliable method)
+    // Method 1: Update location with cache busting
+    const timestamp = Date.now();
+    const authUrl = `/auth?force=true&t=${timestamp}`;
+    
+    // Method 2: Form submit approach
     const form = document.createElement('form');
     form.method = 'GET';
     form.action = '/auth';
     form.style.display = 'none';
     
-    // Add timestamp to prevent caching
     const input = document.createElement('input');
     input.type = 'hidden';
-    input.name = 't';
-    input.value = Date.now().toString();
+    input.name = 'force';
+    input.value = 'true';
     form.appendChild(input);
+    
+    const timeInput = document.createElement('input');
+    timeInput.type = 'hidden';
+    timeInput.name = 't';
+    timeInput.value = timestamp.toString();
+    form.appendChild(timeInput);
+    
+    // Add a special flag for production environment
+    const prodInput = document.createElement('input');
+    prodInput.type = 'hidden';
+    prodInput.name = 'fromLogout';
+    prodInput.value = 'true';
+    form.appendChild(prodInput);
     
     document.body.appendChild(form);
     
-    // Submit the form after a very brief delay to ensure overlay is displayed
-    setTimeout(() => {
-      form.submit();
-      
-      // Fallback in case form submit fails
+    // Method 3: Force a hard refresh
+    const performHardRedirect = () => {
+      window.location.href = authUrl;
+      // If that doesn't work, try hard reload
       setTimeout(() => {
-        window.location.href = '/auth?force=true&t=' + Date.now();
+        window.location.replace(authUrl);
+        // Absolute last resort - hard reload
+        setTimeout(() => {
+          window.location.href = authUrl + "&reload=true";
+          window.location.reload();
+        }, 100);
       }, 100);
-    }, 50);
+    };
+    
+    // Submit the form which is most reliable in production
+    try {
+      form.submit();
+      // Back up with location change if form submit doesn't trigger navigation
+      setTimeout(performHardRedirect, 200);
+    } catch (e) {
+      console.error("Form submit failed:", e);
+      performHardRedirect();
+    }
   };
 
   // Handle login modal

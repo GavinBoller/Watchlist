@@ -13,27 +13,79 @@ export default function AuthPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
 
-  // Check if this is a preload request from the logout process
-  // This helps with immediate loading without blank screen
+  // IMPROVED LOGOUT HANDLING
+  
+  // 1. Check URL parameters for special flags
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const isPreload = urlParams.get('preload') === 'true';
+    const fromLogout = urlParams.get('fromLogout') === 'true';
+    const forceFlag = urlParams.get('force') === 'true';
     
-    // If this is a preload request, we don't need to do anything
-    // Just let the page load in the background
     if (isPreload) {
       console.log("Auth page preloaded for faster logout transition");
-      // Load any assets or data needed to render the page
+      // Just preload assets but don't take any action
+      return;
+    }
+    
+    if (fromLogout || forceFlag) {
+      console.log("Detected navigation from logout process");
+      
+      // Clear any lingering localStorage data to ensure clean slate
+      for (const key of [
+        'movietracker_user', 
+        'movietracker_session_id',
+        'movietracker_enhanced_backup',
+        'movietracker_username',
+        'movietracker_last_verified',
+        'movietracker_session_heartbeat'
+      ]) {
+        localStorage.removeItem(key);
+      }
+      
+      // Force clear cookies (helps in production environment)
+      document.cookie.split(";").forEach(function(c) {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+    }
+  }, []);
+  
+  // 2. Special handler for reloading the page if needed
+  // This helps with stubborn session clearing in production
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const reload = urlParams.get('reload') === 'true';
+    
+    if (reload) {
+      // Remove the reload parameter to prevent reload loop
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('reload');
+      window.history.replaceState({}, '', newUrl.toString());
+      
+      // Check if we're in production and might need additional cookie clearing
+      if (window.location.hostname.includes('replit.app')) {
+        console.log("Production environment detected, applying special cookie clearing...");
+        // One more aggressive cookie clear
+        const allCookies = document.cookie.split(';');
+        for (let i = 0; i < allCookies.length; i++) {
+          const cookie = allCookies[i];
+          const eqPos = cookie.indexOf('=');
+          const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
+          document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;';
+        }
+      }
     }
   }, []);
 
-  // Redirect to home if already logged in
+  // 3. Redirect to home if already logged in and not in preload mode
   useEffect(() => {
-    // Check if this is a preload request, don't redirect in that case
     const urlParams = new URLSearchParams(window.location.search);
     const isPreload = urlParams.get('preload') === 'true';
+    const force = urlParams.get('force') === 'true';
     
-    if (user && !isPreload) {
+    // If this is a forced auth page visit from logout, don't redirect even if user state is still cached
+    if (user && !isPreload && !force) {
+      console.log("User still logged in, redirecting to home");
       setLocation("/");
     }
   }, [user, setLocation]);
