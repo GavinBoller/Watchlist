@@ -359,7 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Watchlist routes - protect all with isAuthenticated middleware
-  app.get("/api/watchlist/:userId", isAuthenticated, hasWatchlistAccess, async (req: Request, res: Response) => {
+  app.get("/api/watchlist/:userId", isJwtAuthenticated, hasJwtWatchlistAccess, async (req: Request, res: Response) => {
     // ENHANCED: Added robust recovery mechanisms for watchlist access
     const isProd = process.env.NODE_ENV === 'production';
     
@@ -490,7 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/watchlist", isAuthenticated, hasWatchlistAccess, async (req: Request, res: Response) => {
+  app.post("/api/watchlist", isJwtAuthenticated, hasJwtWatchlistAccess, async (req: Request, res: Response) => {
     console.log("POST /api/watchlist - Request body:", JSON.stringify(req.body, null, 2));
     
     // CRITICAL PRODUCTION FIX: Direct access for watchlist operations with minimal dependencies
@@ -1000,7 +1000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/watchlist/:id", isAuthenticated, hasWatchlistAccess, async (req: Request, res: Response) => {
+  app.put("/api/watchlist/:id", isJwtAuthenticated, hasJwtWatchlistAccess, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id, 10);
       const { watchedDate, notes, status } = req.body;
@@ -1051,7 +1051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/watchlist/:id", isAuthenticated, hasWatchlistAccess, async (req: Request, res: Response) => {
+  app.delete("/api/watchlist/:id", isJwtAuthenticated, hasJwtWatchlistAccess, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id, 10);
       
