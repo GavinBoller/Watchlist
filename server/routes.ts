@@ -13,6 +13,9 @@ import {
   type User,
   type WatchlistEntryWithMovie
 } from "@shared/schema";
+import { emergencyAuthRouter, emergencyAuthCheck } from "./emergencyAuth";
+import { emergencyWatchlistRouter } from "./emergencyWatchlist";
+import { executeDirectSql } from "./db";
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "79d177894334dec45f251ff671833a50";
 const TMDB_API_BASE_URL = "https://api.themoviedb.org/3";
@@ -68,6 +71,12 @@ async function convertGenreIdsToNames(genreIds: number[] = [], mediaType: string
 export async function registerRoutes(app: Express): Promise<Server> {
   // Apply validateSession middleware to all routes to keep sessions fresh
   app.use(validateSession);
+  
+  // Register emergency routes for reliable authentication and watchlist operations
+  // These routes will work even when standard routes fail
+  console.log("[SERVER] Registering emergency auth endpoints");
+  app.use("/api", emergencyAuthRouter);
+  app.use("/api/emergency", emergencyWatchlistRouter);
   
   // Auth routes are already registered in index.ts - don't register them twice
   
