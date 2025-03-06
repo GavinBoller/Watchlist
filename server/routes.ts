@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { isAuthenticated, hasWatchlistAccess, validateSession } from "./auth";
+import { isJwtAuthenticated, hasJwtWatchlistAccess } from "./jwtMiddleware";
 import axios from "axios";
 import { z } from "zod";
 import { 
