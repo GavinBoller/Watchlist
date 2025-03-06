@@ -372,34 +372,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log("POST /api/watchlist - Request body:", JSON.stringify(req.body, null, 2));
     console.log("Environment:", process.env.NODE_ENV || 'development');
     
-    // Log authentication status - this helps debug 401 issues
-    console.log("User authenticated:", req.isAuthenticated());
-    if (req.isAuthenticated()) {
-      console.log("Authenticated user:", (req.user as any)?.id, (req.user as any)?.username);
-      
-      // Verify the user is only adding to their own watchlist
-      const authenticatedUserId = (req.user as any)?.id;
-      const requestedUserId = req.body.userId;
-      
-      if (authenticatedUserId && requestedUserId && authenticatedUserId !== requestedUserId) {
-        console.warn(`User ID mismatch! Auth user: ${authenticatedUserId}, Requested: ${requestedUserId}`);
-        return res.status(403).json({ 
-          message: "You can only add items to your own watchlist",
-          code: "USER_MISMATCH" 
-        });
-      }
-      
-      // If userId is missing from the request, use the authenticated user's ID
-      if (!req.body.userId && authenticatedUserId) {
+    // PRODUCTION RELIABILITY: Ensure there's always an authenticated user
+    if (!req.isAuthenticated() || !req.user) {
+      console.warn("WARNING: User not authenticated when accessing watchlist POST endpoint");
+      return res.status(401).json({ 
+        message: "Authentication required",
+        details: "Please log in again to add items to your watchlist"
+      });
+    }
+    
+    // Log authentication info
+    const authenticatedUserId = (req.user as any)?.id;
+    const authenticatedUsername = (req.user as any)?.username;
+    console.log(`Authenticated user: ID=${authenticatedUserId}, Username=${authenticatedUsername}`);
+    
+    // CRITICAL: Always ensure we have a valid user ID
+    // First preference: Use the authenticated user's ID (most reliable)
+    if (authenticatedUserId) {
+      // If userId is missing from the request or different, use the authenticated user's ID
+      if (!req.body.userId) {
         console.log(`No userId in request, using authenticated user ID: ${authenticatedUserId}`);
         req.body.userId = authenticatedUserId;
+      } 
+      // If there's a mismatch between requested user and authenticated user, use the authenticated one
+      else if (req.body.userId !== authenticatedUserId) {
+        console.warn(`User ID mismatch! Auth user: ${authenticatedUserId}, Requested: ${req.body.userId}`);
+        console.log(`Overriding with authenticated user ID for security`);
+        req.body.userId = authenticatedUserId;
       }
-    } else {
-      console.warn("WARNING: User not authenticated when accessing watchlist POST endpoint");
-      // We should not reach here because of the middleware, but just in case:
-      return res.status(401).json({ 
-        message: "Authentication error: Please login again to add items to your watchlist",
-        code: "AUTH_REQUIRED_WATCHLIST"
+    } 
+    // If somehow we have no user ID (should never happen with isAuthenticated middleware)
+    else {
+      console.error("CRITICAL: Authenticated but no user ID available!");
+      return res.status(500).json({ 
+        message: "Session error",
+        details: "Please log out and log back in to refresh your session"
       });
     }
     
@@ -442,40 +449,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("Converted userId string to number:", userIdNum);
       }
       
-      const user = await storage.getUser(userIdNum);
+      let user = await storage.getUser(userIdNum);
       
-      // Enhanced user checking with fallback if user not found
+      // Enhanced user checking with multiple fallback strategies if user not found
       if (!user) {
-        console.log("User not found - userId:", userIdNum);
+        console.log("User not found initially - userIdNum:", userIdNum, typeof userIdNum);
         
-        // If we have an authenticated user but their ID doesn't match the requested ID
+        // PRODUCTION RELIABILITY: Always prioritize the authenticated user from the session
         if (req.isAuthenticated() && req.user) {
           const authUserId = (req.user as any).id;
-          console.log("Using authenticated user instead - authUserId:", authUserId);
-          const authUser = await storage.getUser(authUserId);
+          console.log("Using authenticated user from session - authUserId:", authUserId);
           
-          if (authUser) {
-            console.log("Found authenticated user:", authUser.username);
-            // Proceed with the authenticated user instead
-            userIdNum = authUserId;
-          } else {
-            // Try to get users to help with debugging
+          // Always trust the session's user
+          try {
+            const authUser = await storage.getUser(authUserId);
+            
+            if (authUser) {
+              console.log("Found authenticated user:", authUser.username);
+              // Proceed with the authenticated user instead
+              userIdNum = authUserId;
+              // Update the request body to match the authenticated user
+              req.body.userId = authUserId;
+              // Success - continue with this user
+              console.log(`Using authenticated user ${authUser.username} (ID: ${authUserId}) for watchlist operation`);
+            } else {
+              console.warn(`Authenticated user ID ${authUserId} not found in database - this should never happen!`);
+              
+              // EXTREME FALLBACK: If we somehow have an authenticated session but no user record,
+              // try to create a temporary user record to prevent data loss
+              try {
+                console.log("Attempting emergency user record creation for authenticated user");
+                const username = (req.user as any).username || `RecoveredUser_${Date.now()}`;
+                const emergencyUser = await storage.createUser({
+                  username,
+                  password: "temporary_" + Date.now(), // This will be auto-hashed
+                  displayName: username
+                });
+                
+                console.log("Emergency user created:", emergencyUser.username, emergencyUser.id);
+                userIdNum = emergencyUser.id;
+                req.body.userId = emergencyUser.id;
+              } catch (emergencyError) {
+                console.error("Failed to create emergency user:", emergencyError);
+                // Continue with standard error flow
+              }
+            }
+          } catch (dbError) {
+            console.error("Database error while looking up authenticated user:", dbError);
+          }
+        }
+        
+        // If we STILL don't have a valid user, try one more time with the user lookup
+        if (!user && userIdNum) {
+          console.log("Retrying user lookup with userIdNum:", userIdNum);
+          try {
+            user = await storage.getUser(userIdNum);
+          } catch (retryError) {
+            console.error("Error in user lookup retry:", retryError);
+          }
+        }
+        
+        // If we STILL don't have a user after all fallbacks, return error
+        if (!user) {
+          console.error("User not found after all fallback strategies");
+          // Log available users for debugging
+          try {
             const allUsers = await storage.getAllUsers();
             console.log("Available users:", allUsers.map(u => ({ id: u.id, username: u.username })));
-            
-            return res.status(404).json({ 
-              message: "User not found", 
-              details: "No valid user found for this request"
-            });
+          } catch (e) {
+            console.error("Error listing users:", e);
           }
-        } else {
-          // Try to get users to help with debugging
-          const allUsers = await storage.getAllUsers();
-          console.log("Available users:", allUsers.map(u => ({ id: u.id, username: u.username })));
           
           return res.status(404).json({ 
-            message: "User not found", 
-            details: "The user ID provided doesn't exist in the database"
+            message: "User account not found", 
+            details: "Please try logging out and back in to refresh your session"
           });
         }
       } else {

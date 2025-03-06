@@ -233,8 +233,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: "You've been logged out successfully",
       });
       
-      // Force redirect to auth page
-      window.location.href = '/auth';
+      // Force redirect to auth page with reliable production-safe approach
+      // 1. Use timeout to ensure the navigation happens after state updates
+      setTimeout(() => {
+        console.log("Executing logout redirect to /auth");
+        // 2. Try multiple navigation approaches for redundancy
+        try {
+          // Approach 1: Direct location change (most reliable)
+          window.location.replace('/auth');
+        } catch (e) {
+          console.error("Primary redirect failed:", e);
+          // Fallback: simple href change
+          window.location.href = '/auth';
+        }
+      }, 100);
     },
     onError: (error: Error) => {
       toast({
