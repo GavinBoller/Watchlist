@@ -21,6 +21,9 @@ import {
   registerEmergencyEndpoints,
   preventAutoLogout 
 } from "./productionFixes";
+// Import JWT related files
+import { jwtAuthenticate } from "./jwtMiddleware";
+import { jwtAuthRouter } from "./jwtAuthRoutes";
 
 // Extend the Express Session interface to include our custom properties
 // This ensures TypeScript recognizes our custom session data
