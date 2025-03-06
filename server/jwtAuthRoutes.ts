@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { generateToken, createUserResponse } from './jwtAuth';
 import { storage } from './storage';
 import { insertUserSchema } from '@shared/schema';
+import bcrypt from 'bcryptjs';
 import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
 
@@ -12,19 +13,36 @@ const scryptAsync = promisify(scrypt);
  * Helper function to hash password
  */
 async function hashPassword(password: string): Promise<string> {
-  const salt = randomBytes(16).toString('hex');
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString('hex')}.${salt}`;
+  // Use bcrypt with 10 rounds for compatibility with existing passwords
+  return bcrypt.hash(password, 10);
 }
 
 /**
  * Helper function to compare password with hashed password
  */
 async function comparePasswords(supplied: string, stored: string): Promise<boolean> {
-  const [hashed, salt] = stored.split('.');
-  const hashedBuf = Buffer.from(hashed, 'hex');
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  // Use bcrypt to compare passwords - handles both bcrypt and our custom format
+  try {
+    // First try using bcrypt for passwords starting with $2a$ or $2b$ (bcrypt format)
+    if (stored.startsWith('$2')) {
+      return await bcrypt.compare(supplied, stored);
+    }
+    
+    // Fallback to scrypt for custom format passwords (if any exist)
+    const [hashed, salt] = stored.split('.');
+    if (hashed && salt) {
+      const hashedBuf = Buffer.from(hashed, 'hex');
+      const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+      return timingSafeEqual(hashedBuf, suppliedBuf);
+    }
+    
+    // If we can't determine the format, fail securely
+    console.error('[AUTH] Unknown password format:', stored.substring(0, 3) + '...');
+    return false;
+  } catch (error) {
+    console.error('[AUTH] Password comparison error:', error);
+    return false;
+  }
 }
 
 /**
