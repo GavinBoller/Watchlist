@@ -69,7 +69,28 @@ export function ProtectedRoute({
   }, [retryCount]);
 
   // Secondary verification for edge cases where useAuth might report incorrect state
+  // Check if this is an intentional logout in progress to avoid verification
+  const isIntentionalLogout = useCallback(() => {
+    try {
+      const logoutTime = localStorage.getItem('movietracker_intentional_logout_time');
+      if (!logoutTime) return false;
+      
+      const parsedTime = parseInt(logoutTime, 10);
+      const now = Date.now();
+      // If logout was less than 3 seconds ago, consider this an intentional logout
+      return !isNaN(parsedTime) && (now - parsedTime < 3000);
+    } catch (e) {
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
+    // Skip verification if we're in an intentional logout flow
+    if (isIntentionalLogout()) {
+      console.log("ProtectedRoute: Skipping verification during logout flow");
+      return;
+    }
+    
     // Only verify if not already loading, not already verifying, and user is null (potentially false negative)
     if (!isLoading && !isVerifyingSession && !user && verifiedStatus === null) {
       console.log("ProtectedRoute: Starting session verification because user is null but authentication status is unknown");

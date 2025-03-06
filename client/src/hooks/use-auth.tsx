@@ -193,54 +193,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logoutMutation = useMutation({
     mutationFn: async () => {
       try {
+        // OPTIMIZATION: Pre-set the redirect for faster logout
+        // Create a hidden form to use for navigation instead of location.replace
+        // This trick forces an immediate page reload without waiting for the response
+        const form = document.createElement('form');
+        form.method = 'GET';
+        form.action = '/auth';
+        form.style.display = 'none';
+        document.body.appendChild(form);
+        
         // Mark this as an intentional logout to prevent auto-logout detection
-        // This will tell our auto-logout system to ignore auth page navigation
         localStorage.setItem('movietracker_intentional_logout_time', Date.now().toString());
-        console.log("Marked intentional logout time for auto-logout prevention");
         
-        // Remove all local storage keys related to session
-        try {
-          localStorage.removeItem('movietracker_user');
-          localStorage.removeItem('movietracker_session_id');
-          localStorage.removeItem('movietracker_enhanced_backup');
-          localStorage.removeItem('movietracker_username');
-          localStorage.removeItem('movietracker_last_verified');
-          localStorage.removeItem('movietracker_session_heartbeat');
-          console.log("Cleared all local session data");
-        } catch (e) {
-          console.error("Error clearing local storage:", e);
-        }
+        // Clear local storage of all session data immediately (don't wait)
+        localStorage.removeItem('movietracker_user');
+        localStorage.removeItem('movietracker_session_id');
+        localStorage.removeItem('movietracker_enhanced_backup');
+        localStorage.removeItem('movietracker_username');
+        localStorage.removeItem('movietracker_last_verified');
+        localStorage.removeItem('movietracker_session_heartbeat');
+        console.log("Cleared all session data before logout request");
         
-        const res = await apiRequest("POST", "/api/logout");
+        // Start the server-side logout
+        const logoutPromise = apiRequest("POST", "/api/logout");
+        
+        // Don't wait for the logout response - submit the form immediately
+        // This will cause a full page reload to /auth without waiting for API response
+        form.submit();
+        
+        // Continue with the API call in the background
+        // Even though we're already redirecting, we need to complete the server logout
+        const res = await logoutPromise;
         if (!res.ok) {
           throw new Error(`Logout failed with status ${res.status}`);
         }
-        return { success: true };
+        
+        return { success: true, clientSideRedirect: true };
       } catch (error) {
         console.error("Logout error:", error);
         throw error;
       }
     },
     onSuccess: () => {
-      // Clear all auth-related cache immediately
+      // Clear all auth-related cache (may not run due to redirect)
       queryClient.setQueryData(["/api/user"], null);
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/session"] });
       
-      // Start redirect immediately - don't wait
-      console.log("Executing immediate logout redirect to /auth");
-      
-      // Execute the redirect right away
+      // Fallback redirect if the form submit didn't work for some reason
       try {
-        // Perform direct navigation to auth page
-        window.location.replace('/auth');
+        window.location.href = '/auth'; 
       } catch (e) {
-        console.error("Primary redirect failed, using fallback:", e);
-        window.location.href = '/auth';
+        console.error("Fallback redirect failed:", e);
       }
-      
-      // Don't show toast since we're redirecting immediately
-      // This prevents UI lag during logout
     },
     onError: (error: Error) => {
       toast({
