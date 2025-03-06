@@ -73,11 +73,18 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     }
   }, [actualIsMobile]);
 
-  // ULTIMATE PRODUCTION-PROOF SOLUTION: Works in all environments
+  // CROSS-ENVIRONMENT UNIVERSAL LOGOUT SOLUTION
   const handleLogout = async () => {
-    // Detect environment
-    const isProd = window.location.hostname.includes('replit.app');
-    console.log(`Detected environment: ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'}`);
+    // Import environment utilities
+    const {
+      isProductionEnvironment,
+      getEnvironmentName,
+      clearAllClientSideStorage,
+      getLogoutConfig
+    } = await import('../lib/environment-utils');
+    
+    const isProd = isProductionEnvironment();
+    console.log(`Logout initiated in ${getEnvironmentName()} environment`);
     
     // STEP 1: Show overlay for visual feedback
     const overlayDiv = document.createElement('div');
@@ -119,61 +126,22 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     
     document.body.appendChild(overlayDiv);
     
-    // STEP 2: Use our best effort to clear all client-side state
+    // STEP 2: Clear all client-side state using our consolidated utility
+    clearAllClientSideStorage();
     
-    // 2.1: Clear localStorage
+    // Additional step: Clear React Query cache (not handled by the util)
     try {
-      // Mark this as an intentional logout
-      localStorage.setItem('movietracker_logout_time', Date.now().toString());
-      
-      // Clear all potential storage keys
-      const keysToRemove = [
-        'movietracker_user', 
-        'movietracker_session_id',
-        'movietracker_enhanced_backup', 
-        'movietracker_username',
-        'movietracker_last_verified',
-        'movietracker_session_heartbeat',
-        'tanstack-query-cache'
-      ];
-      
-      for (const key of keysToRemove) {
-        localStorage.removeItem(key);
-      }
-      
-      // Also try to clear the entire localStorage in production
-      if (isProd) {
-        localStorage.clear();
-      }
-    } catch (e) {
-      console.error("Error clearing localStorage:", e);
-    }
-    
-    // 2.2: Clear React Query cache
-    try {
+      // Clear the entire cache first
       queryClient.clear();
+      
+      // Then explicitly set user data to null
       queryClient.setQueryData(["/api/user"], null);
+      
+      // Don't use invalidation as it might trigger refetches
+      // Just remove the query from cache entirely
+      queryClient.removeQueries({ queryKey: ["/api/user"] });
     } catch (e) {
       console.error("Error clearing query cache:", e);
-    }
-    
-    // 2.3: Aggressively clear all cookies
-    try {
-      // Clear using standard technique
-      document.cookie.split(";").forEach(function(c) {
-        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-      });
-      
-      // Production-specific extra cookie clearing
-      if (isProd) {
-        // Try explicit cookie paths (including root)
-        ["watchlist.sid", "connect.sid", "session"].forEach(name => {
-          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/auth`;
-        });
-      }
-    } catch (e) {
-      console.error("Error clearing cookies:", e);
     }
     
     // Update status
@@ -182,32 +150,10 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
       statusElement.textContent = "Contacting server...";
     }
     
-    // STEP 3: Contact the server for logout (but don't wait in production)
-    if (!isProd) {
-      // In development, we can wait for the server response
-      try {
-        const response = await fetch('/api/logout', {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store',
-            'Pragma': 'no-cache'
-          },
-          cache: 'no-store'
-        });
-        
-        if (response.ok) {
-          console.log("Server-side logout successful");
-        } else {
-          console.warn("Server-side logout returned non-200 status");
-        }
-      } catch (err) {
-        console.error("Error during server logout:", err);
-      }
-    } else {
-      // In production, fire and forget to avoid hanging
-      fetch('/api/logout', {
+    // STEP 3: Contact the server for logout (with environment-specific behavior)
+    try {
+      // Always initiate server logout
+      const logoutPromise = fetch('/api/logout', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -216,53 +162,55 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
           'Pragma': 'no-cache'
         },
         cache: 'no-store'
-      }).catch(() => {
-        // Ignore errors in production
       });
+      
+      // Only wait for completion in development
+      if (!isProd) {
+        // In development, we can wait for the server response
+        const response = await logoutPromise;
+        
+        if (response.ok) {
+          console.log("Server-side logout successful");
+        } else {
+          console.warn("Server-side logout returned non-200 status");
+        }
+      }
+    } catch (err) {
+      console.error("Error during server logout:", err);
+      // Continue regardless of error
     }
     
-    // Update status again
+    // Update status for user feedback
     if (statusElement) {
-      statusElement.textContent = "Redirecting...";
+      statusElement.textContent = "Redirecting to login...";
     }
     
-    // STEP 4: PRODUCTION-SPECIFIC LOGOUT APPROACH
-    if (isProd) {
-      // In production, we'll use a more aggressive approach
-
-      // Create an iframe to load the login page
+    // STEP 4: Environment-specific redirects
+    const { authUrl, params, useIframe } = getLogoutConfig();
+    
+    // In production, use the iframe technique for additional reliability
+    if (useIframe) {
+      // Create a hidden iframe to preload the auth page
       const iframe = document.createElement('iframe');
       iframe.style.display = 'none';
-      iframe.src = `/auth?force=true&t=${Date.now()}`;
+      iframe.src = authUrl;
       document.body.appendChild(iframe);
       
-      // After a very brief delay, force page reload with special parameters
+      // Delay redirect slightly to allow iframe to initialize
       setTimeout(() => {
-        window.location.href = `/auth?force=true&t=${Date.now()}&clear=true&hard=true`;
-      }, 500);
+        window.location.href = authUrl;
+      }, 300);
       
       return; // Exit early in production
     }
     
-    // STEP 5: DEV-SPECIFIC APPROACH (more orderly)
-    // Create a timestamp for cache busting
-    const timestamp = Date.now();
-    const authUrl = `/auth?force=true&t=${timestamp}`;
-    
-    // Use form approach which is more reliable
+    // For development, use the more controlled form submission approach
     const form = document.createElement('form');
     form.method = 'GET';
     form.action = '/auth';
     form.style.display = 'none';
     
-    // Add parameters
-    const params = {
-      force: 'true',
-      t: timestamp.toString(),
-      fromLogout: 'true'
-    };
-    
-    // Add all parameters to form
+    // Add all parameters from our environment config
     Object.entries(params).forEach(([key, value]) => {
       const input = document.createElement('input');
       input.type = 'hidden';
@@ -273,12 +221,18 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     
     document.body.appendChild(form);
     
-    // Submit the form
+    // STEP 5: Perform the actual redirect
     try {
+      // Try form submission first (most reliable)
       form.submit();
+      
+      // Fallback: use direct navigation after a short delay
+      setTimeout(() => {
+        window.location.href = authUrl;
+      }, 100);
     } catch (e) {
       console.error("Form submit failed:", e);
-      // Fallback to direct navigation
+      // Direct fallback
       window.location.href = authUrl;
     }
   };

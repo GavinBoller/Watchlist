@@ -15,92 +15,71 @@ export default function AuthPage() {
 
   // IMPROVED LOGOUT HANDLING
   
-  // 1. Check URL parameters for special flags and environment detection
+  // 1. Handle URL parameters with environment-aware behavior
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const isPreload = urlParams.get('preload') === 'true';
-    const fromLogout = urlParams.get('fromLogout') === 'true';
-    const forceFlag = urlParams.get('force') === 'true';
-    const clearFlag = urlParams.get('clear') === 'true';
-    const hardFlag = urlParams.get('hard') === 'true';
-    
-    // Detect if we're in production
-    const isProd = window.location.hostname.includes('replit.app');
-    console.log(`Auth page loaded in ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'} environment`);
-    console.log("URL flags:", { isPreload, fromLogout, forceFlag, clearFlag, hardFlag });
-    
-    if (isPreload) {
-      console.log("Auth page preloaded for faster logout transition");
-      // Just preload assets but don't take any action
-      return;
-    }
-    
-    // Super aggressive state clearing for production environment
-    if (isProd || hardFlag) {
-      console.log("APPLYING MAXIMUM STRENGTH COOKIE AND STATE CLEARING");
+    const loadEnvironmentUtils = async () => {
+      // Import environment utilities dynamically
+      const {
+        isProductionEnvironment,
+        getEnvironmentName,
+        clearAllClientSideStorage
+      } = await import('../lib/environment-utils');
       
-      // 1. Attempt multiple cookie clearing techniques
-      // Standard technique
-      document.cookie.split(";").forEach(function(c) {
-        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-      });
+      // Get URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const isPreload = urlParams.get('preload') === 'true';
+      const fromLogout = urlParams.get('fromLogout') === 'true';
+      const forceFlag = urlParams.get('force') === 'true';
+      const clearFlag = urlParams.get('clear') === 'true';
+      const hardFlag = urlParams.get('hard') === 'true';
       
-      // Explicit cookie removal with multiple paths
-      ["watchlist.sid", "connect.sid", "session"].forEach(name => {
-        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/auth`;
-        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/api`;
-      });
+      // Environment detection
+      const isProd = isProductionEnvironment();
+      console.log(`Auth page loaded in ${getEnvironmentName()} environment`);
+      console.log("URL flags:", { isPreload, fromLogout, forceFlag, clearFlag, hardFlag });
       
-      // 2. Clear all localStorage
-      try {
-        localStorage.clear();
-      } catch (e) {
-        console.error("Error clearing localStorage:", e);
+      // Preload mode - just load assets but take no action
+      if (isPreload) {
+        console.log("Auth page preloaded for faster logout transition");
+        return;
       }
       
-      // 3. Production-specific: Additional logout call in auth page
-      if (isProd && (hardFlag || clearFlag)) {
-        // Make an extra logout call just to be sure
-        console.log("Making additional logout request from auth page");
-        fetch('/api/logout', {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store',
-            'Pragma': 'no-cache'
-          },
-          cache: 'no-store'
-        }).catch(() => {
-          // Ignore errors
-        });
-      }
+      // Determine if we need to clear state
+      const needStateClear = isProd || hardFlag || clearFlag || fromLogout || forceFlag;
       
-      return;
-    }
+      if (needStateClear) {
+        console.log(`Clearing client-side state in ${getEnvironmentName()} environment`);
+        
+        // Use our centralized utility for consistent behavior
+        clearAllClientSideStorage();
+        
+        // Production and hard mode: make an additional server call
+        if ((isProd || hardFlag) && !isPreload) {
+          console.log("Making additional logout request from auth page");
+          try {
+            // Use fire-and-forget pattern to avoid waiting
+            fetch('/api/logout', {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store',
+                'Pragma': 'no-cache'
+              },
+              cache: 'no-store'
+            }).catch(() => {
+              // Ignore errors intentionally
+            });
+          } catch (e) {
+            // Ignore all errors in production mode
+            console.error("Error during additional logout:", e);
+          }
+        }
+      }
+    };
     
-    // Standard cleanup for non-production
-    if (fromLogout || forceFlag) {
-      console.log("Detected navigation from logout process");
-      
-      // Clear any lingering localStorage data to ensure clean slate
-      for (const key of [
-        'movietracker_user', 
-        'movietracker_session_id',
-        'movietracker_enhanced_backup',
-        'movietracker_username',
-        'movietracker_last_verified',
-        'movietracker_session_heartbeat'
-      ]) {
-        localStorage.removeItem(key);
-      }
-      
-      // Force clear cookies
-      document.cookie.split(";").forEach(function(c) {
-        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-      });
-    }
+    // Execute the async function
+    loadEnvironmentUtils();
   }, []);
   
   // 2. Special handler for reloading the page if needed
