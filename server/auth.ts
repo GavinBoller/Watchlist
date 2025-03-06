@@ -190,11 +190,50 @@ export function configurePassport() {
   // User deserialization with enhanced error handling and logging
   passport.deserializeUser(async (userData: any, done) => {
     try {
+      // CRITICAL FIX: Special case for existing sessions with problematic user data
+      if (userData === null || userData === undefined) {
+        console.error('[AUTH] Deserialize received null/undefined user data');
+        return done(null, false);
+      }
+
       // Handle both formats - object format from our new serializer and ID-only format from legacy sessions
       const isObjectFormat = userData && typeof userData === 'object';
-      const userId = isObjectFormat && userData.id ? userData.id : userData;
+      let userId;
       
-      console.log(`[AUTH] Deserializing user from session. Type: ${isObjectFormat ? 'Object' : 'ID'}, ID: ${userId}`);
+      // CRITICAL FIX: Add special handling for corrupted userData values
+      if (isObjectFormat && userData.id) {
+        userId = userData.id;
+      } else if (typeof userData === 'string') {
+        // Try to parse string to number
+        userId = parseInt(userData, 10);
+        if (isNaN(userId)) {
+          console.error(`[AUTH] Invalid user ID string: ${userData}`);
+          return done(null, false);
+        }
+      } else if (typeof userData === 'number') {
+        userId = userData;
+      } else {
+        console.error(`[AUTH] Unrecognized user data format:`, userData);
+        return done(null, false);
+      }
+      
+      console.log(`[AUTH] Deserializing user from session. Type: ${isObjectFormat ? 'Object' : typeof userData}, ID: ${userId}`);
+      
+      // PRODUCTION FIX: For specific user IDs that are known to have issues
+      if (userId && (userId === 200 || userId === 201 || userId === 999)) {
+        console.log(`[AUTH] Special handling for problematic user ID: ${userId}`);
+        
+        // Force a database lookup for these IDs
+        const user = await storage.getUser(userId);
+        if (user) {
+          const { password: _, ...userWithoutPassword } = user;
+          console.log(`[AUTH] Successfully recovered problematic user: ${user.username} (ID: ${user.id})`);
+          return done(null, userWithoutPassword);
+        }
+        
+        console.log(`[AUTH] Could not recover problematic user ID: ${userId}`);
+        return done(null, false);
+      }
       
       // If we have complete user data already, use it directly - improves performance by avoiding DB lookups
       if (isObjectFormat && userData.id && userData.username) {

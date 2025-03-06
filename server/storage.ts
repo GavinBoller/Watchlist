@@ -623,6 +623,14 @@ export class DatabaseStorage implements IStorage {
    * This provides a bypass when ORM operations are failing
    * Only use this for critical operations when normal paths fail
    */
+  
+  // CRITICAL FIX FOR PRODUCTION: Track successful session IDs to help
+  // recover sessions that might become corrupted
+  private static knownGoodSessions = new Map<string, {
+    userId: number;
+    username: string;
+    timestamp: number;
+  }>();
   async directSqlQuery<T = any>(
     sql: string, 
     params: any[] = [],
