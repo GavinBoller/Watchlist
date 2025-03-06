@@ -77,10 +77,102 @@ const WatchlistPage = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchQuery]);
 
-  // Fetch watchlist
+  // Fetch watchlist with enhanced error recovery for production
   const { data: watchlist, isLoading } = useQuery<WatchlistEntryWithMovie[]>({ 
     queryKey: currentUser ? [`/api/watchlist/${currentUser.id}`] : [],
     enabled: !!currentUser,
+    queryFn: async ({ queryKey }) => {
+      if (!currentUser) return [];
+      
+      try {
+        console.log(`Fetching watchlist for user ${currentUser.username} (ID: ${currentUser.id})`);
+        
+        // Add redundant auth headers to help with "user not found" issues
+        const res = await fetch(`/api/watchlist/${currentUser.id}`, {
+          headers: {
+            'X-User-ID': currentUser.id.toString(),
+            'X-Username': currentUser.username,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          },
+          cache: 'no-store'
+        });
+        
+        // Check for recovery headers
+        const recoveryMethod = res.headers.get('X-Recovery-Method');
+        const recoveryStatus = res.headers.get('X-Recovery-Status');
+        
+        if (recoveryMethod) {
+          console.log(`Server used recovery method: ${recoveryMethod}`);
+        }
+        
+        if (recoveryStatus === 'failed') {
+          console.warn('Server recovery failed, using client-side backup if available');
+        }
+        
+        if (!res.ok) {
+          throw new Error(`Failed to fetch watchlist: ${res.status}`);
+        }
+        
+        // Process the response
+        const entries = await res.json();
+        
+        // Create a backup for future recovery
+        if (entries && Array.isArray(entries) && entries.length > 0) {
+          console.log(`Backing up ${entries.length} watchlist entries locally`);
+          try {
+            // Store in session storage for this tab
+            sessionStorage.setItem('watchlist_backup', JSON.stringify({
+              userId: currentUser.id,
+              username: currentUser.username,
+              timestamp: Date.now(),
+              entries: entries
+            }));
+            
+            // Also store in window object for immediate memory access
+            (window as any).__watchlistBackup = {
+              userId: currentUser.id,
+              entries: entries,
+              timestamp: Date.now()
+            };
+          } catch (e) {
+            console.error('Error backing up watchlist data:', e);
+          }
+        }
+        
+        return entries;
+      } catch (error) {
+        console.error('Error fetching watchlist:', error);
+        
+        // Try to recover from backup if available
+        try {
+          // Check window object first (fastest)
+          if ((window as any).__watchlistBackup && 
+              (window as any).__watchlistBackup.userId === currentUser.id) {
+            console.log('Using in-memory watchlist backup');
+            return (window as any).__watchlistBackup.entries;
+          }
+          
+          // Try session storage next
+          const backupJSON = sessionStorage.getItem('watchlist_backup');
+          if (backupJSON) {
+            const backup = JSON.parse(backupJSON);
+            if (backup && backup.userId === currentUser.id && Array.isArray(backup.entries)) {
+              console.log(`Using session storage backup from ${new Date(backup.timestamp).toLocaleString()}`);
+              return backup.entries;
+            }
+          }
+        } catch (backupError) {
+          console.error('Error using backup watchlist:', backupError);
+        }
+        
+        // Return empty array as last resort
+        console.log('No valid backup found, returning empty watchlist');
+        return [];
+      }
+    },
+    refetchOnWindowFocus: true, // Refresh when window regains focus
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Filter and sort watchlist
