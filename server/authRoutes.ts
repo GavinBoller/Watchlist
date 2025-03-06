@@ -324,10 +324,37 @@ router.post('/login', (req: Request, res: Response, next) => {
           
           console.log('[AUTH] Session saved successfully with ID:', req.sessionID);
           
-          // Now that session is saved, respond with success
+          // Make sure we have a consistent response format with a proper user object
+          if (!req.user) {
+            console.error('[AUTH] User object missing after successful login');
+            return res.status(500).json({
+              message: 'Login error: User data missing after authentication',
+              error: 'missing_user_data'
+            });
+          }
+          
+          // Ensure the user object has the required properties
+          const userData = req.user as UserResponse;
+          
+          // Verify the user object integrity
+          if (!userData.id || !userData.username) {
+            console.error('[AUTH] Malformed user object after login:', userData);
+            return res.status(500).json({
+              message: 'Login error: Invalid user data',
+              error: 'invalid_user_data'
+            });
+          }
+          
+          // Now that session is saved, respond with success and a properly structured user object
           return res.json({
+            success: true,
             message: 'Login successful',
-            user: req.user,
+            user: {
+              id: userData.id,
+              username: userData.username,
+              displayName: userData.displayName || userData.username,
+              createdAt: userData.createdAt
+            },
             sessionId: req.sessionID // Include session ID for debugging
           });
         });

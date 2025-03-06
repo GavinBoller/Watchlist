@@ -33,20 +33,55 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword
       return;
     }
     
-    loginMutation.mutate(
-      { username, password },
-      {
-        onSuccess: (user) => {
-          onLoginSuccess(user);
-          // Redirect to home page after successful login
-          setLocation("/");
-        },
-        onError: (error: Error) => {
-          // Error handling is already done in the mutation
-          console.error("Login error:", error);
+    try {
+      toast({
+        title: "Logging in",
+        description: "Checking your credentials...",
+      });
+      
+      loginMutation.mutate(
+        { username, password },
+        {
+          onSuccess: (user) => {
+            // Check if we have a valid user object before proceeding
+            if (!user || !user.id || !user.username) {
+              console.error("Invalid user data received:", user);
+              toast({
+                title: "Login error",
+                description: "Received invalid user data from server",
+                variant: "destructive",
+              });
+              return;
+            }
+            
+            console.log("Login successful, user data:", user);
+            toast({
+              title: "Welcome back!",
+              description: `You've successfully logged in as ${user.username}`,
+            });
+            
+            onLoginSuccess(user);
+            // Redirect to home page after successful login
+            setLocation("/");
+          },
+          onError: (error: Error) => {
+            console.error("Login error:", error);
+            toast({
+              title: "Login failed",
+              description: error.message || "There was a problem logging in. Please try again.",
+              variant: "destructive",
+            });
+          }
         }
-      }
-    );
+      );
+    } catch (error) {
+      console.error("Unexpected error during login:", error);
+      toast({
+        title: "Login error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const isLoading = loginMutation.isPending;
