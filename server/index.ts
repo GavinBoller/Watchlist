@@ -501,6 +501,10 @@ async function startServer() {
     // Initialize the session store
     await setupSessionStore();
     
+    // Add JWT authentication middleware early in the chain
+    // This will attempt to authenticate based on JWT token
+    app.use(jwtAuthenticate);
+    
     // In production, we need to ensure cookies work with HTTPS
     if (process.env.NODE_ENV === 'production') {
       console.log('Production environment detected - configuring secure session cookies');
@@ -608,6 +612,9 @@ async function startServer() {
     
     // Register auth routes after passport setup and schema changes
     app.use('/api', authRoutes);
+    
+    // Register JWT authentication routes
+    app.use('/api', jwtAuthRouter);
     
     // Register emergency recovery endpoints for production
     // These provide special recovery mechanisms for user accounts that

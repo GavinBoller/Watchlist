@@ -1,7 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { extractTokenFromHeader, verifyToken } from './jwtAuth';
-import { User } from '@shared/schema';
+import { User, UserResponse } from '@shared/schema';
 import { storage } from './storage';
+
+// Extend Express Request type to include user
+declare global {
+  namespace Express {
+    interface User extends UserResponse {}
+  }
+}
 
 /**
  * JWT Authentication middleware
@@ -46,7 +53,7 @@ export async function jwtAuthenticate(req: Request, res: Response, next: NextFun
  * Middleware to check if user is authenticated via JWT
  * This is an alternative to the passport isAuthenticated middleware
  */
-export function isJwtAuthenticated(req: Request, res: Response, next: NextFunction): void {
+export function isJwtAuthenticated(req: Request, res: Response, next: NextFunction): Response | void {
   if (req.user) {
     return next();
   }
@@ -61,14 +68,14 @@ export function isJwtAuthenticated(req: Request, res: Response, next: NextFuncti
     }
   }
   
-  res.status(401).json({ error: 'Unauthorized: Authentication required' });
+  return res.status(401).json({ error: 'Unauthorized: Authentication required' });
 }
 
 /**
  * Middleware to check if user has access to watchlist
  * Similar to the existing hasWatchlistAccess but for JWT
  */
-export function hasJwtWatchlistAccess(req: Request, res: Response, next: NextFunction): void {
+export function hasJwtWatchlistAccess(req: Request, res: Response, next: NextFunction): Response | void {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized: Authentication required' });
   }
@@ -79,9 +86,9 @@ export function hasJwtWatchlistAccess(req: Request, res: Response, next: NextFun
   }
   
   // Allow access if the user is accessing their own watchlist
-  if (req.user.id === userId) {
+  if (req.user && 'id' in req.user && req.user.id === userId) {
     return next();
   }
   
-  res.status(403).json({ error: 'Forbidden: Cannot access another user\'s watchlist' });
+  return res.status(403).json({ error: 'Forbidden: Cannot access another user\'s watchlist' });
 }
