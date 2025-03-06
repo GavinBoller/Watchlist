@@ -615,8 +615,28 @@ export class MemStorage implements IStorage {
 
 import { executeDirectSql } from './db';
 
+
 // DatabaseStorage implementation for PostgreSQL
 export class DatabaseStorage implements IStorage {
+  /**
+   * Direct SQL query method for emergency operations
+   * This provides a bypass when ORM operations are failing
+   * Only use this for critical operations when normal paths fail
+   */
+  async directSqlQuery<T = any>(
+    sql: string, 
+    params: any[] = [],
+    errorMessage: string = 'Emergency SQL query failed'
+  ): Promise<T[]> {
+    try {
+      console.log(`[STORAGE] Executing emergency direct SQL query: ${sql.substring(0, 100)}...`);
+      return await executeDirectSql<T>(sql, params, errorMessage);
+    } catch (sqlError) {
+      console.error(`[STORAGE] Emergency SQL query failed:`, sqlError);
+      throw sqlError;
+    }
+  }
+
   /**
    * Helper method to determine if we should use direct SQL as fallback
    * This is useful when ORM operations may fail due to connection issues
