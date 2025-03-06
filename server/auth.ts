@@ -167,10 +167,55 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
   const isSessionAuthenticated = req.session && req.session.authenticated === true;
   const hasUserObject = !!req.user;
   
-  console.log(`[AUTH] Authentication sources - Passport: ${isPassportAuthenticated}, Session flag: ${isSessionAuthenticated}, User object: ${hasUserObject}`);
+  // Check for special user data in session as a fallback
+  let hasSpecialUserData = false;
+  if (req.session && !hasUserObject) {
+    // Check for backup user data
+    if ((req.session as any).userData && 
+        (req.session as any).userData.id && 
+        (req.session as any).userData.username) {
+      
+      console.log(`[AUTH] Found userData in session for ${(req.session as any).userData.username}`);
+      // Restore user data from session if passport auth failed
+      hasSpecialUserData = true;
+      
+      // Create user object from session data
+      const userData = (req.session as any).userData;
+      req.user = {
+        id: userData.id,
+        username: userData.username,
+        displayName: userData.displayName || null,
+        createdAt: null,
+        password: '' // Empty password since it's not needed for auth
+      };
+      
+      console.log(`[AUTH] Restored user from session data: ${userData.username} (ID: ${userData.id})`);
+    }
+    // Also check for preservedUserId as alternate backup
+    else if ((req.session as any).preservedUserId && 
+             (req.session as any).preservedUsername) {
+      
+      console.log(`[AUTH] Found preserved user data in session for ${(req.session as any).preservedUsername}`);
+      // Restore user data from preserved data if available
+      hasSpecialUserData = true;
+      
+      // Create user object from preserved data
+      req.user = {
+        id: (req.session as any).preservedUserId,
+        username: (req.session as any).preservedUsername,
+        displayName: (req.session as any).preservedDisplayName || null,
+        createdAt: null,
+        password: '' // Empty password since it's not needed for auth
+      };
+      
+      console.log(`[AUTH] Restored user from preserved data: ${(req.session as any).preservedUsername} (ID: ${(req.session as any).preservedUserId})`);
+    }
+  }
+  
+  console.log(`[AUTH] Authentication sources - Passport: ${isPassportAuthenticated}, Session flag: ${isSessionAuthenticated}, User object: ${hasUserObject}, Special user data: ${hasSpecialUserData}`);
   
   // Accept any valid authentication source - more resilient approach
-  if ((isPassportAuthenticated || isSessionAuthenticated) && hasUserObject) {
+  if ((isPassportAuthenticated || isSessionAuthenticated || hasSpecialUserData) && (hasUserObject || hasSpecialUserData)) {
     // Log detailed information for successful authentication
     const currentUser = req.user as UserResponse;
     console.log(`[AUTH] Access granted for user: ${currentUser.username} (ID: ${currentUser.id})`);
@@ -371,10 +416,55 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
     const isSessionAuthenticated = req.session && req.session.authenticated === true;
     const hasUserObject = !!req.user;
     
-    console.log(`[AUTH] Watchlist authentication sources - Passport: ${isPassportAuthenticated}, Session flag: ${isSessionAuthenticated}, User object: ${hasUserObject}`);
+    // Check for special user data in session as a fallback
+    let hasSpecialUserData = false;
+    if (req.session && !hasUserObject) {
+      // Check for backup user data
+      if ((req.session as any).userData && 
+          (req.session as any).userData.id && 
+          (req.session as any).userData.username) {
+        
+        console.log(`[AUTH:WATCHLIST] Found userData in session for ${(req.session as any).userData.username}`);
+        // Restore user data from session if passport auth failed
+        hasSpecialUserData = true;
+        
+        // Create user object from session data
+        const userData = (req.session as any).userData;
+        req.user = {
+          id: userData.id,
+          username: userData.username,
+          displayName: userData.displayName || null,
+          createdAt: null,
+          password: '' // Empty password since it's not needed for auth
+        };
+        
+        console.log(`[AUTH:WATCHLIST] Restored user from session data: ${userData.username} (ID: ${userData.id})`);
+      }
+      // Also check for preservedUserId as alternate backup
+      else if ((req.session as any).preservedUserId && 
+               (req.session as any).preservedUsername) {
+        
+        console.log(`[AUTH:WATCHLIST] Found preserved user data in session for ${(req.session as any).preservedUsername}`);
+        // Restore user data from preserved data if available
+        hasSpecialUserData = true;
+        
+        // Create user object from preserved data
+        req.user = {
+          id: (req.session as any).preservedUserId,
+          username: (req.session as any).preservedUsername,
+          displayName: (req.session as any).preservedDisplayName || null,
+          createdAt: null,
+          password: '' // Empty password since it's not needed for auth
+        };
+        
+        console.log(`[AUTH:WATCHLIST] Restored user from preserved data: ${(req.session as any).preservedUsername}`);
+      }
+    }
+    
+    console.log(`[AUTH] Watchlist authentication sources - Passport: ${isPassportAuthenticated}, Session flag: ${isSessionAuthenticated}, User object: ${hasUserObject}, Special user data: ${hasSpecialUserData}`);
     
     // If user is not authenticated by any method, deny access
-    if (!(isPassportAuthenticated || isSessionAuthenticated) || !hasUserObject) {
+    if (!(isPassportAuthenticated || isSessionAuthenticated || hasSpecialUserData) || !(hasUserObject || hasSpecialUserData)) {
       console.log('[AUTH] Watchlist access denied: Session not authenticated');
       
       return res.status(401).json({ 

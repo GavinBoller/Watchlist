@@ -531,8 +531,8 @@ async function startServer() {
     
     app.use(session({
       secret: SESSION_SECRET,
-      resave: false, // Don't save session if unmodified
-      saveUninitialized: true, // Changed to true to ensure session cookie is always created
+      resave: true, // Changed to true to ensure session is always saved
+      saveUninitialized: true, // Ensure session cookie is always created
       store: sessionStore,
       proxy: isProd, // Only trust proxies in production
       rolling: true, // Reset expiration countdown on every response
@@ -552,7 +552,7 @@ async function startServer() {
       cookie: {
         httpOnly: true,
         // Use secure attribute only in production (needed for HTTPS)
-        secure: isProd,
+        secure: isProd, 
         // Set a shorter but reasonable session timeout (7 days instead of 30)
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         // Use 'lax' for better security while still allowing redirects
