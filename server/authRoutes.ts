@@ -75,6 +75,81 @@ router.post('/login', (req: Request, res: Response, next) => {
     });
   }
   
+  // CRITICAL PRODUCTION FIX: Use simpler, more reliable auth for all users
+  if (isProd) {
+    const { username, password } = req.body;
+    console.log(`[LOGIN] Production direct login attempt for: ${username}`);
+    
+    // Use direct database user lookup
+    storage.getUserByUsername(username)
+      .then(async user => {
+        if (!user) {
+          console.log(`[LOGIN] Production login failed: User not found ${username}`);
+          return res.status(401).json({ message: 'Invalid credentials' });
+        }
+        
+        console.log(`[LOGIN] Production found user: ${user.username} (ID: ${user.id})`);
+        
+        // Compare password directly for more reliable authentication
+        try {
+          const isMatch = await bcrypt.compare(password, user.password);
+          
+          if (!isMatch) {
+            console.log(`[LOGIN] Production login failed: Password mismatch for ${username}`);
+            return res.status(401).json({ message: 'Invalid credentials' });
+          }
+          
+          console.log(`[LOGIN] Production login successful: ${username}`);
+          
+          // Create sanitized user object for the session
+          const { password: _, ...userWithoutPassword } = user;
+          
+          // Use simpler login process
+          req.login(userWithoutPassword, (loginErr) => {
+            if (loginErr) {
+              console.error(`[LOGIN] Production login error:`, loginErr);
+              return res.status(500).json({ message: 'Login failed' });
+            }
+            
+            // Add comprehensive session flags for robustness
+            if (req.session) {
+              req.session.authenticated = true;
+              req.session.createdAt = Date.now();
+              req.session.lastChecked = Date.now();
+              
+              // Extra session data for production
+              (req.session as any).userAuthenticated = true;
+              (req.session as any).preservedUsername = user.username;
+              (req.session as any).preservedUserId = user.id;
+              
+              // Force session save to ensure persistence
+              req.session.save((saveErr) => {
+                if (saveErr) {
+                  console.error(`[LOGIN] Production session save error:`, saveErr);
+                }
+                
+                // Send response even if save has errors
+                return res.status(200).json(userWithoutPassword);
+              });
+            } else {
+              // Fallback if no session - still allow login
+              return res.status(200).json(userWithoutPassword);
+            }
+          });
+        } catch (bcryptError) {
+          console.error(`[LOGIN] Production bcrypt error:`, bcryptError);
+          return res.status(500).json({ message: 'Authentication error' });
+        }
+      })
+      .catch(dbError => {
+        console.error(`[LOGIN] Production database error:`, dbError);
+        return res.status(500).json({ message: 'Server error during login' });
+      });
+      
+    // Important: Return here to prevent executing the standard authentication flow
+    return;
+  }
+  
   // Check if emergency mode is active for severe database outages
   if (isProd && isEmergencyModeActive()) {
     const { username, password } = req.body;

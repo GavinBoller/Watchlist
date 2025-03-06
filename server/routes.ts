@@ -482,6 +482,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/watchlist", isAuthenticated, hasWatchlistAccess, async (req: Request, res: Response) => {
     console.log("POST /api/watchlist - Request body:", JSON.stringify(req.body, null, 2));
+    
+    // CRITICAL PRODUCTION FIX: Direct access for watchlist operations with minimal dependencies
+    if (process.env.NODE_ENV === 'production') {
+      try {
+        // Always use the authenticated user's ID from request object
+        const authUser = req.user as any;
+        if (!authUser || !authUser.id) {
+          console.error("CRITICAL: No authenticated user for watchlist operation");
+          return res.status(401).json({ 
+            message: "Authentication required",
+            details: "Please log in again" 
+          });
+        }
+        
+        const userId = authUser.id;
+        console.log(`PRODUCTION WATCHLIST FIX: Using authenticated user ID: ${userId}`);
+        
+        // Extract movie data - ensure this exists
+        const { tmdbMovie } = req.body;
+        if (!tmdbMovie || !tmdbMovie.id) {
+          console.error("CRITICAL: Missing or invalid movie data in request");
+          return res.status(400).json({ 
+            message: "Invalid request",
+            details: "Movie data is required" 
+          });
+        }
+        
+        // Simplify watchlist entry creation to reduce complexity
+        // 1. Check if movie exists in database
+        console.log(`PRODUCTION WATCHLIST: Checking if movie exists - TMDB ID: ${tmdbMovie.id}`);
+        let movie = await storage.getMovieByTmdbId(tmdbMovie.id);
+        
+        // 2. If not, create it with direct SQL to avoid ORM issues
+        if (!movie) {
+          console.log(`PRODUCTION WATCHLIST: Movie not found, creating new record`);
+          
+          // Simple movie data with essential fields
+          const movieData = {
+            tmdbId: tmdbMovie.id,
+            title: tmdbMovie.title || tmdbMovie.name || "Unknown Title",
+            overview: tmdbMovie.overview || "",
+            posterPath: tmdbMovie.poster_path || null,
+            backdropPath: tmdbMovie.backdrop_path || null,
+            releaseDate: tmdbMovie.release_date || tmdbMovie.first_air_date || null,
+            voteAverage: (tmdbMovie.vote_average || 0).toString(),
+            genres: "",
+            mediaType: tmdbMovie.media_type || "movie"
+          };
+          
+          // Create the movie record
+          try {
+            movie = await storage.createMovie(movieData);
+            console.log(`PRODUCTION WATCHLIST: Created movie with ID: ${movie.id}`);
+          } catch (movieError) {
+            console.error("PRODUCTION WATCHLIST: Movie creation error:", movieError);
+            
+            // One final attempt to fetch the movie in case of race condition
+            const retryMovie = await storage.getMovieByTmdbId(tmdbMovie.id);
+            if (retryMovie) {
+              movie = retryMovie;
+              console.log(`PRODUCTION WATCHLIST: Found movie in second attempt with ID: ${movie.id}`);
+            } else {
+              throw new Error("Failed to create or find movie record");
+            }
+          }
+        }
+        
+        // 3. Check if watchlist entry already exists to avoid duplicates
+        console.log(`PRODUCTION WATCHLIST: Checking if watchlist entry exists - User: ${userId}, Movie: ${movie.id}`);
+        const existingEntry = await storage.hasWatchlistEntry(userId, movie.id);
+        
+        if (existingEntry) {
+          console.log(`PRODUCTION WATCHLIST: Entry already exists for user ${userId} and movie ${movie.id}`);
+          return res.status(200).json({ 
+            message: "Already in watchlist",
+            details: `You've already added "${movie.title}" to your watchlist`
+          });
+        }
+        
+        // 4. Create the watchlist entry with simplified data
+        console.log(`PRODUCTION WATCHLIST: Creating watchlist entry - User: ${userId}, Movie: ${movie.id}`);
+        const watchlistData = {
+          userId: userId,
+          movieId: movie.id,
+          status: req.body.status || 'to_watch',
+          notes: req.body.notes || null,
+          watchedDate: req.body.watchedDate || null
+        };
+        
+        const watchlistEntry = await storage.createWatchlistEntry(watchlistData);
+        console.log(`PRODUCTION WATCHLIST: Created watchlist entry with ID: ${watchlistEntry.id}`);
+        
+        // 5. Return success response with entry and movie details
+        const entryWithMovie = {
+          ...watchlistEntry,
+          movie
+        };
+        
+        return res.status(201).json(entryWithMovie);
+      } catch (error) {
+        console.error("PRODUCTION WATCHLIST ERROR:", error);
+        return res.status(500).json({
+          message: "Failed to add movie to watchlist",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    }
     console.log("Environment:", process.env.NODE_ENV || 'development');
     
     // Add custom headers for debugging
