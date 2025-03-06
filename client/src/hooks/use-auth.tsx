@@ -193,14 +193,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logoutMutation = useMutation({
     mutationFn: async () => {
       try {
-        // Check for auto-logout pattern to prevent unwanted logouts
-        if (detectAutoLogoutPattern()) {
-          console.log("Prevented auto-logout! This appears to be an automatic/unwanted logout.");
-          return { 
-            autoLogoutPrevented: true,
-            success: false, 
-            clientSideOnly: true 
-          };
+        // Remove all local storage keys related to session
+        try {
+          localStorage.removeItem('movietracker_user');
+          localStorage.removeItem('movietracker_session_id');
+          localStorage.removeItem('movietracker_enhanced_backup');
+          localStorage.removeItem('movietracker_username');
+          localStorage.removeItem('movietracker_last_verified');
+          localStorage.removeItem('movietracker_session_heartbeat');
+          console.log("Cleared all local session data");
+        } catch (e) {
+          console.error("Error clearing local storage:", e);
         }
         
         const res = await apiRequest("POST", "/api/logout");
@@ -214,11 +217,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: () => {
+      // Clear all auth-related cache
       queryClient.setQueryData(["/api/user"], null);
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/session"] });
+      
+      // Show success toast
       toast({
         title: "Logged out",
         description: "You've been logged out successfully",
       });
+      
+      // Force redirect to auth page
+      window.location.href = '/auth';
     },
     onError: (error: Error) => {
       toast({
