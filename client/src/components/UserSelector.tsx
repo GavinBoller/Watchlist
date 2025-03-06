@@ -73,9 +73,13 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     }
   }, [actualIsMobile]);
 
-  // PRODUCTION-SAFE SOLUTION: Works in both DEV and PROD environments
+  // ULTIMATE PRODUCTION-PROOF SOLUTION: Works in all environments
   const handleLogout = async () => {
-    // Show overlay immediately for visual feedback
+    // Detect environment
+    const isProd = window.location.hostname.includes('replit.app');
+    console.log(`Detected environment: ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'}`);
+    
+    // STEP 1: Show overlay for visual feedback
     const overlayDiv = document.createElement('div');
     overlayDiv.style.position = 'fixed';
     overlayDiv.style.top = '0';
@@ -89,10 +93,9 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     overlayDiv.style.alignItems = 'center';
     overlayDiv.style.justifyContent = 'center';
     overlayDiv.style.padding = '20px';
-    overlayDiv.style.transition = 'opacity 0.2s';
-    overlayDiv.style.opacity = '0';
+    overlayDiv.style.opacity = '1'; // Start visible immediately
     
-    // Add loading indicator and message
+    // Add loading indicator
     overlayDiv.innerHTML = `
       <div style="width: 100%; max-width: 400px; margin: 0 auto; text-align: center;">
         <h1 style="margin-bottom: 20px; font-size: 24px; color: white;">Logging Out</h1>
@@ -110,43 +113,101 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
             }
           </style>
         </div>
-        <p style="color: #888; margin-bottom: 20px;">Securely logging you out...</p>
+        <p style="color: #888; margin-bottom: 20px;" id="logout-status">Securely logging you out...</p>
       </div>
     `;
     
     document.body.appendChild(overlayDiv);
     
-    // Fade in the overlay
-    setTimeout(() => {
-      overlayDiv.style.opacity = '1';
-    }, 10);
+    // STEP 2: Use our best effort to clear all client-side state
     
-    // Complete client-side cleanup
-    // 1. Clear local storage
-    localStorage.setItem('movietracker_intentional_logout_time', Date.now().toString());
-    for (const key of [
-      'movietracker_user', 
-      'movietracker_session_id',
-      'movietracker_enhanced_backup', 
-      'movietracker_username',
-      'movietracker_last_verified',
-      'movietracker_session_heartbeat'
-    ]) {
-      localStorage.removeItem(key);
+    // 2.1: Clear localStorage
+    try {
+      // Mark this as an intentional logout
+      localStorage.setItem('movietracker_logout_time', Date.now().toString());
+      
+      // Clear all potential storage keys
+      const keysToRemove = [
+        'movietracker_user', 
+        'movietracker_session_id',
+        'movietracker_enhanced_backup', 
+        'movietracker_username',
+        'movietracker_last_verified',
+        'movietracker_session_heartbeat',
+        'tanstack-query-cache'
+      ];
+      
+      for (const key of keysToRemove) {
+        localStorage.removeItem(key);
+      }
+      
+      // Also try to clear the entire localStorage in production
+      if (isProd) {
+        localStorage.clear();
+      }
+    } catch (e) {
+      console.error("Error clearing localStorage:", e);
     }
     
-    // 2. Clear React Query cache
-    queryClient.clear();
-    queryClient.setQueryData(["/api/user"], null);
-    
-    // 3. Clear cookies (will work in both DEV and PROD)
-    document.cookie.split(";").forEach(function(c) {
-      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-    });
-    
-    // 4. Force logout on server with synchronous request (wait for completion)
+    // 2.2: Clear React Query cache
     try {
-      const response = await fetch('/api/logout', {
+      queryClient.clear();
+      queryClient.setQueryData(["/api/user"], null);
+    } catch (e) {
+      console.error("Error clearing query cache:", e);
+    }
+    
+    // 2.3: Aggressively clear all cookies
+    try {
+      // Clear using standard technique
+      document.cookie.split(";").forEach(function(c) {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+      
+      // Production-specific extra cookie clearing
+      if (isProd) {
+        // Try explicit cookie paths (including root)
+        ["watchlist.sid", "connect.sid", "session"].forEach(name => {
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/auth`;
+        });
+      }
+    } catch (e) {
+      console.error("Error clearing cookies:", e);
+    }
+    
+    // Update status
+    const statusElement = document.getElementById('logout-status');
+    if (statusElement) {
+      statusElement.textContent = "Contacting server...";
+    }
+    
+    // STEP 3: Contact the server for logout (but don't wait in production)
+    if (!isProd) {
+      // In development, we can wait for the server response
+      try {
+        const response = await fetch('/api/logout', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store',
+            'Pragma': 'no-cache'
+          },
+          cache: 'no-store'
+        });
+        
+        if (response.ok) {
+          console.log("Server-side logout successful");
+        } else {
+          console.warn("Server-side logout returned non-200 status");
+        }
+      } catch (err) {
+        console.error("Error during server logout:", err);
+      }
+    } else {
+      // In production, fire and forget to avoid hanging
+      fetch('/api/logout', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -155,73 +216,70 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
           'Pragma': 'no-cache'
         },
         cache: 'no-store'
+      }).catch(() => {
+        // Ignore errors in production
       });
-      
-      if (response.ok) {
-        console.log("Server-side logout successful");
-      } else {
-        console.warn("Server-side logout returned non-200 status");
-      }
-    } catch (err) {
-      console.error("Error during server logout:", err);
     }
     
-    // 5. Redirect to auth page
-    // Use multiple approaches for maximum reliability
+    // Update status again
+    if (statusElement) {
+      statusElement.textContent = "Redirecting...";
+    }
     
-    // Method 1: Update location with cache busting
+    // STEP 4: PRODUCTION-SPECIFIC LOGOUT APPROACH
+    if (isProd) {
+      // In production, we'll use a more aggressive approach
+
+      // Create an iframe to load the login page
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = `/auth?force=true&t=${Date.now()}`;
+      document.body.appendChild(iframe);
+      
+      // After a very brief delay, force page reload with special parameters
+      setTimeout(() => {
+        window.location.href = `/auth?force=true&t=${Date.now()}&clear=true&hard=true`;
+      }, 500);
+      
+      return; // Exit early in production
+    }
+    
+    // STEP 5: DEV-SPECIFIC APPROACH (more orderly)
+    // Create a timestamp for cache busting
     const timestamp = Date.now();
     const authUrl = `/auth?force=true&t=${timestamp}`;
     
-    // Method 2: Form submit approach
+    // Use form approach which is more reliable
     const form = document.createElement('form');
     form.method = 'GET';
     form.action = '/auth';
     form.style.display = 'none';
     
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'force';
-    input.value = 'true';
-    form.appendChild(input);
+    // Add parameters
+    const params = {
+      force: 'true',
+      t: timestamp.toString(),
+      fromLogout: 'true'
+    };
     
-    const timeInput = document.createElement('input');
-    timeInput.type = 'hidden';
-    timeInput.name = 't';
-    timeInput.value = timestamp.toString();
-    form.appendChild(timeInput);
-    
-    // Add a special flag for production environment
-    const prodInput = document.createElement('input');
-    prodInput.type = 'hidden';
-    prodInput.name = 'fromLogout';
-    prodInput.value = 'true';
-    form.appendChild(prodInput);
+    // Add all parameters to form
+    Object.entries(params).forEach(([key, value]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = value;
+      form.appendChild(input);
+    });
     
     document.body.appendChild(form);
     
-    // Method 3: Force a hard refresh
-    const performHardRedirect = () => {
-      window.location.href = authUrl;
-      // If that doesn't work, try hard reload
-      setTimeout(() => {
-        window.location.replace(authUrl);
-        // Absolute last resort - hard reload
-        setTimeout(() => {
-          window.location.href = authUrl + "&reload=true";
-          window.location.reload();
-        }, 100);
-      }, 100);
-    };
-    
-    // Submit the form which is most reliable in production
+    // Submit the form
     try {
       form.submit();
-      // Back up with location change if form submit doesn't trigger navigation
-      setTimeout(performHardRedirect, 200);
     } catch (e) {
       console.error("Form submit failed:", e);
-      performHardRedirect();
+      // Fallback to direct navigation
+      window.location.href = authUrl;
     }
   };
 

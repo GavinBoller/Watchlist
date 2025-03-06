@@ -15,12 +15,19 @@ export default function AuthPage() {
 
   // IMPROVED LOGOUT HANDLING
   
-  // 1. Check URL parameters for special flags
+  // 1. Check URL parameters for special flags and environment detection
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const isPreload = urlParams.get('preload') === 'true';
     const fromLogout = urlParams.get('fromLogout') === 'true';
     const forceFlag = urlParams.get('force') === 'true';
+    const clearFlag = urlParams.get('clear') === 'true';
+    const hardFlag = urlParams.get('hard') === 'true';
+    
+    // Detect if we're in production
+    const isProd = window.location.hostname.includes('replit.app');
+    console.log(`Auth page loaded in ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'} environment`);
+    console.log("URL flags:", { isPreload, fromLogout, forceFlag, clearFlag, hardFlag });
     
     if (isPreload) {
       console.log("Auth page preloaded for faster logout transition");
@@ -28,6 +35,52 @@ export default function AuthPage() {
       return;
     }
     
+    // Super aggressive state clearing for production environment
+    if (isProd || hardFlag) {
+      console.log("APPLYING MAXIMUM STRENGTH COOKIE AND STATE CLEARING");
+      
+      // 1. Attempt multiple cookie clearing techniques
+      // Standard technique
+      document.cookie.split(";").forEach(function(c) {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+      
+      // Explicit cookie removal with multiple paths
+      ["watchlist.sid", "connect.sid", "session"].forEach(name => {
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/auth`;
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/api`;
+      });
+      
+      // 2. Clear all localStorage
+      try {
+        localStorage.clear();
+      } catch (e) {
+        console.error("Error clearing localStorage:", e);
+      }
+      
+      // 3. Production-specific: Additional logout call in auth page
+      if (isProd && (hardFlag || clearFlag)) {
+        // Make an extra logout call just to be sure
+        console.log("Making additional logout request from auth page");
+        fetch('/api/logout', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store',
+            'Pragma': 'no-cache'
+          },
+          cache: 'no-store'
+        }).catch(() => {
+          // Ignore errors
+        });
+      }
+      
+      return;
+    }
+    
+    // Standard cleanup for non-production
     if (fromLogout || forceFlag) {
       console.log("Detected navigation from logout process");
       
@@ -43,7 +96,7 @@ export default function AuthPage() {
         localStorage.removeItem(key);
       }
       
-      // Force clear cookies (helps in production environment)
+      // Force clear cookies
       document.cookie.split(";").forEach(function(c) {
         document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
       });
