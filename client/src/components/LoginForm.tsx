@@ -34,6 +34,13 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword
     }
     
     try {
+      // Add detailed debug info about login attempt
+      console.log("[AUTH TEST] Attempting login for test user:", username);
+      console.log("[AUTH TEST] This login will try multiple pathways if needed:");
+      console.log("[AUTH TEST] 1. Standard login via /api/login");
+      console.log("[AUTH TEST] 2. Emergency login via /api/auth/emergency-login");
+      console.log("[AUTH TEST] 3. Secondary emergency login via /api/emergency/watchlist/login");
+      
       toast({
         title: "Logging in",
         description: "Checking your credentials...",
@@ -54,10 +61,16 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword
               return;
             }
             
-            console.log("Login successful, user data:", user);
+            console.log("[AUTH TEST] Login successful, user data:", user);
+            
+            // Check if this was an emergency login
+            const emergencyMode = (user as any).emergencyMode;
+            
             toast({
               title: "Welcome back!",
-              description: `You've successfully logged in as ${user.username}`,
+              description: emergencyMode ? 
+                `Connected using emergency pathway` : 
+                `You've successfully logged in as ${user.username}`,
             });
             
             onLoginSuccess(user);
@@ -65,7 +78,8 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword
             setLocation("/");
           },
           onError: (error: Error) => {
-            console.error("Login error:", error);
+            console.error("[AUTH TEST] Login error:", error);
+            console.error("[AUTH TEST] All login pathways failed for user:", username);
             toast({
               title: "Login failed",
               description: error.message || "There was a problem logging in. Please try again.",
