@@ -416,52 +416,53 @@ router.post('/logout', (req: Request, res: Response) => {
       return res.status(500).json({ message: 'Error during logout process' });
     }
     
-    // Destroy session with error handling
-    if (req.session) {
-      req.session.destroy((sessionErr) => {
-        if (sessionErr) {
-          console.error('Error destroying session:', sessionErr);
-          return res.status(500).json({ message: 'Error clearing session' });
-        }
-        
-        // Clear ALL potential cookies to ensure clean logout
-        try {
-          // Clear the main session cookie with proper configuration
-          res.clearCookie(cookieName, {
-            path: '/',
-            httpOnly: true,
-            secure: isProd,
-            sameSite: 'lax'
-          });
-          
-          // Also clear legacy cookie names to prevent issues
-          res.clearCookie('connect.sid', {
-            path: '/',
-            httpOnly: true,
-            secure: isProd,
-            sameSite: 'lax'
-          });
-          
-          // Force-clear all potential cookie variations to ensure complete logout
-          // This addresses issues with inconsistent cookie naming between environments
-          res.setHeader('Set-Cookie', [
-            `watchlist.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
-            `connect.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
-            // Also clear legacy cookie names for complete cleanup
-            `watchapp.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
-          ]);
-        } catch (cookieErr) {
-          console.error('Error clearing cookies:', cookieErr);
-          // Continue despite cookie error
-        }
-        
-        return res.json({ 
-          message: 'Logout successful',
-          emergencyMode: emergencyMode || undefined,
-          time: new Date().toISOString() // Add timestamp for debugging
-        });
-      });
-    } else {
+    // OPTIMIZATION: First clear cookies and respond immediately before session cleanup
+  // This allows the client to continue without waiting for session destruction
+  try {
+    // Clear all cookies immediately
+    res.clearCookie(cookieName, {
+      path: '/',
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax'
+    });
+    
+    res.clearCookie('connect.sid', {
+      path: '/',
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax'
+    });
+    
+    // Force-clear all potential cookie variations to ensure complete logout
+    res.setHeader('Set-Cookie', [
+      `watchlist.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
+      `connect.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
+      `watchapp.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; ${isProd ? 'Secure; ' : ''}SameSite=Lax`,
+    ]);
+  } catch (cookieErr) {
+    console.error('Error clearing cookies:', cookieErr);
+    // Continue despite cookie error
+  }
+  
+  // Send response immediately - don't wait for session destruction
+  res.json({ 
+    message: 'Logout successful',
+    emergencyMode: emergencyMode || undefined,
+    time: new Date().toISOString(),
+    immediate: true
+  });
+  
+  // THEN destroy the session in the background (after response is sent)
+  if (req.session) {
+    req.session.destroy((sessionErr) => {
+      if (sessionErr) {
+        console.error('Background session destruction error:', sessionErr);
+      } else {
+        console.log('Background session destruction completed successfully');
+      }
+    });
+  } else {
       // If session is already gone, just clear cookies and return
       try {
         // Clear all potential cookies

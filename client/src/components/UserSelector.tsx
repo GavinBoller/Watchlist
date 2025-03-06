@@ -73,20 +73,38 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     }
   }, [actualIsMobile]);
 
-  // Handle logout
-  const handleLogout = async () => {
-    try {
-      // Use our new auth system for logout
-      await logoutMutation.mutateAsync();
-      setSheetOpen(false);
-      // Toast is handled by the mutation itself
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to log out",
-        variant: "destructive",
-      });
-    }
+  // Direct hard logout for immediate effect without waiting
+  const handleLogout = () => {
+    // Clear all toast notifications first
+    // This prevents any residual UI from remaining visible
+    queryClient.clear();
+    
+    // 1. Mark intentional logout in localStorage
+    localStorage.setItem('movietracker_intentional_logout_time', Date.now().toString());
+    
+    // 2. Clear all session-related data from localStorage
+    localStorage.removeItem('movietracker_user');
+    localStorage.removeItem('movietracker_session_id');
+    localStorage.removeItem('movietracker_enhanced_backup');
+    localStorage.removeItem('movietracker_username');
+    localStorage.removeItem('movietracker_last_verified');
+    localStorage.removeItem('movietracker_session_heartbeat');
+    
+    // 3. Clear React Query cache immediately
+    queryClient.setQueryData(["/api/user"], null);
+    queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/session"] });
+    
+    // 4. Set a cookie to indicate logout (helps with session clearing)
+    document.cookie = "logout_time=" + Date.now() + "; path=/; max-age=5";
+    
+    // 5. Send a background logout request to the server
+    const logoutRequest = new XMLHttpRequest();
+    logoutRequest.open('POST', '/api/logout', true); // async=true
+    logoutRequest.send();
+    
+    // 6. Redirect immediately to auth page with hard navigation
+    window.location.href = '/auth?timestamp=' + Date.now(); // Add timestamp to prevent caching
   };
 
   // Handle login modal
