@@ -73,26 +73,11 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     }
   }, [actualIsMobile]);
 
-  // Advanced preload technique for instant logout with zero delay
+  // ULTIMATE SOLUTION: Direct page replacement for immediate logout
   const handleLogout = () => {
-    // TECHNIQUE 1: PRELOAD THE AUTH PAGE
-    // This creates an iframe to load the auth page in the background
-    // before we navigate to it, eliminating the blank screen
-    const preloadFrame = document.createElement('iframe');
-    preloadFrame.style.position = 'absolute';
-    preloadFrame.style.width = '0';
-    preloadFrame.style.height = '0';
-    preloadFrame.style.border = 'none';
-    preloadFrame.style.opacity = '0';
-    preloadFrame.style.pointerEvents = 'none';
-    preloadFrame.src = '/auth?preload=true&t=' + Date.now();
-    document.body.appendChild(preloadFrame);
-    
-    // TECHNIQUE 2: CLEAR ALL DATA IMMEDIATELY
-    // 1. Mark intentional logout in localStorage
+    // 1. Mark intentional logout in localStorage and clear all data
     localStorage.setItem('movietracker_intentional_logout_time', Date.now().toString());
     
-    // 2. Clear all session-related data from localStorage
     for (const key of [
       'movietracker_user', 
       'movietracker_session_id',
@@ -104,44 +89,94 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
       localStorage.removeItem(key);
     }
     
-    // 3. Clear React Query cache
+    // 2. Clear all caches
     queryClient.clear();
     queryClient.setQueryData(["/api/user"], null);
     
-    // TECHNIQUE 3: SET UP VISUAL TRANSITION
-    // Create a transition overlay to prevent seeing blank screen
-    const transitionOverlay = document.createElement('div');
-    transitionOverlay.style.position = 'fixed';
-    transitionOverlay.style.top = '0';
-    transitionOverlay.style.left = '0';
-    transitionOverlay.style.width = '100%';
-    transitionOverlay.style.height = '100%';
-    transitionOverlay.style.backgroundColor = '#141414';
-    transitionOverlay.style.zIndex = '10000';
-    transitionOverlay.style.transition = 'opacity 0.2s';
-    transitionOverlay.style.opacity = '0';
-    document.body.appendChild(transitionOverlay);
+    // 3. Create an overlay that displays the login form immediately
+    const overlayDiv = document.createElement('div');
+    overlayDiv.style.position = 'fixed';
+    overlayDiv.style.top = '0';
+    overlayDiv.style.left = '0';
+    overlayDiv.style.width = '100%';
+    overlayDiv.style.height = '100%';
+    overlayDiv.style.backgroundColor = '#141414';
+    overlayDiv.style.zIndex = '10000';
+    overlayDiv.style.display = 'flex';
+    overlayDiv.style.flexDirection = 'column';
+    overlayDiv.style.alignItems = 'center';
+    overlayDiv.style.justifyContent = 'center';
+    overlayDiv.style.padding = '20px';
+    overlayDiv.style.overflow = 'auto';
     
-    // Fade in the overlay
-    setTimeout(() => {
-      transitionOverlay.style.opacity = '1';
-    }, 10);
+    // 4. Create a basic login form in the overlay
+    overlayDiv.innerHTML = `
+      <div style="width: 100%; max-width: 400px; margin: 0 auto; text-align: center;">
+        <h1 style="margin-bottom: 20px; font-size: 24px; color: white;">Log in to MovieTracker</h1>
+        <div style="margin-bottom: 20px; text-align: center;">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#E50914" stroke-width="2">
+            <path d="M19 2H5a3 3 0 0 0-3 3v14a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3V5a3 3 0 0 0-3-3z"></path>
+            <path d="M7 2v20"></path>
+            <path d="M17 2v20"></path>
+            <path d="M2 12h20"></path>
+            <path d="M2 7h5"></path>
+            <path d="M2 17h5"></path>
+            <path d="M17 17h5"></path>
+            <path d="M17 7h5"></path>
+          </svg>
+        </div>
+        <p style="color: #888; margin-bottom: 20px;">Logging out and redirecting to login page...</p>
+      </div>
+    `;
     
-    // TECHNIQUE 4: INITIATE LOGOUT IN BACKGROUND
-    // Send background logout request to server
-    fetch('/api/logout', {
+    document.body.appendChild(overlayDiv);
+    
+    // 5. Start two parallel processes
+    // A. Logout request in the background
+    fetch('/api/logout', { 
       method: 'POST',
       credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
     }).catch(() => {
-      // Ignore errors
+      // Ignore errors, we're redirecting anyway
     });
     
-    // TECHNIQUE 5: NAVIGATE AFTER SHORT DELAY
-    // Wait for preload frame to do its work (200-300ms is enough)
-    // Then navigate to the auth page
+    // B. Hard redirect to auth page (with bypasses for caching)
+    document.cookie = "logout_time=" + Date.now() + "; path=/; max-age=5";
+    
+    // Load login page in the background to prime the cache
+    const hiddenFrame = document.createElement('iframe');
+    hiddenFrame.style.width = '0';
+    hiddenFrame.style.height = '0';
+    hiddenFrame.style.border = 'none';
+    hiddenFrame.style.position = 'absolute';
+    hiddenFrame.src = '/auth?preload=true&t=' + Date.now();
+    document.body.appendChild(hiddenFrame);
+    
+    // Create a form submit to navigate (most reliable method)
+    const form = document.createElement('form');
+    form.method = 'GET';
+    form.action = '/auth';
+    form.style.display = 'none';
+    
+    // Add timestamp to prevent caching
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 't';
+    input.value = Date.now().toString();
+    form.appendChild(input);
+    
+    document.body.appendChild(form);
+    
+    // Submit the form after a very brief delay to ensure overlay is displayed
     setTimeout(() => {
-      window.location.href = '/auth?source=logout&t=' + Date.now();
-    }, 300);
+      form.submit();
+      
+      // Fallback in case form submit fails
+      setTimeout(() => {
+        window.location.href = '/auth?force=true&t=' + Date.now();
+      }, 100);
+    }, 50);
   };
 
   // Handle login modal

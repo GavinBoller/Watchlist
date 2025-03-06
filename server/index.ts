@@ -651,6 +651,45 @@ async function startServer() {
     // ALWAYS serve the app on port 5000
     // this serves both the API and the client
     const port = 5000;
+    
+    // Force garbage collection to reduce memory usage before starting server
+    // This helps with Replit deployment memory constraints
+    if (global.gc) {
+      console.log("Running garbage collection before starting server");
+      global.gc();
+    }
+    
+    // Add graceful shutdown handlers for production
+    const cleanupHandler = () => {
+      console.log('Shutdown signal received: closing HTTP server');
+      server.close(() => {
+        console.log('HTTP server closed');
+        
+        // Close database connections
+        if (pool) {
+          console.log('Closing database pool');
+          pool.end().catch(err => console.error('Error closing pool:', err));
+        }
+        
+        // Close session store if it has a close method
+        if (sessionStore && typeof sessionStore.close === 'function') {
+          console.log('Closing session store');
+          sessionStore.close();
+        }
+        
+        process.exit(0);
+      });
+      
+      // Force exit after 10 seconds if graceful shutdown fails
+      setTimeout(() => {
+        console.error('Forced exit after 10s timeout during shutdown');
+        process.exit(1);
+      }, 10000);
+    };
+    
+    process.on('SIGTERM', cleanupHandler);
+    process.on('SIGINT', cleanupHandler);
+    
     server.listen({
       port,
       host: "0.0.0.0",
