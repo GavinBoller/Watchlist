@@ -64,8 +64,11 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
         confirmPassword
       },
       {
-        onSuccess: async (user) => {
+        onSuccess: async (data) => {
           console.log("Registration form received success response");
+          
+          // Extract user from the JWT response
+          const user = data.user;
           
           // Signal success to parent component
           onRegisterSuccess(user);
@@ -98,6 +101,7 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
                   // IMPORTANT: Pre-populate the cache with user data to prevent the login screen flash
                   // This creates the illusion of a seamless transition
                   queryClient.setQueryData(["/api/user"], user);
+                  queryClient.setQueryData(["/api/jwt/user"], user);
                   queryClient.setQueryData(["/api/auth/user"], user);
                   
                   // Store temporary registration data to help the protected route
@@ -151,7 +155,7 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
                               password: originalPassword
                             },
                             {
-                              onSuccess: (userData) => resolve(userData),
+                              onSuccess: (loginResponse) => resolve(loginResponse),
                               onError: (error) => reject(error)
                             }
                           );

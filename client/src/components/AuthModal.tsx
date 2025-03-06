@@ -22,7 +22,6 @@ type AuthView = "login" | "register" | "passwordReset";
 
 export const AuthModal = ({ isOpen, onClose, onAuthSuccess }: AuthModalProps) => {
   const [view, setView] = useState<AuthView>("login");
-  const auth = useJwtAuth();
 
   const handleAuthSuccess = (user: UserResponse) => {
     // The user will be set in the auth context automatically by the mutations
