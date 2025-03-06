@@ -33,7 +33,17 @@ declare global {
  */
 export function detectAutoLogoutPattern(): boolean {
   try {
-    // We now apply consistent session protection to all users without special cases
+    // Check if user just logged out intentionally - in which case we should skip detection
+    const recentLogoutTime = localStorage.getItem('movietracker_intentional_logout_time');
+    if (recentLogoutTime) {
+      const logoutTime = parseInt(recentLogoutTime);
+      const now = Date.now();
+      // If user logged out in the last 60 seconds, this is likely intentional navigation
+      if (now - logoutTime < 60000) { // 60 seconds
+        console.log('Recent intentional logout detected, skipping auto-logout detection');
+        return false;
+      }
+    }
     
     // Standard auto-logout detection for all users
     const recentLogoutsJSON = localStorage.getItem('movietracker_recent_logouts');
@@ -45,9 +55,28 @@ export function detectAutoLogoutPattern(): boolean {
       recentLogouts.patterns = [];
     }
     
-    // Get the current URL and referrer for pattern analysis
+    // Get the current URL and referrer for analysis
     const currentUrl = window.location.href;
     const referrer = document.referrer;
+    
+    // Current and referrer paths for better analysis
+    const currentPath = new URL(currentUrl).pathname;
+    const referrerPath = referrer ? new URL(referrer).pathname : '';
+    
+    // Skip detection on standard auth page navigation
+    if (currentPath === '/auth') {
+      // For normal auth page navigation, don't consider this as auto-logout
+      if (referrerPath === '/' || referrerPath === '/search' || referrerPath === '/watchlist') {
+        console.log('Normal navigation to auth page from main app, not an auto-logout');
+        return false;
+      }
+      
+      // Also skip if we're just refreshing the auth page
+      if (referrerPath === '/auth') {
+        console.log('Auth page refresh detected, not an auto-logout');
+        return false;
+      }
+    }
     
     // Record this pattern for analysis
     const pattern = `${currentUrl} <- ${referrer}`;
@@ -61,8 +90,9 @@ export function detectAutoLogoutPattern(): boolean {
     // Check if we have multiple rapid logout attempts
     const now = Date.now();
     
-    // More selective timeframe - consider only very rapid logout attempts (15 seconds)
-    const withinTimeWindow = (now - recentLogouts.timestamp) < 15000; // 15 seconds
+    // More selective timeframe - consider only very rapid logout attempts (8 seconds)
+    // Reduced from 15s to 8s to avoid false positives
+    const withinTimeWindow = (now - recentLogouts.timestamp) < 8000; // 8 seconds
     
     // Check if this is a test user (to avoid false positives for regular users)
     const cachedUser = localStorage.getItem('movietracker_user');
@@ -91,12 +121,12 @@ export function detectAutoLogoutPattern(): boolean {
       const isSpecialTestUser = cachedUsername && ['test30', 'test36', 'janes'].some(name => 
         cachedUsername.toLowerCase() === name);
       
-      // Lower threshold for special test users (catches issues faster)
-      // Standard threshold for all other users (avoid false positives)
-      const threshold = isSpecialTestUser ? 2 : 4;
+      // Increased thresholds to reduce false positives
+      // Higher threshold for regular users (8 for regular, 3 for special test)
+      const threshold = isSpecialTestUser ? 3 : 8;
       
       if (recentLogouts.count >= threshold) {
-        console.warn(`Detected potential auto-logout pattern: ${recentLogouts.count} attempts in 15s for ${isTestUser ? 'test user' : 'regular user'}`);
+        console.warn(`Detected potential auto-logout pattern: ${recentLogouts.count} attempts in 8s for ${isTestUser ? 'test user' : 'regular user'}`);
         console.warn('Navigation patterns:', recentLogouts.patterns);
         console.warn('Username:', cachedUsername);
         
@@ -119,25 +149,6 @@ export function detectAutoLogoutPattern(): boolean {
         patterns: recentLogouts.patterns || []
       };
       localStorage.setItem('movietracker_recent_logouts', JSON.stringify(recentLogouts));
-    }
-    
-    // Check for specific URL patterns known to cause issues
-    const problematicPatterns = [
-      { source: '/watchlist', destination: '/auth' },
-      { source: '/search', destination: '/auth' }
-    ];
-    
-    // Parse the current URL and referrer to check for problematic patterns
-    const currentPath = new URL(currentUrl).pathname;
-    const referrerPath = referrer ? new URL(referrer).pathname : '';
-    
-    for (const pattern of problematicPatterns) {
-      if (currentPath.includes(pattern.destination) && referrerPath.includes(pattern.source)) {
-        console.warn(`Detected problematic navigation pattern: ${pattern.source} -> ${pattern.destination}`);
-        localStorage.setItem('movietracker_problematic_navigation', 'true');
-        localStorage.setItem('movietracker_problematic_navigation_ts', String(now));
-        return true;
-      }
     }
     
     return false;
@@ -228,7 +239,26 @@ export async function handleSessionExpiration(
 ): Promise<void> {
   console.log('Handling session expiration check:', errorCode, errorMessage);
   
-  // Check for auto-logout patterns first - highest priority protection
+  // Check if we already at the auth page or just logged out - don't show messages in that case
+  const currentPath = window.location.pathname;
+  if (currentPath === '/auth') {
+    console.log('Already on auth page, skipping session expiration message');
+    return;
+  }
+  
+  // Check for recent intentional logout
+  const recentLogoutTime = localStorage.getItem('movietracker_intentional_logout_time');
+  if (recentLogoutTime) {
+    const logoutTime = parseInt(recentLogoutTime);
+    const now = Date.now();
+    // If intentional logout happened in last 30 seconds, skip the error message
+    if (now - logoutTime < 30000) {
+      console.log('Recent intentional logout detected, skipping session error message');
+      return;
+    }
+  }
+  
+  // Check for auto-logout patterns
   if (detectAutoLogoutPattern()) {
     console.warn('Auto-logout pattern detected during session expiration handling');
     
@@ -238,7 +268,7 @@ export async function handleSessionExpiration(
     let showToast = true;
     if (lastToastTime) {
       const lastTime = parseInt(lastToastTime);
-      showToast = (now - lastTime) > 60000; // Only show once per minute
+      showToast = (now - lastTime) > 180000; // Only show once every 3 minutes
     }
     
     if (showToast) {
@@ -261,15 +291,29 @@ export async function handleSessionExpiration(
     return;
   }
   
-  // Generic session handling for standard expiration cases
+  // For normal session expirations (not auto-logout pattern)
   try {
-    // Show the generic "your session has expired" message
-    toast({
-      title: "Session expired",
-      description: errorMessage || "Your session has expired. Please log in again.",
-      variant: "destructive",
-      duration: 5000
-    });
+    // Check if we've shown this message recently to avoid spamming
+    const lastSessionToastTime = localStorage.getItem('movietracker_session_expired_toast_time');
+    const now = Date.now();
+    let showToast = true;
+    if (lastSessionToastTime) {
+      const lastTime = parseInt(lastSessionToastTime);
+      showToast = (now - lastTime) > 60000; // Only show once per minute
+    }
+    
+    if (showToast) {
+      // Store the toast time
+      localStorage.setItem('movietracker_session_expired_toast_time', String(now));
+      
+      // Show the generic "your session has expired" message
+      toast({
+        title: "Session expired",
+        description: errorMessage || "Your session has expired. Please log in again.",
+        variant: "destructive",
+        duration: 5000
+      });
+    }
     
     // Clean up any login state
     queryClient.setQueryData(['/api/user'], null);

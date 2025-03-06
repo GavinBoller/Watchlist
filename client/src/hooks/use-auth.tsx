@@ -193,6 +193,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logoutMutation = useMutation({
     mutationFn: async () => {
       try {
+        // Mark this as an intentional logout to prevent auto-logout detection
+        // This will tell our auto-logout system to ignore auth page navigation
+        localStorage.setItem('movietracker_intentional_logout_time', Date.now().toString());
+        console.log("Marked intentional logout time for auto-logout prevention");
+        
         // Remove all local storage keys related to session
         try {
           localStorage.removeItem('movietracker_user');
