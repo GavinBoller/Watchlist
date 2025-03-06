@@ -535,23 +535,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('X-Auth-User-ID', authenticatedUserId);
     res.setHeader('X-Auth-Username', authenticatedUsername);
     
-    // CRITICAL: Always ensure we have a valid user ID
-    // First preference: Use the authenticated user's ID (most reliable)
+    // CRITICAL: Always ensure we have a valid user ID - FIX FOR PRODUCTION ISSUES
+    
     if (authenticatedUserId) {
-      // If userId is missing from the request or different, use the authenticated user's ID
-      if (!req.body.userId) {
-        console.log(`No userId in request, using authenticated user ID: ${authenticatedUserId}`);
-        req.body.userId = authenticatedUserId;
-      } 
-      // If there's a mismatch between requested user and authenticated user, use the authenticated one
-      else if (req.body.userId !== authenticatedUserId) {
-        console.warn(`User ID mismatch! Auth user: ${authenticatedUserId}, Requested: ${req.body.userId}`);
-        console.log(`Overriding with authenticated user ID for security`);
-        req.body.userId = authenticatedUserId;
+      // GUARANTEED FIX: Always force userId to be the authenticated user's ID
+      // This resolves the "username not found" issue in production
+      console.log(`WATCHLIST FIX: Setting userId to authenticated user (${authenticatedUserId})`);
+      req.body.userId = authenticatedUserId;
+      
+      // Extra validation for debugging
+      if (typeof req.body.userId !== 'number') {
+        console.warn(`CRITICAL: userId is not a number after assignment! Type: ${typeof req.body.userId}, Value: ${req.body.userId}`);
+        // Force conversion to number
+        req.body.userId = Number(authenticatedUserId);
       }
-    } 
-    // Super-fallback for production: user ID from multiple sources
-    else {
+    } else {
       console.error("CRITICAL: Authenticated but no user ID available!");
       
       // Try to get user ID from request headers (set by client for recovery)

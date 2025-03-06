@@ -52,6 +52,7 @@ router.post('/login', (req: Request, res: Response, next) => {
   const isProd = process.env.NODE_ENV === 'production';
   console.log(`[LOGIN] Processing login request in ${isProd ? 'PRODUCTION' : 'development'} mode`);
   console.log(`[LOGIN] Current session ID: ${req.sessionID || 'none'}`);
+  console.log(`[LOGIN] Received credentials - Username: ${req.body?.username || 'missing'}, Password: ${req.body?.password ? '[PROVIDED]' : '[MISSING]'}`);
   
   if (req.session) {
     console.log(`[LOGIN] Session cookie settings:`, {
@@ -63,6 +64,15 @@ router.post('/login', (req: Request, res: Response, next) => {
     });
   } else {
     console.log(`[LOGIN] No session object available`);
+  }
+  
+  // CRITICAL FIX FOR PRODUCTION: Validate credentials are present
+  if (!req.body || !req.body.username || !req.body.password) {
+    console.error(`[LOGIN] Missing login credentials in request`);
+    return res.status(400).json({
+      message: 'Username and password are required',
+      details: 'Please provide both username and password'
+    });
   }
   
   // Check if emergency mode is active for severe database outages
