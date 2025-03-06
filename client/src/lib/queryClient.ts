@@ -183,13 +183,27 @@ export async function apiRequest(
           console.error('[API] Error adding recovery headers:', e);
         }
         
-        // Combine all headers
-        const combinedHeaders = { ...defaultHeaders, ...headers };
+        // Use the Headers API which correctly handles the types
+        const headerObj = new Headers();
+        
+        // First add default headers
+        if (data) {
+          headerObj.set("Content-Type", "application/json");
+        }
+        headerObj.set("Pragma", "no-cache");
+        headerObj.set("Cache-Control", "no-cache, no-store, must-revalidate");
+        
+        // Then add any custom headers
+        Object.entries(headers).forEach(([key, value]) => {
+          if (value !== undefined) {
+            headerObj.set(key, String(value));
+          }
+        });
         
         // Execute the fetch request
         const res = await fetch(url, {
           method,
-          headers: combinedHeaders,
+          headers: headerObj,
           body: data ? JSON.stringify(data) : undefined,
           credentials: "include", // Always send cookies for authentication
           signal: controller.signal
@@ -263,12 +277,14 @@ export async function apiRequest(
           console.log('[API] Delayed session check after 401 error');
           
           // Check session status directly first to avoid unnecessary logout
+          // Use Headers API for type safety
+          const headers = new Headers();
+          headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+          headers.set("Pragma", "no-cache");
+          
           const sessionData = await fetch('/api/session', {
             credentials: 'include',
-            headers: {
-              "Cache-Control": "no-cache, no-store, must-revalidate",
-              "Pragma": "no-cache"
-            }
+            headers: headers
           }).then(res => res.json()).catch(err => null);
           
           // If session appears valid, don't show error
