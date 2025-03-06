@@ -370,8 +370,10 @@ export function validateSession(req: Request, res: Response, next: NextFunction)
 // Middleware to check if the user has access to the requested watchlist
 // with enhanced security validation, production-aware logging, and session protection
 export function hasWatchlistAccess(req: Request, res: Response, next: NextFunction) {
+  // MAJOR ENHANCEMENT: Production-specific watchlist access checks with fallback mechanisms
   // Environment detection for tailored behavior
   const isProd = process.env.NODE_ENV === 'production';
+  const isTest = isProd ? false : true; // For testing in development
   
   // Skip this check for public endpoints
   if (req.path === '/api/users' || req.path.startsWith('/api/movies')) {
@@ -382,6 +384,20 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
   console.log(`[AUTH] Checking watchlist access for ${req.method} ${req.path}`);
   console.log(`[AUTH] Request session ID: ${req.sessionID}`);
   console.log(`[AUTH] IsAuthenticated status: ${req.isAuthenticated()}`);
+  
+  // RECOVERY MECHANISM 1: Extract userId from different sources
+  let requestUserId: number | undefined;
+  
+  // Try to get userId from multiple sources
+  if (req.params.userId) {
+    requestUserId = parseInt(req.params.userId);
+  } else if (req.body.userId) {
+    requestUserId = parseInt(req.body.userId);
+  } else if (req.query.userId) {
+    requestUserId = parseInt(req.query.userId as string);
+  }
+  
+  console.log(`[AUTH] Requested userId from params/body/query: ${requestUserId || 'none'}`);
   
   if (req.session) {
     // Log session information for debugging
@@ -404,6 +420,14 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
     console.log(`[AUTH] No user object in request`);
   }
   
+  // RECOVERY MECHANISM 2: Check session for preserved user data (Test users)
+  const preservedUserId = (req.session as any)?.preservedUserId;
+  const preservedUsername = (req.session as any)?.preservedUsername;
+  
+  if (preservedUserId) {
+    console.log(`[AUTH] Found preserved user data: ${preservedUsername} (ID: ${preservedUserId})`);
+  }
+  
   // For watchlist specific operations
   if (req.path.includes('/watchlist')) {
     // Set cache control headers to prevent stale sessions
@@ -416,8 +440,8 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
     const isSessionAuthenticated = req.session && req.session.authenticated === true;
     const hasUserObject = !!req.user;
     
-    // Check for special user data in session as a fallback
-    let hasSpecialUserData = false;
+    // RECOVERY MECHANISM 3: Check for special user data in session as a fallback
+    const hasSpecialUserData = !!(preservedUserId && preservedUsername);
     if (req.session && !hasUserObject) {
       // Check for backup user data
       if ((req.session as any).userData && 
