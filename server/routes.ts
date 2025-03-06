@@ -1075,6 +1075,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Register emergency endpoints for auth and watchlist operations
+  console.log("[SERVER] Registering emergency auth endpoints");
+  app.use('/api/auth', emergencyAuthRouter);
+  
+  // Register emergency watchlist endpoints 
+  console.log("[SERVER] Registering emergency watchlist endpoints");
+  app.use('/api/emergency/watchlist', emergencyWatchlistRouter);
+
   const httpServer = createServer(app);
   return httpServer;
 }
