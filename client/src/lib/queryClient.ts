@@ -11,17 +11,46 @@ async function throwIfResNotOk(res: Response) {
       // Try to handle JSON responses
       if (contentType && contentType.includes('application/json')) {
         try {
-          const jsonData = await res.json();
-          console.log("Error response JSON data:", jsonData);
+          // Clone the response before attempting to read it as JSON
+          const responseClone = res.clone();
+          let jsonData;
+          
+          try {
+            jsonData = await res.json();
+            console.log("Error response JSON data:", jsonData);
+          } catch (jsonParseError) {
+            // If JSON parsing fails, try to get meaningful text instead
+            console.error("Failed to parse JSON error response:", jsonParseError);
+            const textData = await responseClone.text();
+            console.log("Error response as text:", textData);
+            
+            // Create a more specific error for JSON parse failures
+            const error = new Error(`${res.status}: Error parsing server response`);
+            (error as any).status = res.status;
+            (error as any).isJsonParseError = true;
+            (error as any).isServerError = res.status >= 500;
+            (error as any).isClientError = res.status >= 400 && res.status < 500;
+            (error as any).responseText = textData;
+            throw error;
+          }
+          
+          // If we get here, JSON parsing succeeded
           const error = new Error(`${res.status}: ${jsonData.message || res.statusText}`);
           (error as any).status = res.status;
           (error as any).data = jsonData;
           (error as any).isServerError = res.status >= 500;
           (error as any).isClientError = res.status >= 400 && res.status < 500;
           throw error;
-        } catch (jsonError) {
-          console.error("Failed to parse JSON error response:", jsonError);
-          const error = new Error(`${res.status}: Invalid JSON response`);
+        } catch (handlingError) {
+          // If this is our own error with status, just re-throw it
+          if (handlingError instanceof Error && 
+             ((handlingError as any).status || (handlingError as any).isJsonParseError)) {
+            throw handlingError;
+          }
+          
+          // Otherwise create a generic error
+          console.error("Error handling error response:", handlingError);
+          const error = new Error(`${res.status}: Unable to process server response`);
           (error as any).status = res.status;
           (error as any).isServerError = res.status >= 500;
           (error as any).isClientError = res.status >= 400 && res.status < 500;

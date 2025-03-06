@@ -84,16 +84,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       try {
+        console.log("Attempting login with credentials:", credentials.username);
         const res = await apiRequest("POST", "/api/login", credentials);
-        if (!res.ok) {
-          throw new Error(`Login failed with status ${res.status}`);
-        }
-        const data = await res.json();
-        console.log("Login response data:", data);
         
-        // Extract the user object based on response structure
-        const user = data.user || data;
-        return user;
+        // Check Content-Type header to ensure we're getting JSON
+        const contentType = res.headers.get('content-type');
+        console.log("Login response Content-Type:", contentType);
+        
+        if (!res.ok) {
+          if (contentType && contentType.includes('application/json')) {
+            try {
+              const errorData = await res.json();
+              throw new Error(errorData.message || `Login failed with status ${res.status}`);
+            } catch (jsonError) {
+              console.error("Failed to parse error response JSON:", jsonError);
+              throw new Error(`Login failed: Unable to parse server response`);
+            }
+          } else {
+            // Handle non-JSON error responses
+            const errorText = await res.text();
+            console.error("Non-JSON error response:", errorText);
+            throw new Error(`Login failed with status ${res.status}`);
+          }
+        }
+        
+        // For successful responses, parse the JSON carefully
+        try {
+          const data = await res.json();
+          console.log("Login response data:", data);
+          
+          // Extract the user object based on response structure
+          const user = data.user || data;
+          // Make sure we have a valid user object with required fields
+          if (!user || !user.id || !user.username) {
+            console.error("Invalid user data in login response:", user);
+            throw new Error("Login successful but received invalid user data");
+          }
+          return user;
+        } catch (jsonError) {
+          console.error("Failed to parse successful login response:", jsonError);
+          throw new Error("Login may have succeeded but we couldn't process the response");
+        }
       } catch (error) {
         console.error("Login error:", error);
         throw error;
