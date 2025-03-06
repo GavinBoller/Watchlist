@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { UserResponse } from "@shared/schema";
-import { useAuth } from "@/hooks/use-auth";
+import { useJwtAuth } from "@/hooks/use-jwt-auth";
 import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
 
@@ -19,7 +19,7 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const { registerMutation, loginMutation } = useAuth();
+  const { registerMutation, loginMutation } = useJwtAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 

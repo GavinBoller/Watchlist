@@ -10,7 +10,7 @@ import { LoginForm } from "./LoginForm";
 import { RegisterForm } from "./RegisterForm";
 import { PasswordResetForm } from "./PasswordResetForm";
 import { UserResponse } from "@shared/schema";
-import { useAuth } from '../hooks/use-auth';
+import { useJwtAuth } from '../hooks/use-jwt-auth';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -22,7 +22,7 @@ type AuthView = "login" | "register" | "passwordReset";
 
 export const AuthModal = ({ isOpen, onClose, onAuthSuccess }: AuthModalProps) => {
   const [view, setView] = useState<AuthView>("login");
-  const auth = useAuth();
+  const auth = useJwtAuth();
 
   const handleAuthSuccess = (user: UserResponse) => {
     // The user will be set in the auth context automatically by the mutations

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useAuth } from "../hooks/use-auth";
+import { useJwtAuth } from "../hooks/use-jwt-auth";
 import { LoginForm } from "@/components/LoginForm";
 import { RegisterForm } from "@/components/RegisterForm";
 import { PasswordResetForm } from "@/components/PasswordResetForm";
@@ -10,7 +10,7 @@ type AuthView = "login" | "register" | "passwordReset";
 
 export default function AuthPage() {
   const [view, setView] = useState<AuthView>("login");
-  const { user } = useAuth();
+  const { user } = useJwtAuth();
   const [, setLocation] = useLocation();
 
   // IMPROVED LOGOUT HANDLING

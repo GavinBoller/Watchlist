@@ -18,18 +18,18 @@ import { ChevronDown, UserCircle, Users, LogOut, LockKeyhole } from 'lucide-reac
 import { AuthModal } from './AuthModal';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '../hooks/use-auth';
+import { useJwtAuth } from '../hooks/use-jwt-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { UserResponse } from '@shared/schema';
 import { useContext } from 'react';
-import { AuthContext } from '../hooks/use-auth';
+import { JwtAuthContext } from '../hooks/use-jwt-auth';
 
 // Keep this line to maintain compatibility with other components
 export const useUserContext = () => {
-  const auth = useContext(AuthContext);
+  const auth = useContext(JwtAuthContext);
   if (!auth) {
-    throw new Error("useUserContext must be used within an AuthProvider");
+    throw new Error("useUserContext must be used within a JwtAuthProvider");
   }
   
   return {
@@ -51,9 +51,9 @@ interface UserSelectorProps {
 
 const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
   // Use the auth context directly
-  const auth = useContext(AuthContext);
+  const auth = useContext(JwtAuthContext);
   if (!auth) {
-    throw new Error("UserSelector must be used within an AuthProvider");
+    throw new Error("UserSelector must be used within a JwtAuthProvider");
   }
   
   const { user, logoutMutation } = auth;

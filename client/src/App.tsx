@@ -9,7 +9,7 @@ import WatchlistPage from "@/pages/WatchlistPage";
 import AuthPage from "@/pages/auth-page";
 import { UserContext } from "@/components/UserSelector";
 import { Switch, Route } from "wouter";
-import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { JwtAuthProvider, useJwtAuth } from "@/hooks/use-jwt-auth";
 import { ProtectedRoute } from "./lib/protected-route";
 
 /**
@@ -18,7 +18,7 @@ import { ProtectedRoute } from "./lib/protected-route";
  */
 function AppInternal() {
   const [location, setLocation] = useLocation();
-  const { user, logoutMutation } = useAuth();
+  const { user, logoutMutation } = useJwtAuth();
   
   // Prepare the user context value for backward compatibility
   const userContextValue = {
@@ -64,9 +64,9 @@ function AppInternal() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+      <JwtAuthProvider>
         <AppInternal />
-      </AuthProvider>
+      </JwtAuthProvider>
     </QueryClientProvider>
   );
 }

@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { UserResponse } from "@shared/schema";
-import { useAuth } from "@/hooks/use-auth";
+import { useJwtAuth } from "@/hooks/use-jwt-auth";
 import { useLocation } from "wouter";
 
 interface LoginFormProps {
@@ -17,7 +17,7 @@ interface LoginFormProps {
 export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword }: LoginFormProps) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const { loginMutation } = useAuth();
+  const { loginMutation } = useJwtAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -49,7 +49,10 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword
       loginMutation.mutate(
         { username, password },
         {
-          onSuccess: (user) => {
+          onSuccess: (data) => {
+            // Extract user from the JWT response
+            const user = data.user;
+            
             // Check if we have a valid user object before proceeding
             if (!user || !user.id || !user.username) {
               console.error("Invalid user data received:", user);
@@ -62,6 +65,7 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword
             }
             
             console.log("[AUTH TEST] Login successful, user data:", user);
+            console.log("[AUTH TEST] JWT token received:", data.token ? "Yes (token length: " + data.token.length + ")" : "No");
             
             // Check if this was an emergency login
             const emergencyMode = (user as any).emergencyMode;
