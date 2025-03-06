@@ -53,12 +53,22 @@ app.use(express.urlencoded({ extended: false }));
 const isProd = process.env.NODE_ENV === 'production';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'watchlist-app-secret';
 
+// Create memory store for sessions
+const MemoryStoreSession = MemoryStore(session);
+const memoryStore = new MemoryStoreSession({
+  checkPeriod: 86400000, // prune expired entries every 24h
+  stale: true,           // Return stale values if issue with cache
+  max: 5000,             // Limit to prevent memory issues
+  ttl: 7 * 24 * 60 * 60 * 1000  // 7 day TTL for all sessions
+});
+
 // Initialize session early in the middleware chain (required by passport)
 app.use(session({
   secret: SESSION_SECRET,
   resave: false,
-  saveUninitialized: true, // Changed to true to ensure session is created even for anonymous users
+  saveUninitialized: true, // Create session for anonymous users
   rolling: true, // Reset the maxAge on every response to keep the session active
+  store: memoryStore,
   cookie: {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     httpOnly: true,
@@ -77,9 +87,8 @@ app.use(productionSessionRepair);   // Session repair mechanisms
 app.use(productionOptimizations);   // Performance optimizations
 app.use(preventAutoLogout);         // Prevent automatic logout issues for all users
 
-// Setup session store with fallback
-let sessionStore: any; // Using any type here since we'll be assigning different types of stores
-let usePostgresSession = false;
+// We're now using memory store directly initialized at the top of the file
+// No need for separate sessionStore variable or session store setup
 
 // Create session table if needed with enhanced robustness
 async function createSessionTable(dbPool: any): Promise<boolean> {
@@ -498,9 +507,6 @@ async function startServer() {
     // Short timeout to make sure the database connection is ready
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Initialize the session store
-    await setupSessionStore();
-    
     // Add JWT authentication middleware early in the chain
     // This will attempt to authenticate based on JWT token
     app.use(jwtAuthenticate);
@@ -513,9 +519,8 @@ async function startServer() {
       console.log('Development environment detected - using non-secure cookies');
     }
     
-    // Configure session middleware with environment-specific settings 
-    const isProd = process.env.NODE_ENV === 'production';
-    console.log(`Configuring session for ${isProd ? 'production' : 'development'} environment`);
+    // Using simple in-memory session store for all environments
+    console.log('Using in-memory session store for all environments');
     
     // Enhanced environment detection with more detailed logging
     const environment = isProd ? 'PRODUCTION' : 'development';
@@ -540,7 +545,7 @@ async function startServer() {
       secret: SESSION_SECRET,
       resave: true, // Changed to true to ensure session is always saved
       saveUninitialized: true, // Ensure session cookie is always created
-      store: sessionStore,
+      store: memoryStore, // Use memory store for all environments
       proxy: isProd, // Only trust proxies in production
       rolling: true, // Reset expiration countdown on every response
       name: 'watchlist.sid', // Use consistent name across environments
@@ -681,10 +686,10 @@ async function startServer() {
           pool.end().catch(err => console.error('Error closing pool:', err));
         }
         
-        // Close session store if it has a close method
-        if (sessionStore && typeof sessionStore.close === 'function') {
-          console.log('Closing session store');
-          sessionStore.close();
+        // Close memory store if it has a close method
+        if (memoryStore && typeof memoryStore.close === 'function') {
+          console.log('Closing memory store');
+          memoryStore.close();
         }
         
         process.exit(0);
