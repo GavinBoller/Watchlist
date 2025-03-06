@@ -441,7 +441,7 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
     const hasUserObject = !!req.user;
     
     // RECOVERY MECHANISM 3: Check for special user data in session as a fallback
-    const hasSpecialUserData = !!(preservedUserId && preservedUsername);
+    let hasSpecialUserData = !!(preservedUserId && preservedUsername);
     if (req.session && !hasUserObject) {
       // Check for backup user data
       if ((req.session as any).userData && 

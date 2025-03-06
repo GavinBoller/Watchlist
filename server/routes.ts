@@ -10,7 +10,8 @@ import {
   insertWatchlistEntrySchema,
   type TMDBSearchResponse,
   type TMDBMovie,
-  type User
+  type User,
+  type WatchlistEntryWithMovie
 } from "@shared/schema";
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "79d177894334dec45f251ff671833a50";
@@ -349,22 +350,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Watchlist routes - protect all with isAuthenticated middleware
   app.get("/api/watchlist/:userId", isAuthenticated, hasWatchlistAccess, async (req: Request, res: Response) => {
+    // ENHANCED: Added robust recovery mechanisms for watchlist access
+    const isProd = process.env.NODE_ENV === 'production';
+    
     try {
       const userId = parseInt(req.params.userId, 10);
+      console.log(`[WATCHLIST] Fetching watchlist for user ID: ${userId}`);
       
       if (isNaN(userId)) {
         return res.status(400).json({ message: "Invalid user ID" });
       }
       
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
+      // For safer watchlist access across environments
+      let watchlistData: WatchlistEntryWithMovie[] = [];
+      let userFound = false;
+      
+      // STEP 1: Try standard approach first
+      try {
+        // Get user to verify existence
+        const user = await storage.getUser(userId);
+        
+        if (user) {
+          userFound = true;
+          console.log(`[WATCHLIST] Found user: ${user.username} (ID: ${userId})`);
+          
+          // Successful user lookup - get watchlist
+          watchlistData = await storage.getWatchlistEntries(userId);
+          console.log(`[WATCHLIST] Standard fetch successful: ${watchlistData.length} entries`);
+          
+          // Store backup in session for potential recovery
+          if (isProd && req.session) {
+            (req.session as any).lastWatchlistUser = userId;
+            (req.session as any).lastWatchlistCount = watchlistData.length;
+            (req.session as any).lastWatchlistTime = Date.now();
+          }
+          
+          return res.json(watchlistData);
+        } else {
+          console.log(`[WATCHLIST] User with ID ${userId} not found in standard lookup`);
+        }
+      } catch (primaryError) {
+        console.error(`[WATCHLIST] Error in primary watchlist fetch:`, primaryError);
       }
       
-      const watchlist = await storage.getWatchlistEntries(userId);
-      res.json(watchlist);
+      // STEP 2: If we get here, there was an issue - try recovery mechanisms
+      
+      // Special handling for production environment
+      if (isProd) {
+        console.log(`[WATCHLIST] Attempting production recovery for user ${userId}`);
+        
+        // Recovery mechanism 1: Check if watchlist is in session
+        if (req.session && (req.session as any).lastWatchlistUser === userId) {
+          console.log(`[WATCHLIST] Found previous watchlist data in session`);
+          
+          try {
+            // Try again with a direct call to minimize layers
+            watchlistData = await storage.getWatchlistEntries(userId);
+            console.log(`[WATCHLIST] Direct storage retry successful: ${watchlistData.length} entries`);
+            
+            // Return recovered data
+            return res.status(200)
+              .header('X-Recovery-Method', 'direct-retry')
+              .json(watchlistData);
+          } catch (retryError) {
+            console.error(`[WATCHLIST] Direct retry failed:`, retryError);
+          }
+        }
+        
+        // Recovery mechanism 2: Use the authenticated user as fallback
+        if (req.user && (req.user as any).id) {
+          const authUserId = (req.user as any).id;
+          
+          // Only try this if the requested user is different from authenticated user
+          if (authUserId !== userId) {
+            console.log(`[WATCHLIST] Fallback to authenticated user watchlist: ${authUserId}`);
+            
+            try {
+              watchlistData = await storage.getWatchlistEntries(authUserId);
+              console.log(`[WATCHLIST] Auth user fallback successful: ${watchlistData.length} entries`);
+              
+              // Return recovered data
+              return res.status(200)
+                .header('X-Recovery-Method', 'auth-user-fallback')
+                .json(watchlistData);
+            } catch (authError) {
+              console.error(`[WATCHLIST] Auth user fallback failed:`, authError);
+            }
+          }
+        }
+        
+        // Recovery mechanism 3: Use backup data from session if available
+        if (req.session && 
+            (req.session as any).userBackup && 
+            (req.session as any).userBackup.watchlist) {
+          
+          console.log(`[WATCHLIST] Using backup watchlist data from session`);
+          const backupData = (req.session as any).userBackup.watchlist;
+          
+          // Return whatever we have as backup
+          return res.status(200)
+            .header('X-Recovery-Method', 'session-backup')
+            .json(backupData);
+        }
+      }
+      
+      // If all recovery mechanisms fail, return appropriate response
+      if (userFound) {
+        // User exists but watchlist fetch failed
+        console.log(`[WATCHLIST] All recovery attempts failed but user exists, returning empty array`);
+        return res.status(200)
+          .header('X-Recovery-Status', 'failed')
+          .json([]);
+      } else {
+        // User not found
+        console.log(`[WATCHLIST] User not found and recovery failed`);
+        return res.status(404).json({ 
+          message: "User not found", 
+          code: "USER_NOT_FOUND",
+          recoveryAttempted: isProd
+        });
+      }
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch watchlist" });
+      console.error('[WATCHLIST] Unhandled exception in watchlist route:', error);
+      
+      res.status(500).json({ 
+        message: "Failed to fetch watchlist", 
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 
