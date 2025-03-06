@@ -484,8 +484,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log("POST /api/watchlist - Request body:", JSON.stringify(req.body, null, 2));
     console.log("Environment:", process.env.NODE_ENV || 'development');
     
-    // PRODUCTION RELIABILITY: Ensure there's always an authenticated user
-    if (!req.isAuthenticated() || !req.user) {
+    // Add custom headers for debugging
+    res.setHeader('X-Watchlist-Operation', 'add_item');
+    res.setHeader('X-Request-ID', `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`);
+    
+    // === ENHANCED USER VALIDATION ===
+    // Check authentication at multiple levels for production reliability
+    if (!req.isAuthenticated()) {
       console.warn("WARNING: User not authenticated when accessing watchlist POST endpoint");
       return res.status(401).json({ 
         message: "Authentication required",
@@ -493,10 +498,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
     
+    // Validate user object exists
+    if (!req.user) {
+      console.error("ERROR: isAuthenticated true but req.user missing");
+      // Try to recover session information
+      const sessionUser = (req.session as any)?.passport?.user;
+      if (sessionUser) {
+        console.log("Found user ID in session passport data:", sessionUser);
+        // Recreate user object from session data
+        try {
+          const recoveredUser = await storage.getUser(sessionUser);
+          if (recoveredUser) {
+            console.log("Successfully recovered user from session data:", recoveredUser.username);
+            req.user = recoveredUser;
+          }
+        } catch (e) {
+          console.error("Failed to recover user from session data:", e);
+        }
+      }
+      
+      // If still no user, return error
+      if (!req.user) {
+        return res.status(401).json({ 
+          message: "Session error",
+          details: "Please log out and log back in to refresh your session"
+        });
+      }
+    }
+    
     // Log authentication info
     const authenticatedUserId = (req.user as any)?.id;
     const authenticatedUsername = (req.user as any)?.username;
     console.log(`Authenticated user: ID=${authenticatedUserId}, Username=${authenticatedUsername}`);
+    
+    // Add tracing headers for client to validate
+    res.setHeader('X-Auth-User-ID', authenticatedUserId);
+    res.setHeader('X-Auth-Username', authenticatedUsername);
     
     // CRITICAL: Always ensure we have a valid user ID
     // First preference: Use the authenticated user's ID (most reliable)
@@ -513,13 +550,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.body.userId = authenticatedUserId;
       }
     } 
-    // If somehow we have no user ID (should never happen with isAuthenticated middleware)
+    // Super-fallback for production: user ID from multiple sources
     else {
       console.error("CRITICAL: Authenticated but no user ID available!");
-      return res.status(500).json({ 
-        message: "Session error",
-        details: "Please log out and log back in to refresh your session"
-      });
+      
+      // Try to get user ID from request headers (set by client for recovery)
+      const headerUserId = req.headers['x-user-id'];
+      if (headerUserId && !Array.isArray(headerUserId)) {
+        const parsedUserId = parseInt(headerUserId);
+        if (!isNaN(parsedUserId)) {
+          console.log(`Found user ID in custom header: ${parsedUserId}`);
+          req.body.userId = parsedUserId;
+        }
+      }
+      
+      // If still no user ID, check session data
+      if (!req.body.userId && req.session) {
+        const sessionUserId = (req.session as any)?.preservedUserId || (req.session as any)?.passport?.user;
+        if (sessionUserId) {
+          console.log(`Found user ID in session data: ${sessionUserId}`);
+          req.body.userId = sessionUserId;
+        }
+      }
+      
+      // If we still have no user ID, return error
+      if (!req.body.userId) {
+        return res.status(500).json({ 
+          message: "Session error",
+          details: "Please log out and log back in to refresh your session"
+        });
+      }
     }
     
     try {

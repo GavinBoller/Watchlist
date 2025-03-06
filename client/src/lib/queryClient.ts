@@ -116,13 +116,15 @@ export async function apiRequest(
     retries?: number;
     retryDelay?: number;
     ignoreAuthErrors?: boolean; // Flag to handle auth errors differently
+    headers?: Record<string, string>; // Additional headers
   } = {}
 ): Promise<Response> {
   const { 
     timeout = 15000,       // 15 second default timeout
     retries = 2,           // 2 retries by default 
     retryDelay = 1000,     // 1 second delay between retries
-    ignoreAuthErrors = false // Default to throwing auth errors
+    ignoreAuthErrors = false, // Default to throwing auth errors
+    headers = {} // Custom headers to add
   } = options;
   
   let lastError: Error | null = null;
@@ -139,17 +141,55 @@ export async function apiRequest(
       }
       
       try {
+        // Merge default headers with custom headers
+        const defaultHeaders = data ? { 
+          "Content-Type": "application/json",
+          // Add cache-busting headers for IE11 and some mobile browsers
+          "Pragma": "no-cache",
+          "Cache-Control": "no-cache, no-store, must-revalidate"
+        } : {
+          "Pragma": "no-cache", 
+          "Cache-Control": "no-cache, no-store, must-revalidate"
+        };
+        
+        // Add user recovery information - try to get current user from window object or storage
+        try {
+          // Try to get user info from window object (fastest)
+          const authBackup = (window as any).__authBackup;
+          if (authBackup && authBackup.userId) {
+            console.log('[API] Adding user recovery info from in-memory backup');
+            Object.assign(headers, {
+              'X-User-ID': authBackup.userId.toString(),
+              'X-Username': authBackup.username,
+              'X-Request-Timestamp': Date.now().toString()
+            });
+          }
+          // If not in window object, try session storage
+          else {
+            const backupJSON = sessionStorage.getItem('auth_backup');
+            if (backupJSON) {
+              const backup = JSON.parse(backupJSON);
+              if (backup && backup.userId) {
+                console.log('[API] Adding user recovery info from session storage');
+                Object.assign(headers, {
+                  'X-User-ID': backup.userId.toString(),
+                  'X-Username': backup.username,
+                  'X-Request-Timestamp': Date.now().toString()
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.error('[API] Error adding recovery headers:', e);
+        }
+        
+        // Combine all headers
+        const combinedHeaders = { ...defaultHeaders, ...headers };
+        
+        // Execute the fetch request
         const res = await fetch(url, {
           method,
-          headers: data ? { 
-            "Content-Type": "application/json",
-            // Add cache-busting headers for IE11 and some mobile browsers
-            "Pragma": "no-cache",
-            "Cache-Control": "no-cache, no-store, must-revalidate"
-          } : {
-            "Pragma": "no-cache", 
-            "Cache-Control": "no-cache, no-store, must-revalidate"
-          },
+          headers: combinedHeaders,
           body: data ? JSON.stringify(data) : undefined,
           credentials: "include", // Always send cookies for authentication
           signal: controller.signal

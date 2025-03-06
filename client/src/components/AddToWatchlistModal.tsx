@@ -202,8 +202,43 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
         // Continue despite error - the main request will handle auth issues
       }
       
+      // Add backup user information and critical headers to help with recovery
+      const headers: Record<string, string> = {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      };
+      
+      // Add backup user information to help server recovery scenarios
+      if (currentUser) {
+        console.log(`Adding backup user information for reliability: ID=${currentUser.id}, Username=${currentUser.username}`);
+        headers['X-User-ID'] = currentUser.id.toString();
+        headers['X-Username'] = currentUser.username;
+        headers['X-Request-Timestamp'] = Date.now().toString();
+        
+        // Also store backup in session storage for client-side recovery
+        try {
+          sessionStorage.setItem('auth_backup', JSON.stringify({
+            userId: currentUser.id,
+            username: currentUser.username,
+            timestamp: Date.now()
+          }));
+          
+          // Also store in window object for immediate memory access
+          (window as any).__authBackup = {
+            userId: currentUser.id,
+            username: currentUser.username,
+            timestamp: Date.now()
+          };
+        } catch (e) {
+          console.error('Error creating auth backup:', e);
+        }
+      }
+      
       // Try with max retries and cross-browser compatibility improvements
-      const res = await apiRequest('POST', '/api/watchlist', watchlistData, apiOptions);
+      const res = await apiRequest('POST', '/api/watchlist', watchlistData, { 
+        ...apiOptions,
+        headers
+      });
       
       // Handle successful response
       const contentType = res.headers.get('content-type');
