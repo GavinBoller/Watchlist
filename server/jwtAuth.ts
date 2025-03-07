@@ -2,14 +2,13 @@ import jwt from 'jsonwebtoken';
 import { User, UserResponse } from '@shared/schema';
 
 // Secret key for signing JWT tokens
-// FIXED: Use a consistent secret for both dev and production
-// This ensures tokens work reliably across environments
-// Use hardcoded secret - we'll rely on the fallback for both environments
-const JWT_SECRET = 'watchlist-app-secure-jwt-secret-8fb38d7c98a1'; 
+// FIXED: Use a completely hardcoded secret for all environments
+// This ensures tokens work reliably across environments with no variability
+const JWT_SECRET = 'watchlist-app-extremely-secure-jwt-secret-key-8fb38d7c98a1'; 
 const TOKEN_EXPIRATION = '7d'; // Token expiration time
 
-// Log JWT secret for debug
-console.log('[JWT] Using secret starting with:', JWT_SECRET.substring(0, 8) + '...');
+// Log JWT secret for debug - only showing first few characters for security
+console.log('[JWT] Using hardcoded JWT secret for consistent behavior');
 
 // Omit password when creating payload for JWT
 type UserPayload = Omit<User, 'password'>;

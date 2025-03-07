@@ -87,6 +87,10 @@ app.use(productionSessionRepair);   // Session repair mechanisms
 app.use(productionOptimizations);   // Performance optimizations
 app.use(preventAutoLogout);         // Prevent automatic logout issues for all users
 
+// Register JWT authentication middleware to validate tokens
+console.log('[SERVER] Adding JWT authentication middleware');
+app.use(jwtAuthenticate);
+
 // We're now using memory store directly initialized at the top of the file
 // No need for separate session store functions or setup
 
@@ -218,10 +222,6 @@ async function startServer() {
     console.log("Waiting for database connection to be ready...");
     // Short timeout to make sure the database connection is ready
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Add JWT authentication middleware early in the chain
-    // This will attempt to authenticate based on JWT token
-    app.use(jwtAuthenticate);
     
     // In production, we need to ensure cookies work with HTTPS
     if (process.env.NODE_ENV === 'production') {
