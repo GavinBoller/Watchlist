@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { handleSessionExpiration, isSessionError } from './session-utils';
+import { getToken, setAuthHeader } from './jwtUtils';
 
 // Enhanced error handling with detailed error information and HTML response detection
 async function throwIfResNotOk(res: Response) {
