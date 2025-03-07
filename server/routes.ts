@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { isAuthenticated, hasWatchlistAccess, validateSession } from "./auth";
 import { isJwtAuthenticated, hasJwtWatchlistAccess } from "./jwtMiddleware";
-import { extractTokenFromHeader, verifyToken, createUserResponse } from "./jwtAuth";
+import { extractTokenFromHeader, verifyToken } from "./jwtAuth";
 import axios from "axios";
 import { z } from "zod";
 import { 
@@ -17,6 +17,7 @@ import {
 } from "@shared/schema";
 import { emergencyAuthRouter, emergencyAuthCheck } from "./emergencyAuth";
 import { emergencyWatchlistRouter } from "./emergencyWatchlist";
+import { jwtAuthRouter } from "./jwtAuthRoutes";
 import { executeDirectSql } from "./db";
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "79d177894334dec45f251ff671833a50";
@@ -662,6 +663,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Register JWT auth routes
+  console.log("[SERVER] Registering JWT auth endpoints");
+  app.use('/api', jwtAuthRouter);
+  
   // Register emergency endpoints for auth and watchlist operations
   console.log("[SERVER] Registering emergency auth endpoints");
   app.use('/api/auth', emergencyAuthRouter);

@@ -4,8 +4,12 @@ import { User, UserResponse } from '@shared/schema';
 // Secret key for signing JWT tokens
 // FIXED: Use a consistent secret for both dev and production
 // This ensures tokens work reliably across environments
-const JWT_SECRET = process.env.JWT_SECRET || 'watchlist-app-secure-jwt-secret-8fb38d7c98a1'; 
+// Use hardcoded secret - we'll rely on the fallback for both environments
+const JWT_SECRET = 'watchlist-app-secure-jwt-secret-8fb38d7c98a1'; 
 const TOKEN_EXPIRATION = '7d'; // Token expiration time
+
+// Log JWT secret for debug
+console.log('[JWT] Using secret starting with:', JWT_SECRET.substring(0, 8) + '...');
 
 // Omit password when creating payload for JWT
 type UserPayload = Omit<User, 'password'>;
