@@ -20,16 +20,23 @@ export async function jwtAuthenticate(req: Request, res: Response, next: NextFun
   // Check for token in Authorization header
   const token = extractTokenFromHeader(req.headers.authorization);
   
+  // Log token info (without showing the actual token)
+  console.log(`[JWT AUTH] Request path: ${req.path}, Authorization header present: ${!!req.headers.authorization}`);
+  
   // If no token is provided, continue without authentication
   if (!token) {
+    console.log('[JWT AUTH] No token provided');
     return next();
   }
   
   // Verify the token
   const userPayload = verifyToken(token);
   if (!userPayload) {
+    console.log('[JWT AUTH] Token verification failed');
     return next();
   }
+  
+  console.log(`[JWT AUTH] Token verified successfully for user: ${userPayload.username} (ID: ${userPayload.id})`);
   
   // Get the full user from storage if needed (optional)
   // This step can be skipped if the JWT payload contains all needed user data
@@ -54,20 +61,32 @@ export async function jwtAuthenticate(req: Request, res: Response, next: NextFun
  * This is an alternative to the passport isAuthenticated middleware
  */
 export function isJwtAuthenticated(req: Request, res: Response, next: NextFunction): Response | void {
+  console.log(`[JWT AUTH] isJwtAuthenticated check for path: ${req.path}`);
+  
   if (req.user) {
+    console.log(`[JWT AUTH] User already authenticated via middleware: ${req.user.username} (${req.user.id})`);
     return next();
   }
+  
+  console.log(`[JWT AUTH] No user in request, checking Authorization header: ${!!req.headers.authorization}`);
   
   // Also check Authorization header for JWT directly
   const token = extractTokenFromHeader(req.headers.authorization);
   if (token) {
+    console.log('[JWT AUTH] Token found in Authorization header');
     const userPayload = verifyToken(token);
     if (userPayload) {
+      console.log(`[JWT AUTH] Token verified for user: ${userPayload.username} (${userPayload.id})`);
       req.user = userPayload;
       return next();
+    } else {
+      console.log('[JWT AUTH] Token verification failed');
     }
+  } else {
+    console.log('[JWT AUTH] No token found in Authorization header');
   }
   
+  console.log('[JWT AUTH] Authentication failed, returning 401');
   return res.status(401).json({ error: 'Unauthorized: Authentication required' });
 }
 

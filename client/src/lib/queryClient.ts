@@ -194,6 +194,13 @@ export async function apiRequest(
         headerObj.set("Pragma", "no-cache");
         headerObj.set("Cache-Control", "no-cache, no-store, must-revalidate");
         
+        // Add JWT token for authentication
+        const token = getToken();
+        if (token) {
+          headerObj.set("Authorization", `Bearer ${token}`);
+          console.log('[API] Adding JWT token to request');
+        }
+        
         // Then add any custom headers
         Object.entries(headers).forEach(([key, value]) => {
           if (value !== undefined) {
@@ -275,26 +282,41 @@ export async function apiRequest(
         // Handle auth errors more gracefully - don't log out immediately
         // Wait at least 2 seconds before considering it a real session error
         setTimeout(async () => {
-          console.log('[API] Delayed session check after 401 error');
+          console.log('[API] Delayed JWT check after 401 error');
           
-          // Check session status directly first to avoid unnecessary logout
-          // Use Headers API for type safety
-          const headers = new Headers();
-          headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
-          headers.set("Pragma", "no-cache");
+          // Get JWT token from localStorage
+          const token = getToken();
           
-          const sessionData = await fetch('/api/session', {
-            credentials: 'include',
-            headers: headers
-          }).then(res => res.json()).catch(err => null);
-          
-          // If session appears valid, don't show error
-          if (sessionData?.authenticated) {
-            console.log('[API] Session appears valid after direct check - ignoring auth error');
+          if (!token) {
+            // No token, definitely logged out
+            handleSessionExpiration(
+              (error as any)?.status || 'auth_error',
+              "Please sign in to continue", // Simpler message
+              1000 // shorter redirect delay since we already waited
+            );
             return;
           }
           
-          // Check if session is still valid after a delay
+          // Check JWT user endpoint directly with token in header
+          const headers = new Headers();
+          headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+          headers.set("Pragma", "no-cache");
+          headers.set("Authorization", `Bearer ${token}`);
+          
+          const userData = await fetch('/api/jwt/user', {
+            headers: headers
+          }).then(res => {
+            if (res.ok) return res.json();
+            return null;
+          }).catch(err => null);
+          
+          // If JWT is valid, don't show error
+          if (userData) {
+            console.log('[API] JWT appears valid after direct check - ignoring auth error');
+            return;
+          }
+          
+          // JWT is invalid, handle session expiration
           handleSessionExpiration(
             (error as any)?.status || 'auth_error',
             "Please sign in to continue", // Simpler message
