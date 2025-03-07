@@ -45,7 +45,7 @@ export const JwtAuthContext = createContext<JwtAuthContextType | null>(null);
 export function JwtAuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
-  // Get user data from JWT token
+  // Get user data from JWT token with enhanced fallback mechanisms
   const {
     data: user,
     error,
@@ -54,12 +54,40 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
   } = useQuery<UserResponse | null, Error>({
     queryKey: ["/api/jwt/user"],
     queryFn: async () => {
-      // First try to get user from API
+      console.log("[JWT AUTH] Starting user authentication check");
+      
+      // Try emergency token as last resort if we detect repeated auth failures
+      const needsEmergencyToken = localStorage.getItem('jwt_auth_failures') && 
+                               parseInt(localStorage.getItem('jwt_auth_failures') || '0') > 3;
+      
+      if (needsEmergencyToken) {
+        console.log("[JWT AUTH] Multiple auth failures detected, trying emergency token");
+        try {
+          const response = await fetch('/api/jwt/emergency-token');
+          if (response.ok) {
+            const data = await response.json();
+            if (data.token && data.user) {
+              console.log("[JWT AUTH] Emergency token obtained successfully");
+              saveToken(data.token);
+              localStorage.removeItem('jwt_auth_failures');
+              return data.user;
+            }
+          }
+        } catch (err) {
+          console.error("[JWT AUTH] Failed to get emergency token:", err);
+        }
+      }
+      
+      // Normal authentication flow
       try {
         // Check if we have a token
         const token = getToken();
-        if (!token) return null;
+        if (!token) {
+          console.log("[JWT AUTH] No token found in storage");
+          return null;
+        }
 
+        console.log("[JWT AUTH] Attempting to validate existing token");
         const res = await apiRequest("GET", "/api/jwt/user", undefined, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -67,28 +95,40 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
         if (!res.ok) {
           // If API fails with 401, try to parse user from token as fallback
           if (res.status === 401) {
+            console.log("[JWT AUTH] 401 from /api/jwt/user endpoint, token may be invalid");
+            
+            // Increment auth failure counter
+            const failures = parseInt(localStorage.getItem('jwt_auth_failures') || '0');
+            localStorage.setItem('jwt_auth_failures', (failures + 1).toString());
+            
+            // Try to parse user from token as fallback
             const userFromToken = parseUserFromToken();
             if (userFromToken) {
-              console.log("[JWT] Using parsed user from token:", userFromToken);
+              console.log("[JWT AUTH] Using parsed user from token:", userFromToken.username);
               return userFromToken;
             }
           }
           throw new Error(`Authentication failed: ${res.statusText}`);
         }
 
+        // Success! Clear failure counter
+        localStorage.removeItem('jwt_auth_failures');
         return await res.json();
       } catch (error) {
         console.error("[JWT AUTH] Error fetching user:", error);
+        
         // As final fallback, try to parse user from token
         const userFromToken = parseUserFromToken();
         if (userFromToken) {
-          console.log("[JWT] Using parsed user from token as fallback");
+          console.log("[JWT AUTH] Using parsed user from token as final fallback");
           return userFromToken;
         }
+        
         return null;
       }
     },
     retry: 1,
+    retryDelay: 1000,
   });
 
   // Login mutation
