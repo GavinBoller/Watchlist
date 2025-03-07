@@ -474,8 +474,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (user && user.username === usernameHeader) {
               console.log(`[WATCHLIST] Emergency authentication successful via headers`);
-              authUser = user;
-              req.user = createUserResponse(user);
+              // Create a user response object without the password
+              const { password, ...userWithoutPassword } = user;
+              authUser = userWithoutPassword;
+              req.user = userWithoutPassword;
             }
           } catch (dbError) {
             console.error('[WATCHLIST] Error retrieving user from headers info:', dbError);
