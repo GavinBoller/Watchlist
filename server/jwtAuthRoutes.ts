@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { generateToken, createUserResponse } from './jwtAuth';
+import { generateToken, createUserResponse, verifyToken } from './jwtAuth';
 import { storage } from './storage';
 import { insertUserSchema } from '@shared/schema';
 import bcrypt from 'bcryptjs';
@@ -68,8 +68,18 @@ router.post('/jwt/login', async (req: Request, res: Response) => {
     }
     
     // Generate JWT token
-    const token = generateToken(user);
     const userResponse = createUserResponse(user);
+    const token = generateToken(userResponse);
+    
+    // Verify token immediately to ensure it works
+    const verifiedUser = verifyToken(token);
+    if (!verifiedUser) {
+      console.error(`[JWT AUTH] Generated token failed verification for user ${username}`);
+      console.error('[JWT AUTH] This is a critical security issue - using hardcoded secret for reliability');
+      return res.status(500).json({ error: 'JWT token generation failed - please contact support' });
+    }
+    
+    console.log(`[JWT AUTH] Login successful and token verified for user ${username}`);
     
     // Send token and user information
     res.status(200).json({
@@ -108,8 +118,18 @@ router.post('/jwt/register', async (req: Request, res: Response) => {
     const newUser = await storage.createUser(userData);
     
     // Generate JWT token
-    const token = generateToken(newUser);
     const userResponse = createUserResponse(newUser);
+    const token = generateToken(userResponse);
+    
+    // Verify token immediately to ensure it works
+    const verifiedUser = verifyToken(token);
+    if (!verifiedUser) {
+      console.error(`[JWT AUTH] Generated token failed verification for new user ${req.body.username}`);
+      console.error('[JWT AUTH] This is a critical security issue - using hardcoded secret for reliability');
+      return res.status(500).json({ error: 'JWT token generation failed - please contact support' });
+    }
+    
+    console.log(`[JWT AUTH] Registration successful and token verified for user ${req.body.username}`);
     
     // Send token and user information
     res.status(201).json({
@@ -137,11 +157,35 @@ router.get('/jwt/user', async (req: Request, res: Response) => {
  * Validate token endpoint (optional, for debugging)
  */
 router.post('/jwt/validate', (req: Request, res: Response) => {
-  if (!req.user) {
-    return res.status(401).json({ error: 'Invalid token' });
+  try {
+    // Get token from Authorization header or request body
+    const authHeader = req.headers.authorization;
+    const tokenFromBody = req.body.token;
+    
+    let token = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (tokenFromBody) {
+      token = tokenFromBody;
+    }
+    
+    if (!token) {
+      return res.status(400).json({ error: 'No token provided' });
+    }
+    
+    // Manually verify the token
+    const verified = verifyToken(token);
+    if (!verified) {
+      console.error('[JWT] Token validation failed on direct validation endpoint');
+      return res.status(401).json({ valid: false, error: 'Invalid token' });
+    }
+    
+    console.log('[JWT] Token successfully validated:', verified.username);
+    return res.status(200).json({ valid: true, user: verified });
+  } catch (error) {
+    console.error('[JWT] Token validation error:', error);
+    return res.status(500).json({ valid: false, error: 'Token validation error' });
   }
-  
-  res.status(200).json({ valid: true, user: req.user });
 });
 
 export const jwtAuthRouter = router;

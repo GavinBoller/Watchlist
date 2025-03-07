@@ -60,7 +60,14 @@ export const parseUserFromToken = (): UserResponse | null => {
   
   try {
     // Get the payload part of the JWT (second part)
-    const base64Url = token.split('.')[1];
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      console.error('Invalid JWT token format - not three parts');
+      removeToken(); // Clear invalid token
+      return null;
+    }
+    
+    const base64Url = parts[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     const jsonPayload = decodeURIComponent(
       atob(base64)
@@ -69,9 +76,25 @@ export const parseUserFromToken = (): UserResponse | null => {
         .join('')
     );
     
-    return JSON.parse(jsonPayload);
+    const payload = JSON.parse(jsonPayload);
+    
+    // Validate payload has required fields
+    if (!payload.id || !payload.username) {
+      console.error('Invalid JWT payload - missing required fields');
+      removeToken(); // Clear invalid token
+      return null;
+    }
+    
+    console.log('[JWT] Successfully parsed user from token:', payload.username);
+    
+    // Store backup user info in localStorage for emergency fallback
+    localStorage.setItem('backup_user_id', payload.id.toString());
+    localStorage.setItem('backup_username', payload.username);
+    
+    return payload;
   } catch (error) {
     console.error('Failed to parse user from token:', error);
+    removeToken(); // Clear invalid token
     return null;
   }
 };
