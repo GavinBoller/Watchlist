@@ -413,8 +413,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST endpoint to add movie to watchlist with enhanced JWT verification
-  app.post("/api/watchlist", async (req: Request, res: Response) => {
+  // POST endpoint to add movie to watchlist with isJwtAuthenticated middleware
+  app.post("/api/watchlist", isJwtAuthenticated, async (req: Request, res: Response) => {
     console.log("POST /api/watchlist - Request body:", JSON.stringify(req.body, null, 2));
     console.log("POST /api/watchlist - Headers:", JSON.stringify({
       auth: req.headers.authorization ? "Present" : "Missing",
@@ -423,79 +423,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }, null, 2));
     
     try {
-      // First, check if the user is already authenticated via session
-      if (req.isAuthenticated() && req.user) {
-        console.log(`[WATCHLIST] User already authenticated via session: ${(req.user as any).username}`);
-      } else {
-        console.log('[WATCHLIST] No session authentication, checking for JWT token');
-      }
+      // The isJwtAuthenticated middleware already checked authentication
+      // and populated req.user if token is valid
       
-      // Try JWT token verification
-      const token = extractTokenFromHeader(req.headers.authorization);
-      let authUser: any = null;
-      let tokenVerified = false;
-      
-      if (token) {
-        console.log('[WATCHLIST] JWT token found in request');
-        try {
-          const userPayload = verifyToken(token);
-          if (userPayload) {
-            console.log(`[WATCHLIST] JWT token verified for user: ${userPayload.username}`);
-            authUser = userPayload;
-            req.user = userPayload; // Set user on the request object
-            tokenVerified = true;
-          } else {
-            console.log('[WATCHLIST] JWT token verification failed');
-          }
-        } catch (tokenError) {
-          console.error('[WATCHLIST] JWT token verification error:', tokenError);
-        }
-      } else {
-        console.log('[WATCHLIST] No JWT token in request');
-      }
-      
-      // Fallback: If no token or verification failed, check if user is already set in request
-      if (!authUser && req.user) {
-        console.log('[WATCHLIST] Using existing authenticated user from session');
-        authUser = req.user;
-      }
-      
-      // Try to extract user information from headers (emergency fallback)
-      if (!authUser) {
-        const userIdHeader = req.headers['x-user-id'];
-        const usernameHeader = req.headers['x-username'];
-        
-        if (userIdHeader && usernameHeader) {
-          console.log(`[WATCHLIST] Found user info in headers: ID=${userIdHeader}, Username=${usernameHeader}`);
-          
-          try {
-            // Try to get the user from database
-            const userId = parseInt(userIdHeader as string, 10);
-            const user = await storage.getUser(userId);
-            
-            if (user && user.username === usernameHeader) {
-              console.log(`[WATCHLIST] Emergency authentication successful via headers`);
-              // Create a user response object without the password
-              const { password, ...userWithoutPassword } = user;
-              authUser = userWithoutPassword;
-              req.user = userWithoutPassword;
-            }
-          } catch (dbError) {
-            console.error('[WATCHLIST] Error retrieving user from headers info:', dbError);
-          }
-        }
-      }
-      
-      // Check authentication
+      const authUser = req.user;
       if (!authUser) {
         console.log('[WATCHLIST] No authenticated user found');
         return res.status(401).json({ 
           message: "Authentication required",
-          details: "Please log in again. Your session may have expired.",
-          tokenPresent: !!token,
-          tokenVerified: tokenVerified
+          details: "Please log in again. Your session may have expired."
         });
       }
+      
+      console.log(`[WATCHLIST] User authenticated for watchlist action: ${(authUser as any).username} (ID: ${(authUser as any).id})`);
+    
       
       // Parse and validate the input
       const { userId, tmdbId, tmdbData, status = 'to_watch', watchedDate = null, notes = '' } = req.body;
