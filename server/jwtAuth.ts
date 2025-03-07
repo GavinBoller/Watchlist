@@ -27,7 +27,11 @@ export function generateToken(user: UserPayload): string {
  */
 export function verifyToken(token: string): UserResponse | null {
   try {
+    console.log('[JWT] Verifying token with secret:', JWT_SECRET.substring(0, 3) + '...');
+    console.log('[JWT] Token to verify (first 20 chars):', token.substring(0, 20) + '...');
+    
     const decoded = jwt.verify(token, JWT_SECRET) as UserResponse;
+    console.log('[JWT] Token decoded successfully:', JSON.stringify(decoded));
     return decoded;
   } catch (error) {
     console.error('[JWT] Token verification failed:', error);
