@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { isAuthenticated, hasWatchlistAccess, validateSession } from "./auth";
 import { isJwtAuthenticated, hasJwtWatchlistAccess } from "./jwtMiddleware";
+import { extractTokenFromHeader, verifyToken } from "./jwtAuth";
 import axios from "axios";
 import { z } from "zod";
 import { 
@@ -141,7 +142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       environment
     });
   });
-  
+
   // Add special refresh session endpoint that can recover sessions
   app.get("/api/refresh-session", async (req: Request, res: Response) => {
     const userId = req.query.userId ? parseInt(req.query.userId as string, 10) : null;
@@ -403,587 +404,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error(`[WATCHLIST] Error in primary watchlist fetch:`, primaryError);
       }
       
-      // STEP 2: If we get here, there was an issue - try recovery mechanisms
-      
-      // Special handling for production environment
-      if (isProd) {
-        console.log(`[WATCHLIST] Attempting production recovery for user ${userId}`);
-        
-        // Recovery mechanism 1: Check if watchlist is in session
-        if (req.session && (req.session as any).lastWatchlistUser === userId) {
-          console.log(`[WATCHLIST] Found previous watchlist data in session`);
-          
-          try {
-            // Try again with a direct call to minimize layers
-            watchlistData = await storage.getWatchlistEntries(userId);
-            console.log(`[WATCHLIST] Direct storage retry successful: ${watchlistData.length} entries`);
-            
-            // Return recovered data
-            return res.status(200)
-              .header('X-Recovery-Method', 'direct-retry')
-              .json(watchlistData);
-          } catch (retryError) {
-            console.error(`[WATCHLIST] Direct retry failed:`, retryError);
-          }
-        }
-        
-        // Recovery mechanism 2: Use the authenticated user as fallback
-        if (req.user && (req.user as any).id) {
-          const authUserId = (req.user as any).id;
-          
-          // Only try this if the requested user is different from authenticated user
-          if (authUserId !== userId) {
-            console.log(`[WATCHLIST] Fallback to authenticated user watchlist: ${authUserId}`);
-            
-            try {
-              watchlistData = await storage.getWatchlistEntries(authUserId);
-              console.log(`[WATCHLIST] Auth user fallback successful: ${watchlistData.length} entries`);
-              
-              // Return recovered data
-              return res.status(200)
-                .header('X-Recovery-Method', 'auth-user-fallback')
-                .json(watchlistData);
-            } catch (authError) {
-              console.error(`[WATCHLIST] Auth user fallback failed:`, authError);
-            }
-          }
-        }
-        
-        // Recovery mechanism 3: Use backup data from session if available
-        if (req.session && 
-            (req.session as any).userBackup && 
-            (req.session as any).userBackup.watchlist) {
-          
-          console.log(`[WATCHLIST] Using backup watchlist data from session`);
-          const backupData = (req.session as any).userBackup.watchlist;
-          
-          // Return whatever we have as backup
-          return res.status(200)
-            .header('X-Recovery-Method', 'session-backup')
-            .json(backupData);
-        }
-      }
-      
-      // If all recovery mechanisms fail, return appropriate response
-      if (userFound) {
-        // User exists but watchlist fetch failed
-        console.log(`[WATCHLIST] All recovery attempts failed but user exists, returning empty array`);
-        return res.status(200)
-          .header('X-Recovery-Status', 'failed')
-          .json([]);
-      } else {
-        // User not found
-        console.log(`[WATCHLIST] User not found and recovery failed`);
-        return res.status(404).json({ 
-          message: "User not found", 
-          code: "USER_NOT_FOUND",
-          recoveryAttempted: isProd
-        });
-      }
+      // If we reach here, something went wrong with the primary fetch
+      return res.status(404).json({ message: "Watchlist not found" });
     } catch (error) {
-      console.error('[WATCHLIST] Unhandled exception in watchlist route:', error);
-      
-      res.status(500).json({ 
-        message: "Failed to fetch watchlist", 
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
+      console.error("Error fetching watchlist:", error);
+      res.status(500).json({ message: "Failed to fetch watchlist" });
     }
   });
 
-  app.post("/api/watchlist", isJwtAuthenticated, hasJwtWatchlistAccess, async (req: Request, res: Response) => {
+  // POST endpoint to add movie to watchlist with enhanced JWT verification
+  app.post("/api/watchlist", async (req: Request, res: Response) => {
     console.log("POST /api/watchlist - Request body:", JSON.stringify(req.body, null, 2));
-    
-    // CRITICAL PRODUCTION FIX: Direct access for watchlist operations with minimal dependencies
-    if (process.env.NODE_ENV === 'production') {
-      try {
-        // Always use the authenticated user's ID from request object
-        const authUser = req.user as any;
-        if (!authUser || !authUser.id) {
-          console.error("CRITICAL: No authenticated user for watchlist operation");
-          return res.status(401).json({ 
-            message: "Authentication required",
-            details: "Please log in again" 
-          });
-        }
-        
-        const userId = authUser.id;
-        console.log(`PRODUCTION WATCHLIST FIX: Using authenticated user ID: ${userId}`);
-        
-        // Extract movie data - ensure this exists
-        const { tmdbMovie } = req.body;
-        if (!tmdbMovie || !tmdbMovie.id) {
-          console.error("CRITICAL: Missing or invalid movie data in request");
-          return res.status(400).json({ 
-            message: "Invalid request",
-            details: "Movie data is required" 
-          });
-        }
-        
-        // Simplify watchlist entry creation to reduce complexity
-        // 1. Check if movie exists in database
-        console.log(`PRODUCTION WATCHLIST: Checking if movie exists - TMDB ID: ${tmdbMovie.id}`);
-        let movie = await storage.getMovieByTmdbId(tmdbMovie.id);
-        
-        // 2. If not, create it with direct SQL to avoid ORM issues
-        if (!movie) {
-          console.log(`PRODUCTION WATCHLIST: Movie not found, creating new record`);
-          
-          // Simple movie data with essential fields
-          const movieData = {
-            tmdbId: tmdbMovie.id,
-            title: tmdbMovie.title || tmdbMovie.name || "Unknown Title",
-            overview: tmdbMovie.overview || "",
-            posterPath: tmdbMovie.poster_path || null,
-            backdropPath: tmdbMovie.backdrop_path || null,
-            releaseDate: tmdbMovie.release_date || tmdbMovie.first_air_date || null,
-            voteAverage: (tmdbMovie.vote_average || 0).toString(),
-            genres: "",
-            mediaType: tmdbMovie.media_type || "movie"
-          };
-          
-          // Create the movie record
-          try {
-            movie = await storage.createMovie(movieData);
-            console.log(`PRODUCTION WATCHLIST: Created movie with ID: ${movie.id}`);
-          } catch (movieError) {
-            console.error("PRODUCTION WATCHLIST: Movie creation error:", movieError);
-            
-            // One final attempt to fetch the movie in case of race condition
-            const retryMovie = await storage.getMovieByTmdbId(tmdbMovie.id);
-            if (retryMovie) {
-              movie = retryMovie;
-              console.log(`PRODUCTION WATCHLIST: Found movie in second attempt with ID: ${movie.id}`);
-            } else {
-              throw new Error("Failed to create or find movie record");
-            }
-          }
-        }
-        
-        // 3. Check if watchlist entry already exists to avoid duplicates
-        console.log(`PRODUCTION WATCHLIST: Checking if watchlist entry exists - User: ${userId}, Movie: ${movie.id}`);
-        const existingEntry = await storage.hasWatchlistEntry(userId, movie.id);
-        
-        if (existingEntry) {
-          console.log(`PRODUCTION WATCHLIST: Entry already exists for user ${userId} and movie ${movie.id}`);
-          return res.status(200).json({ 
-            message: "Already in watchlist",
-            details: `You've already added "${movie.title}" to your watchlist`
-          });
-        }
-        
-        // 4. Create the watchlist entry with simplified data
-        console.log(`PRODUCTION WATCHLIST: Creating watchlist entry - User: ${userId}, Movie: ${movie.id}`);
-        const watchlistData = {
-          userId: userId,
-          movieId: movie.id,
-          status: req.body.status || 'to_watch',
-          notes: req.body.notes || null,
-          watchedDate: req.body.watchedDate || null
-        };
-        
-        const watchlistEntry = await storage.createWatchlistEntry(watchlistData);
-        console.log(`PRODUCTION WATCHLIST: Created watchlist entry with ID: ${watchlistEntry.id}`);
-        
-        // 5. Return success response with entry and movie details
-        const entryWithMovie = {
-          ...watchlistEntry,
-          movie
-        };
-        
-        return res.status(201).json(entryWithMovie);
-      } catch (error) {
-        console.error("PRODUCTION WATCHLIST ERROR:", error);
-        return res.status(500).json({
-          message: "Failed to add movie to watchlist",
-          details: error instanceof Error ? error.message : "Unknown error"
-        });
-      }
-    }
-    console.log("Environment:", process.env.NODE_ENV || 'development');
-    
-    // Add custom headers for debugging
-    res.setHeader('X-Watchlist-Operation', 'add_item');
-    res.setHeader('X-Request-ID', `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`);
-    
-    // === ENHANCED USER VALIDATION ===
-    // Check authentication at multiple levels for production reliability
-    if (!req.isAuthenticated()) {
-      console.warn("WARNING: User not authenticated when accessing watchlist POST endpoint");
-      return res.status(401).json({ 
-        message: "Authentication required",
-        details: "Please log in again to add items to your watchlist"
-      });
-    }
-    
-    // Validate user object exists
-    if (!req.user) {
-      console.error("ERROR: isAuthenticated true but req.user missing");
-      // Try to recover session information
-      const sessionUser = (req.session as any)?.passport?.user;
-      if (sessionUser) {
-        console.log("Found user ID in session passport data:", sessionUser);
-        // Recreate user object from session data
-        try {
-          const recoveredUser = await storage.getUser(sessionUser);
-          if (recoveredUser) {
-            console.log("Successfully recovered user from session data:", recoveredUser.username);
-            req.user = recoveredUser;
-          }
-        } catch (e) {
-          console.error("Failed to recover user from session data:", e);
-        }
-      }
-      
-      // If still no user, return error
-      if (!req.user) {
-        return res.status(401).json({ 
-          message: "Session error",
-          details: "Please log out and log back in to refresh your session"
-        });
-      }
-    }
-    
-    // Log authentication info
-    const authenticatedUserId = (req.user as any)?.id;
-    const authenticatedUsername = (req.user as any)?.username;
-    console.log(`Authenticated user: ID=${authenticatedUserId}, Username=${authenticatedUsername}`);
-    
-    // Add tracing headers for client to validate
-    res.setHeader('X-Auth-User-ID', authenticatedUserId);
-    res.setHeader('X-Auth-Username', authenticatedUsername);
-    
-    // CRITICAL: Always ensure we have a valid user ID - FIX FOR PRODUCTION ISSUES
-    
-    if (authenticatedUserId) {
-      // GUARANTEED FIX: Always force userId to be the authenticated user's ID
-      // This resolves the "username not found" issue in production
-      console.log(`WATCHLIST FIX: Setting userId to authenticated user (${authenticatedUserId})`);
-      req.body.userId = authenticatedUserId;
-      
-      // Extra validation for debugging
-      if (typeof req.body.userId !== 'number') {
-        console.warn(`CRITICAL: userId is not a number after assignment! Type: ${typeof req.body.userId}, Value: ${req.body.userId}`);
-        // Force conversion to number
-        req.body.userId = Number(authenticatedUserId);
-      }
-    } else {
-      console.error("CRITICAL: Authenticated but no user ID available!");
-      
-      // Try to get user ID from request headers (set by client for recovery)
-      const headerUserId = req.headers['x-user-id'];
-      if (headerUserId && !Array.isArray(headerUserId)) {
-        const parsedUserId = parseInt(headerUserId);
-        if (!isNaN(parsedUserId)) {
-          console.log(`Found user ID in custom header: ${parsedUserId}`);
-          req.body.userId = parsedUserId;
-        }
-      }
-      
-      // If still no user ID, check session data
-      if (!req.body.userId && req.session) {
-        const sessionUserId = (req.session as any)?.preservedUserId || (req.session as any)?.passport?.user;
-        if (sessionUserId) {
-          console.log(`Found user ID in session data: ${sessionUserId}`);
-          req.body.userId = sessionUserId;
-        }
-      }
-      
-      // If we still have no user ID, return error
-      if (!req.body.userId) {
-        return res.status(500).json({ 
-          message: "Session error",
-          details: "Please log out and log back in to refresh your session"
-        });
-      }
-    }
+    console.log("POST /api/watchlist - Headers:", JSON.stringify({
+      auth: req.headers.authorization ? "Present" : "Missing",
+      contentType: req.headers['content-type'],
+      userAgent: req.headers['user-agent']
+    }, null, 2));
     
     try {
-      const { userId, tmdbMovie, watchedDate, notes, status } = req.body;
+      // First, verify JWT token manually to ensure proper authentication
+      const token = extractTokenFromHeader(req.headers.authorization);
+      let authUser: any = null;
       
-      // Enhanced validation for production stability
-      if (!userId) {
-        console.log("Missing userId field");
-        return res.status(400).json({ message: "User ID is required" });
-      }
-      
-      if (!tmdbMovie) {
-        console.log("Missing tmdbMovie field");
-        return res.status(400).json({ message: "Movie data is required" });
-      }
-      
-      if (!tmdbMovie.id) {
-        console.log("Missing tmdbMovie.id field");
-        return res.status(400).json({ message: "Movie ID is required" });
-      }
-      
-      // Check for authentication if in production - prevent malicious access
-      const isProd = process.env.NODE_ENV === 'production';
-      if (isProd && req.isAuthenticated()) {
-        const authenticatedUserId = (req.user as any)?.id;
-        if (authenticatedUserId && authenticatedUserId !== userId) {
-          console.log("Auth mismatch - auth user:", authenticatedUserId, "request user:", userId);
-          return res.status(403).json({ message: "You can only add movies to your own watchlist" });
-        }
-      }
-      
-      // Check if user exists - with enhanced error handling and type checking
-      console.log("Checking if user exists - userId:", userId, "typeof:", typeof userId);
-      
-      // Try to parse userId to number if it's a string
-      let userIdNum = userId;
-      if (typeof userId === 'string') {
-        userIdNum = parseInt(userId, 10);
-        console.log("Converted userId string to number:", userIdNum);
-      }
-      
-      let user = await storage.getUser(userIdNum);
-      
-      // Enhanced user checking with multiple fallback strategies if user not found
-      if (!user) {
-        console.log("User not found initially - userIdNum:", userIdNum, typeof userIdNum);
-        
-        // PRODUCTION RELIABILITY: Always prioritize the authenticated user from the session
-        if (req.isAuthenticated() && req.user) {
-          const authUserId = (req.user as any).id;
-          console.log("Using authenticated user from session - authUserId:", authUserId);
-          
-          // Always trust the session's user
-          try {
-            const authUser = await storage.getUser(authUserId);
-            
-            if (authUser) {
-              console.log("Found authenticated user:", authUser.username);
-              // Proceed with the authenticated user instead
-              userIdNum = authUserId;
-              // Update the request body to match the authenticated user
-              req.body.userId = authUserId;
-              // Success - continue with this user
-              console.log(`Using authenticated user ${authUser.username} (ID: ${authUserId}) for watchlist operation`);
-            } else {
-              console.warn(`Authenticated user ID ${authUserId} not found in database - this should never happen!`);
-              
-              // EXTREME FALLBACK: If we somehow have an authenticated session but no user record,
-              // try to create a temporary user record to prevent data loss
-              try {
-                console.log("Attempting emergency user record creation for authenticated user");
-                const username = (req.user as any).username || `RecoveredUser_${Date.now()}`;
-                const emergencyUser = await storage.createUser({
-                  username,
-                  password: "temporary_" + Date.now(), // This will be auto-hashed
-                  displayName: username
-                });
-                
-                console.log("Emergency user created:", emergencyUser.username, emergencyUser.id);
-                userIdNum = emergencyUser.id;
-                req.body.userId = emergencyUser.id;
-              } catch (emergencyError) {
-                console.error("Failed to create emergency user:", emergencyError);
-                // Continue with standard error flow
-              }
-            }
-          } catch (dbError) {
-            console.error("Database error while looking up authenticated user:", dbError);
-          }
-        }
-        
-        // If we STILL don't have a valid user, try one more time with the user lookup
-        if (!user && userIdNum) {
-          console.log("Retrying user lookup with userIdNum:", userIdNum);
-          try {
-            user = await storage.getUser(userIdNum);
-          } catch (retryError) {
-            console.error("Error in user lookup retry:", retryError);
-          }
-        }
-        
-        // If we STILL don't have a user after all fallbacks, return error
-        if (!user) {
-          console.error("User not found after all fallback strategies");
-          // Log available users for debugging
-          try {
-            const allUsers = await storage.getAllUsers();
-            console.log("Available users:", allUsers.map(u => ({ id: u.id, username: u.username })));
-          } catch (e) {
-            console.error("Error listing users:", e);
-          }
-          
-          return res.status(404).json({ 
-            message: "User account not found", 
-            details: "Please try logging out and back in to refresh your session"
-          });
+      if (token) {
+        console.log('[WATCHLIST] Token found in request');
+        const userPayload = verifyToken(token);
+        if (userPayload) {
+          console.log(`[WATCHLIST] Token verified for user: ${userPayload.username}`);
+          authUser = userPayload;
+          req.user = userPayload; // Set user on the request object
+        } else {
+          console.log('[WATCHLIST] Token verification failed');
         }
       } else {
-        console.log("User found:", user.username, "ID:", user.id);
+        console.log('[WATCHLIST] No token in request');
       }
       
-      // Ensure tmdbMovie has the required fields with fallback values for production robustness
-      const validatedTmdbMovie = {
-        id: tmdbMovie.id || 0,
-        title: tmdbMovie.title || tmdbMovie.name || "Unknown Title",
-        overview: tmdbMovie.overview || "",
-        poster_path: tmdbMovie.poster_path || null,
-        backdrop_path: tmdbMovie.backdrop_path || null,
-        release_date: tmdbMovie.release_date || tmdbMovie.first_air_date || null,
-        vote_average: tmdbMovie.vote_average || 0,
-        genre_ids: Array.isArray(tmdbMovie.genre_ids) ? tmdbMovie.genre_ids : [],
-        media_type: tmdbMovie.media_type || "movie"
-      };
-      
-      if (validatedTmdbMovie.id === 0) {
-        console.error("Invalid TMDB movie data - missing ID");
-        return res.status(400).json({ message: "Invalid movie data: missing ID" });
+      // Fallback: If no token or verification failed, check if user is already set in request
+      if (!authUser && req.user) {
+        console.log('[WATCHLIST] Using existing authenticated user from request');
+        authUser = req.user;
       }
       
-      // Check if movie already exists in our database, if not create it
-      console.log("Checking if movie exists in database - tmdbId:", validatedTmdbMovie.id);
-      let movie = await storage.getMovieByTmdbId(validatedTmdbMovie.id);
+      // Check authentication
+      if (!authUser) {
+        console.log('[WATCHLIST] No authenticated user found');
+        return res.status(401).json({ message: "Unauthorized - Please log in again" });
+      }
       
-      if (!movie) {
-        console.log("Movie not found in database, creating new record");
-        // Convert genre IDs to genre names
-        const genreNames = await convertGenreIdsToNames(validatedTmdbMovie.genre_ids, validatedTmdbMovie.media_type);
-        const genres = genreNames.join(",");
+      // Parse and validate the input
+      const { userId, tmdbId, tmdbData, status = 'to_watch', watchedDate = null, notes = '' } = req.body;
+      
+      // Enhanced validation with better error messages
+      if (!userId || !tmdbId || !tmdbData) {
+        const missingFields = [];
+        if (!userId) missingFields.push('userId');
+        if (!tmdbId) missingFields.push('tmdbId');
+        if (!tmdbData) missingFields.push('tmdbData');
         
-        const mediaType = validatedTmdbMovie.media_type || "movie";
-        const title = validatedTmdbMovie.title || "Unknown Title";
-        const releaseDate = validatedTmdbMovie.release_date || null;
+        return res.status(400).json({ 
+          message: `Missing required fields: ${missingFields.join(', ')}` 
+        });
+      }
+      
+      // Safety check - ensure the user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Security check - ensure the authenticated user can only add to their own watchlist
+      // This prevents users from adding movies to other users' watchlists
+      if (authUser.id !== userId) {
+        console.log(`[WATCHLIST] Auth mismatch: authUser.id=${authUser.id}, userId=${userId}`);
+        return res.status(403).json({ 
+          message: "You can only add movies to your own watchlist" 
+        });
+      }
+      
+      // Check if this movie already exists in our database
+      let movie = await storage.getMovieByTmdbId(tmdbId);
+      
+      // If not, create the movie record
+      if (!movie) {
+        const mediaType = tmdbData.media_type || 'movie';
+        const title = mediaType === 'tv' ? tmdbData.name : tmdbData.title;
+        const releaseDate = mediaType === 'tv' ? tmdbData.first_air_date : tmdbData.release_date;
         
         try {
-          const movieData = {
-            tmdbId: validatedTmdbMovie.id,
-            title,
-            overview: validatedTmdbMovie.overview || "",
-            posterPath: validatedTmdbMovie.poster_path || null,
-            backdropPath: validatedTmdbMovie.backdrop_path || null,
-            releaseDate,
-            voteAverage: validatedTmdbMovie.vote_average?.toString() || "0",
-            genres,
-            mediaType,
-          };
+          movie = await storage.createMovie({
+            tmdbId,
+            title: title || '[Unknown Title]',
+            overview: tmdbData.overview || '',
+            posterPath: tmdbData.poster_path || '',
+            backdropPath: tmdbData.backdrop_path || '',
+            releaseDate: releaseDate || null,
+            voteAverage: tmdbData.vote_average || 0,
+            mediaType
+          });
           
-          console.log("Creating movie with data:", JSON.stringify(movieData, null, 2));
-          
-          // Validate the movie data
-          const validatedMovieData = insertMovieSchema.parse(movieData);
-          movie = await storage.createMovie(validatedMovieData);
-          console.log("Movie created successfully:", movie.id);
-          
+          console.log(`[WATCHLIST] Created new movie: ${movie.title} (ID: ${movie.id})`);
         } catch (movieError) {
-          console.error("Error creating movie record:", movieError);
-          
-          // Check if the movie was created despite the error (race condition)
-          const existingMovie = await storage.getMovieByTmdbId(validatedTmdbMovie.id);
-          if (existingMovie) {
-            console.log("Movie found after error (possible race condition):", existingMovie.id);
-            movie = existingMovie;
-          } else {
-            throw new Error(`Failed to create movie record: ${movieError instanceof Error ? movieError.message : 'Unknown error'}`);
-          }
+          console.error(`[WATCHLIST] Error creating movie:`, movieError);
+          return res.status(500).json({ message: "Error creating movie record" });
         }
       } else {
-        console.log("Movie found in database:", movie.id, movie.title);
+        console.log(`[WATCHLIST] Found existing movie: ${movie.title} (ID: ${movie.id})`);
       }
       
       // Check if this movie is already in the user's watchlist
-      console.log("Checking if movie is already in user's watchlist - userId:", userIdNum, "movieId:", movie.id);
-      const alreadyInWatchlist = await storage.hasWatchlistEntry(userIdNum, movie.id);
-      if (alreadyInWatchlist) {
-        const movieTitle = movie.title || "this title";
-        console.log("Movie already in watchlist:", movieTitle);
-        
-        // Find the existing entry to return to client
-        const entries = await storage.getWatchlistEntries(userIdNum);
-        const existingEntry = entries.find(entry => entry.movieId === movie.id);
-        
-        if (existingEntry) {
-          console.log("Returning existing watchlist entry:", existingEntry.id);
-          return res.status(200).json({
-            ...existingEntry,
-            message: "Already in watchlist",
-            details: `You've already added "${movieTitle}" to your watchlist`
-          });
-        }
-        
+      const exists = await storage.hasWatchlistEntry(userId, movie.id);
+      if (exists) {
         return res.status(409).json({ 
-          message: "Already in watchlist", 
-          details: `You've already added "${movieTitle}" to your watchlist` 
+          message: "This movie is already in your watchlist" 
         });
       }
       
-      // Validate the status
-      const validStatus = status === 'to_watch' || status === 'watching' || status === 'watched' 
-        ? status 
-        : 'to_watch'; // Default to 'to_watch' if not specified or invalid
+      // Add the movie to the watchlist
+      const entry = await storage.createWatchlistEntry({
+        userId,
+        movieId: movie.id,
+        status,
+        watchedDate,
+        notes
+      });
       
-      console.log("Creating watchlist entry with status:", validStatus);
+      console.log(`[WATCHLIST] Added movie ${movie.title} to watchlist for user ${userId}`);
       
-      try {
-        // Create watchlist entry - ensure we use the validated userIdNum
-        const entryData = {
-          userId: userIdNum,
-          movieId: movie.id,
-          watchedDate: watchedDate || null,
-          notes: notes || null,
-          status: validStatus,
-        };
-        
-        console.log("Watchlist entry data:", JSON.stringify(entryData, null, 2));
-        // Validate and create the entry
-        const validatedEntryData = insertWatchlistEntrySchema.parse(entryData);
-        const watchlistEntry = await storage.createWatchlistEntry(validatedEntryData);
-        console.log("Watchlist entry created successfully:", watchlistEntry.id);
-        
-        // Return the entry with movie details
-        const entryWithMovie = {
-          ...watchlistEntry,
-          movie,
-        };
-        
-        res.status(201).json(entryWithMovie);
-        console.log("Watchlist entry response sent with status 201");
-      } catch (entryError) {
-        // Try to gracefully handle the error
-        console.error("Error creating watchlist entry:", entryError);
-        
-        if (entryError instanceof z.ZodError) {
-          console.error("Validation error details:", JSON.stringify(entryError.errors, null, 2));
-          return res.status(400).json({ 
-            message: "Invalid watchlist entry data", 
-            errors: entryError.errors 
-          });
-        }
-        
-        // Check for duplicate entry (race condition)
-        const errorMessage = entryError instanceof Error ? entryError.message : 'Unknown error';
-        if (errorMessage.includes('duplicate') || errorMessage.includes('unique constraint')) {
-          console.log("Detected duplicate entry error, retrieving existing entry");
-          
-          // Try to find the existing entry - use the validated userIdNum
-          const entries = await storage.getWatchlistEntries(userIdNum);
-          const existingEntry = entries.find(entry => entry.movieId === movie.id);
-          
-          if (existingEntry) {
-            console.log("Found existing entry after error:", existingEntry.id);
-            return res.status(200).json({
-              ...existingEntry,
-              message: "Entry already exists",
-              details: "This movie is already in your watchlist"
-            });
-          }
-        }
-        
-        // Pass the error details to client for debugging in development
-        const isDevEnvironment = process.env.NODE_ENV !== 'production';
-        const errorDetails = isDevEnvironment ? {
-          error: errorMessage,
-          stack: entryError instanceof Error ? entryError.stack : undefined
-        } : {};
-        
-        res.status(500).json({ 
-          message: "Failed to add movie to watchlist", 
-          ...errorDetails
-        });
-      }
+      // Return the newly created watchlist entry
+      return res.status(201).json(entry);
     } catch (error) {
       console.error("Unhandled error in watchlist creation:", error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1009,44 +558,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid watchlist entry ID" });
       }
       
+      // Get the existing entry to check ownership
       const existingEntry = await storage.getWatchlistEntry(id);
       if (!existingEntry) {
         return res.status(404).json({ message: "Watchlist entry not found" });
       }
       
-      // Validate the status if provided
-      let validStatus = undefined;
-      if (status !== undefined) {
-        validStatus = status === 'to_watch' || status === 'watching' || status === 'watched' 
-          ? status 
-          : 'watched'; // Default to 'watched' if invalid value
+      // Make sure the user can only update their own entries
+      if (existingEntry.userId !== (req.user as any).id) {
+        return res.status(403).json({ message: "You can only update your own watchlist entries" });
       }
       
-      const updates = {
-        ...(watchedDate !== undefined && { watchedDate }), // Keep as string for SQLite
-        ...(notes !== undefined && { notes }),
-        ...(validStatus !== undefined && { status: validStatus }),
-      };
+      // Update the entry
+      const updatedEntry = await storage.updateWatchlistEntry(id, {
+        status,
+        watchedDate,
+        notes
+      });
       
-      const updatedEntry = await storage.updateWatchlistEntry(id, updates);
-      
-      if (!updatedEntry) {
-        return res.status(404).json({ message: "Watchlist entry not found" });
-      }
-      
-      // Get the movie details to return the complete entry
-      const movie = await storage.getMovie(updatedEntry.movieId);
+      // Check if movie details are still valid
+      const movie = await storage.getMovie(existingEntry.movieId);
       if (!movie) {
         return res.status(500).json({ message: "Movie not found" });
       }
       
-      const entryWithMovie = {
-        ...updatedEntry,
-        movie,
-      };
-      
-      res.json(entryWithMovie);
+      res.json(updatedEntry);
     } catch (error) {
+      console.error("Error updating watchlist entry:", error);
       res.status(500).json({ message: "Failed to update watchlist entry" });
     }
   });
@@ -1059,19 +597,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid watchlist entry ID" });
       }
       
+      // Get the existing entry to check ownership
       const existingEntry = await storage.getWatchlistEntry(id);
       if (!existingEntry) {
         return res.status(404).json({ message: "Watchlist entry not found" });
       }
       
-      const deleted = await storage.deleteWatchlistEntry(id);
-      
-      if (!deleted) {
-        return res.status(500).json({ message: "Failed to delete watchlist entry" });
+      // Make sure the user can only delete their own entries
+      if (existingEntry.userId !== (req.user as any).id) {
+        return res.status(403).json({ message: "You can only delete your own watchlist entries" });
       }
       
-      res.status(204).end();
+      // Delete the entry
+      const success = await storage.deleteWatchlistEntry(id);
+      
+      res.json({ success });
     } catch (error) {
+      console.error("Error deleting watchlist entry:", error);
       res.status(500).json({ message: "Failed to delete watchlist entry" });
     }
   });
