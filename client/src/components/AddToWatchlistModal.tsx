@@ -208,6 +208,15 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
         'Pragma': 'no-cache'
       };
       
+      // Get JWT token and explicitly add it to the Authorization header
+      const token = localStorage.getItem('jwt_token');
+      if (token) {
+        console.log('[WATCHLIST] Adding JWT token to request directly');
+        headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        console.warn('[WATCHLIST] No JWT token found in localStorage');
+      }
+      
       // Add backup user information to help server recovery scenarios
       if (currentUser) {
         console.log(`Adding backup user information for reliability: ID=${currentUser.id}, Username=${currentUser.username}`);
@@ -235,6 +244,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
       }
       
       // Try with max retries and cross-browser compatibility improvements
+      console.log('[WATCHLIST] Sending request with headers:', headers);
       const res = await apiRequest('POST', '/api/watchlist', watchlistData, { 
         ...apiOptions,
         headers

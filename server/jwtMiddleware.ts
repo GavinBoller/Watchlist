@@ -62,18 +62,19 @@ export async function jwtAuthenticate(req: Request, res: Response, next: NextFun
  */
 export function isJwtAuthenticated(req: Request, res: Response, next: NextFunction): Response | void {
   console.log(`[JWT AUTH] isJwtAuthenticated check for path: ${req.path}`);
+  console.log(`[JWT AUTH] Request method: ${req.method}`);
+  console.log(`[JWT AUTH] Authorization header: ${req.headers.authorization ? 'Present' : 'Missing'}`);
+  console.log(`[JWT AUTH] Content-Type: ${req.headers['content-type'] || 'Not set'}`);
   
   if (req.user) {
     console.log(`[JWT AUTH] User already authenticated via middleware: ${req.user.username} (${req.user.id})`);
     return next();
   }
   
-  console.log(`[JWT AUTH] No user in request, checking Authorization header: ${!!req.headers.authorization}`);
-  
   // Also check Authorization header for JWT directly
   const token = extractTokenFromHeader(req.headers.authorization);
   if (token) {
-    console.log('[JWT AUTH] Token found in Authorization header');
+    console.log(`[JWT AUTH] Token found in Authorization header (first 20 chars): ${token.substring(0, 20)}...`);
     const userPayload = verifyToken(token);
     if (userPayload) {
       console.log(`[JWT AUTH] Token verified for user: ${userPayload.username} (${userPayload.id})`);
@@ -84,10 +85,22 @@ export function isJwtAuthenticated(req: Request, res: Response, next: NextFuncti
     }
   } else {
     console.log('[JWT AUTH] No token found in Authorization header');
+    
+    // Enhanced logging for debugging - check headers
+    console.log('[JWT AUTH] Available headers:', Object.keys(req.headers).join(', '));
+    
+    if (req.headers['x-user-id'] && req.headers['x-username']) {
+      console.log(`[JWT AUTH] Found backup user info in headers: User ID=${req.headers['x-user-id']}, Username=${req.headers['x-username']}`);
+    }
   }
   
   console.log('[JWT AUTH] Authentication failed, returning 401');
-  return res.status(401).json({ error: 'Unauthorized: Authentication required' });
+  return res.status(401).json({ 
+    error: 'Unauthorized: Authentication required',
+    message: 'Please log in again. Your session may have expired.',
+    path: req.path,
+    method: req.method 
+  });
 }
 
 /**

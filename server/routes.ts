@@ -439,7 +439,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
       
       // Parse and validate the input
-      const { userId, tmdbId, tmdbData, status = 'to_watch', watchedDate = null, notes = '' } = req.body;
+      console.log("[WATCHLIST] Raw request body:", JSON.stringify(req.body, null, 2));
+      
+      // Handle both tmdbData and tmdbMovie formats (for backward compatibility)
+      let userId = req.body.userId;
+      let tmdbId = req.body.tmdbId;
+      let tmdbData = req.body.tmdbData || req.body.tmdbMovie;
+      const status = req.body.status || 'to_watch'; 
+      const watchedDate = req.body.watchedDate || null;
+      const notes = req.body.notes || '';
+      
+      // If there's a tmdbMovie but no tmdbId, extract it from the tmdbMovie
+      if (!tmdbId && req.body.tmdbMovie && req.body.tmdbMovie.id) {
+        tmdbId = req.body.tmdbMovie.id;
+        console.log(`[WATCHLIST] Extracted tmdbId ${tmdbId} from tmdbMovie`);
+      }
+      
+      console.log(`[WATCHLIST] Parsed values: userId=${userId}, tmdbId=${tmdbId}, status=${status}`);
       
       // Enhanced validation with better error messages
       if (!userId || !tmdbId || !tmdbData) {
