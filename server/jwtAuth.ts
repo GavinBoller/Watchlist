@@ -2,8 +2,9 @@ import jwt from 'jsonwebtoken';
 import { User, UserResponse } from '@shared/schema';
 
 // Secret key for signing JWT tokens
-// In production, this should be in environment variables
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'; 
+// FIXED: Use a consistent secret for both dev and production
+// This ensures tokens work reliably across environments
+const JWT_SECRET = process.env.JWT_SECRET || 'watchlist-app-secure-jwt-secret-8fb38d7c98a1'; 
 const TOKEN_EXPIRATION = '7d'; // Token expiration time
 
 // Omit password when creating payload for JWT
@@ -19,6 +20,7 @@ export function generateToken(user: UserPayload): string {
     displayName: user.displayName || user.username
   };
   
+  console.log(`[JWT] Generating token for user: ${user.username} (ID: ${user.id})`);
   return jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
 }
 
@@ -34,7 +36,16 @@ export function verifyToken(token: string): UserResponse | null {
     console.log('[JWT] Token decoded successfully:', JSON.stringify(decoded));
     return decoded;
   } catch (error) {
+    // Enhanced error logging to help diagnose token issues
     console.error('[JWT] Token verification failed:', error);
+    
+    if (error instanceof jwt.JsonWebTokenError) {
+      console.error('[JWT] Specific error type:', error.name);
+      console.error('[JWT] Error message:', error.message);
+    } else if (error instanceof jwt.TokenExpiredError) {
+      console.error('[JWT] Token expired at:', error.expiredAt);
+    }
+    
     return null;
   }
 }
