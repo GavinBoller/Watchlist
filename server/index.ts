@@ -163,13 +163,18 @@ async function pushDatabaseSchema() {
     // Check if any sessions exist first to avoid data loss
     let sessionCount = 0;
     try {
-      const client = await pool.connect();
-      try {
-        const { rows } = await client.query('SELECT COUNT(*) FROM "session"');
-        sessionCount = parseInt(rows[0].count);
-        console.log(`Found ${sessionCount} existing sessions in database`);
-      } finally {
-        client.release();
+      // Check if pool is initialized and ready
+      if (pool && typeof pool.connect === 'function') {
+        const client = await pool.connect();
+        try {
+          const { rows } = await client.query('SELECT COUNT(*) FROM "session"');
+          sessionCount = parseInt(rows[0].count);
+          console.log(`Found ${sessionCount} existing sessions in database`);
+        } finally {
+          client.release();
+        }
+      } else {
+        console.log('Database pool not ready, skipping session count check');
       }
     } catch (err) {
       console.log('Error checking session count, assuming 0:', err);
@@ -338,7 +343,12 @@ async function startServer() {
     
     // Apply authentication middleware to protected routes AFTER registering routes
     // This ensures that the middleware is applied to all routes that need protection
-    app.use('/api/watchlist', isAuthenticated, hasWatchlistAccess);
+    // Use regular session-based authentication as a fallback for non-JWT routes
+    app.use('/api/watchlist-session', isAuthenticated, hasWatchlistAccess);
+    
+    // Apply JWT authentication middleware for watchlist routes - will be handled in routes.ts
+    // The middlewares are already imported in routes.ts and applied there
+    console.log('[SERVER] JWT Authentication middleware is applied to watchlist routes in routes.ts');
 
     // Add error handling middleware
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
