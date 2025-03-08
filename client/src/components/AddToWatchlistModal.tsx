@@ -166,37 +166,71 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
     try {
       console.log("Submitting watchlist data:", JSON.stringify(watchlistData, null, 2));
       
-      // Execute a simple auth check directly before continuing
+      // Execute a simple auth check directly before continuing with proper JWT support
       try {
-        const userCheck = await fetch("/api/user", { 
+        // Get JWT token from localStorage
+        const token = localStorage.getItem('jwt_token');
+        
+        console.log('[WATCHLIST] Pre-checking authentication before adding to watchlist');
+        
+        // Create headers with JWT token if available
+        const headers: Record<string, string> = {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache"
+        };
+        
+        // Include JWT token if available
+        if (token) {
+          console.log('[WATCHLIST] Including JWT token in auth check request');
+          headers['Authorization'] = `Bearer ${token}`;
+        } else {
+          console.warn('[WATCHLIST] No JWT token found for auth check');
+        }
+        
+        // First try with JWT endpoint
+        const userCheck = await fetch("/api/jwt/user", { 
           credentials: "include",
-          headers: {
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache"
-          }
+          headers
         });
         
         if (userCheck.status === 401) {
-          console.error("User not authenticated when trying to add to watchlist");
-          toast({
-            title: "Authentication required",
-            description: "Please login again to add items to your watchlist",
-            variant: "destructive",
+          // If JWT fails, try fallback to session-based auth as last resort
+          console.warn("JWT authentication failed, trying session auth as fallback");
+          
+          const sessionCheck = await fetch("/api/user", {
+            credentials: "include",
+            headers: {
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              "Pragma": "no-cache"
+            }
           });
           
-          // Force a re-fetch of user data
-          queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-          queryClient.setQueryData(["/api/user"], null);
-          
-          // Redirect to auth page after showing toast
-          setTimeout(() => {
-            window.location.href = '/auth';
-          }, 1000);
-          
-          setIsSubmitting(false);
-          onClose();
-          return;
+          if (sessionCheck.status === 401) {
+            console.error("User not authenticated when trying to add to watchlist");
+            toast({
+              title: "Authentication required",
+              description: "Please login again to add items to your watchlist",
+              variant: "destructive",
+            });
+            
+            // Force a re-fetch of user data
+            queryClient.invalidateQueries({ queryKey: ["/api/jwt/user"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+            queryClient.setQueryData(["/api/jwt/user"], null);
+            queryClient.setQueryData(["/api/user"], null);
+            
+            // Redirect to auth page after showing toast
+            setTimeout(() => {
+              window.location.href = '/auth';
+            }, 1000);
+            
+            setIsSubmitting(false);
+            onClose();
+            return;
+          }
         }
+        
+        console.log('[WATCHLIST] Authentication check passed, proceeding with request');
       } catch (error) {
         console.error("Auth check error:", error);
         // Continue despite error - the main request will handle auth issues
