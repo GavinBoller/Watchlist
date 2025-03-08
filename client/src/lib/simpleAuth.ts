@@ -2,6 +2,13 @@ import { UserResponse } from '@shared/schema';
 import { apiRequest } from './queryClient';
 import { saveToken } from './jwtUtils';
 
+// Define fallback endpoints to try if the main one fails with a 501 error
+const REGISTRATION_ENDPOINTS = [
+  '/api/simple-register',   // Primary endpoint
+  '/api/jwt/register',      // Fallback #1
+  '/api/register'           // Fallback #2
+];
+
 /**
  * Production-safe registration function that uses the simplified registration endpoint
  * This provides a more robust alternative to the standard registration flow
@@ -27,61 +34,113 @@ export async function simpleRegister(userData: {
     let lastError = null;
     let responseJson = null;
     
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        if (attempt > 0) {
-          console.log(`[SIMPLE AUTH] Retry attempt ${attempt}/${maxRetries}`);
-          // Add increasing delay between retries
-          await new Promise(resolve => setTimeout(resolve, 500 * attempt));
-        }
-        
-        // Make the API request
-        const response = await apiRequest('POST', '/api/simple-register', userData);
-        responseJson = await response.json();
-        
-        if (!response.ok) {
-          console.error(`[SIMPLE AUTH] Registration attempt ${attempt + 1} failed:`, responseJson);
-          
-          // Check if it's a temporary error that we should retry
-          if (responseJson.temporaryError && attempt < maxRetries) {
-            lastError = new Error(responseJson.error || 'Temporary registration failure');
-            continue; // Retry
+    // Try each registration endpoint until one works
+    for (const endpoint of REGISTRATION_ENDPOINTS) {
+      console.log(`[SIMPLE AUTH] Trying registration endpoint: ${endpoint}`);
+      
+      // For each endpoint, try multiple times with backoff
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          if (attempt > 0) {
+            console.log(`[SIMPLE AUTH] Retry attempt ${attempt}/${maxRetries} for endpoint ${endpoint}`);
+            // Add increasing delay between retries
+            await new Promise(resolve => setTimeout(resolve, 500 * attempt));
           }
           
-          // If it's a permanent error or we've run out of retries, throw
-          throw new Error(responseJson.error || 'Registration failed');
+          // Add special formatting for jwt/register endpoint which has different param formats
+          const requestData = endpoint === '/api/jwt/register' 
+            ? { ...userData, confirmPassword: userData.password } 
+            : userData;
+          
+          // Make the API request
+          const response = await apiRequest('POST', endpoint, requestData);
+          
+          try {
+            responseJson = await response.json();
+          } catch (jsonError) {
+            console.warn(`[SIMPLE AUTH] Failed to parse JSON from ${endpoint}`, jsonError);
+            responseJson = { error: 'Invalid response format' };
+          }
+          
+          if (!response.ok) {
+            console.error(`[SIMPLE AUTH] Registration attempt ${attempt + 1} on ${endpoint} failed:`, responseJson);
+            
+            // Handle specific error codes
+            if (response.status === 501 || response.status === 404) {
+              console.warn(`[SIMPLE AUTH] Endpoint ${endpoint} not implemented (${response.status}), trying next endpoint`);
+              // Break inner loop to try next endpoint
+              break;
+            }
+            
+            // Check if it's a temporary error that we should retry
+            if (responseJson.temporaryError && attempt < maxRetries) {
+              lastError = new Error(responseJson.error || `Temporary registration failure on ${endpoint}`);
+              continue; // Retry the same endpoint
+            }
+            
+            // If it's a permanent error, throw to try the next endpoint
+            throw new Error(responseJson.error || `Registration failed on ${endpoint}`);
+          }
+          
+          // If we get here, the request was successful
+          const elapsedTime = Date.now() - startTime;
+          console.log(`[SIMPLE AUTH] Registration successful in ${elapsedTime}ms using ${endpoint}`);
+          
+          // Handle different response formats from different endpoints
+          let user = responseJson.user;
+          let token = responseJson.token;
+          
+          // For the standard registration endpoint that doesn't return a token
+          if (endpoint === '/api/register' && !token && user) {
+            console.log('[SIMPLE AUTH] Using standard registration endpoint without token');
+            // We still need to create a token for this user
+            try {
+              const loginResponse = await apiRequest('POST', '/api/jwt/login', {
+                username: userData.username,
+                password: userData.password
+              });
+              
+              if (loginResponse.ok) {
+                const loginJson = await loginResponse.json();
+                token = loginJson.token;
+                console.log('[SIMPLE AUTH] Successfully obtained token from login endpoint after registration');
+              }
+            } catch (loginError) {
+              console.warn('[SIMPLE AUTH] Failed to get token after registration:', loginError);
+              // Continue anyway, the app will handle missing token
+            }
+          }
+          
+          // Save the token if it was provided
+          if (token) {
+            saveToken(token);
+            console.log('[SIMPLE AUTH] JWT token saved successfully');
+          } else {
+            console.warn('[SIMPLE AUTH] No token received from registration endpoint');
+          }
+          
+          // Registration succeeded, return the response
+          return { 
+            user: user || responseJson, 
+            token: token || '' 
+          };
+        } catch (attemptError) {
+          lastError = attemptError;
+          console.error(`[SIMPLE AUTH] Error during registration attempt ${attempt + 1} on ${endpoint}:`, attemptError);
+          
+          // If this is not the last attempt for this endpoint, continue retrying
+          if (attempt < maxRetries) {
+            continue;
+          }
+          
+          // On the last attempt for this endpoint, continue to the next endpoint
+          console.log(`[SIMPLE AUTH] All attempts failed for ${endpoint}, trying next endpoint if available`);
         }
-        
-        // If we get here, the request was successful
-        const elapsedTime = Date.now() - startTime;
-        console.log(`[SIMPLE AUTH] Registration successful in ${elapsedTime}ms`);
-        
-        // Save the token if it was provided
-        if (responseJson.token) {
-          saveToken(responseJson.token);
-          console.log('[SIMPLE AUTH] JWT token saved successfully');
-        } else {
-          console.warn('[SIMPLE AUTH] No token received from registration endpoint');
-        }
-        
-        // Registration succeeded, exit the retry loop
-        return responseJson;
-      } catch (attemptError) {
-        lastError = attemptError;
-        console.error(`[SIMPLE AUTH] Error during registration attempt ${attempt + 1}:`, attemptError);
-        
-        // If this is not the last attempt, continue to the next iteration
-        if (attempt < maxRetries) {
-          continue;
-        }
-        
-        // On the last attempt, rethrow the error to be caught by the outer catch
-        throw attemptError;
       }
     }
     
-    // This should never happen due to the loop structure, but TypeScript wants it
-    throw lastError || new Error('Registration failed with no specific error');
+    // If we get here, all endpoints and all retries failed
+    throw lastError || new Error('Registration failed on all endpoints');
   } catch (error) {
     console.error('[SIMPLE AUTH] Registration ultimately failed after all attempts:', error);
     

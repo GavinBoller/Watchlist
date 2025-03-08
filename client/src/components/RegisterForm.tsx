@@ -132,13 +132,20 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
           ? error.message 
           : "Registration failed. Please try again.";
         
+        // Check for specific 501 Not Implemented error which means the endpoint isn't available in production
+        const is501Error = errorMessage.includes('501') || errorMessage.includes('Not Implemented');
+        
         // Fall back to standard registration below
         toast({
-          title: "Initial registration attempt failed",
+          title: is501Error 
+            ? "Using alternative registration method" 
+            : "Initial registration attempt failed",
           description: errorMessage.includes('Username already exists')
             ? "Username already exists, please choose another."
-            : "Trying alternative registration method...",
-          variant: "destructive",
+            : is501Error
+              ? "The first method wasn't available, trying another way..."
+              : "Trying alternative registration method...",
+          variant: is501Error ? "default" : "destructive",
         });
       }
     }

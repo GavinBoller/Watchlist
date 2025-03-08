@@ -35,6 +35,11 @@ const simpleRegistrationSchema = z.object({
 router.post('/simple-register', async (req: Request, res: Response) => {
   console.log('[SIMPLE REGISTER] Beginning registration request');
   
+  // Log debug information for production diagnosis
+  console.log(`[SIMPLE REGISTER] Request headers: ${JSON.stringify(req.headers)}`);
+  console.log(`[SIMPLE REGISTER] Request environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`[SIMPLE REGISTER] Request IP: ${req.ip}`);
+  
   try {
     // Validate input data
     const validationResult = simpleRegistrationSchema.safeParse(req.body);
