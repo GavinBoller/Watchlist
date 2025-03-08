@@ -18,6 +18,7 @@ import {
 import { emergencyAuthRouter, emergencyAuthCheck } from "./emergencyAuth";
 import { emergencyWatchlistRouter } from "./emergencyWatchlist";
 import { jwtAuthRouter } from "./jwtAuthRoutes";
+import { simpleRegisterRouter } from "./simpleRegister";
 import { executeDirectSql } from "./db";
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "79d177894334dec45f251ff671833a50";
@@ -80,6 +81,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   console.log("[SERVER] Registering emergency auth endpoints");
   app.use("/api", emergencyAuthRouter);
   app.use("/api/emergency", emergencyWatchlistRouter);
+  
+  // Register simplified registration router for more reliable user creation
+  console.log("[SERVER] Registering simplified registration endpoint");
+  app.use("/api", simpleRegisterRouter);
   
   // Auth routes are already registered in index.ts - don't register them twice
   
