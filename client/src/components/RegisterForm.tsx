@@ -8,6 +8,7 @@ import { UserResponse } from "@shared/schema";
 import { useJwtAuth } from "@/hooks/use-jwt-auth";
 import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
+import { simpleRegister, shouldUseSimpleRegistration } from "@/lib/simpleAuth";
 
 interface RegisterFormProps {
   onRegisterSuccess: (user: UserResponse) => void;
@@ -56,6 +57,74 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
     // Store the original password locally for auto-login later
     const originalPassword = password;
     
+    // Check if we should use the simplified registration process
+    // This is mainly for production environments or when previous registration attempts failed
+    const useSimpleRegistration = shouldUseSimpleRegistration();
+    
+    if (useSimpleRegistration) {
+      // Try the simplified registration flow first
+      console.log("Using simplified registration flow for reliability");
+      
+      try {
+        // Mark UI as loading for simple registration
+        setIsSimpleRegistering(true);
+        registerMutation.reset();
+        
+        // Attempt simplified registration
+        const result = await simpleRegister({
+          username,
+          password,
+          displayName: displayName || undefined
+        });
+        
+        console.log("Simplified registration successful");
+        
+        // Extract user from the response
+        const user = result.user;
+        
+        // Signal success to parent component
+        onRegisterSuccess(user);
+        
+        // Pre-populate the cache with user data
+        queryClient.setQueryData(["/api/user"], user);
+        queryClient.setQueryData(["/api/jwt/user"], user);
+        
+        // Store temporary registration data
+        window.__tempRegistrationData = {
+          timestamp: Date.now(),
+          username: username
+        };
+        
+        // Store user data in localStorage as a backup
+        try {
+          localStorage.setItem('movietracker_user', JSON.stringify(user));
+          localStorage.setItem('movietracker_registration_time', Date.now().toString());
+          localStorage.setItem('movietracker_username', username);
+          console.log("Stored user data in localStorage for session persistence backup");
+        } catch (storageError) {
+          console.error("Failed to store user data in localStorage:", storageError);
+        }
+        
+        // Immediate redirect to home page
+        setLocation("/");
+        
+        return; // Exit early since registration was successful
+      } catch (error) {
+        console.error("Simplified registration failed, falling back to standard registration:", error);
+        // Store registration failure in localStorage so we can use simple registration next time
+        localStorage.setItem('registration_failure', 'true');
+        
+        // Fall back to standard registration below
+        toast({
+          title: "Initial registration attempt failed",
+          description: "Trying alternative registration method...",
+          variant: "destructive",
+        });
+      }
+    }
+    
+    // If simple registration failed or is not being used, try standard registration
+    console.log("Using standard registration flow");
     registerMutation.mutate(
       {
         username,
@@ -210,7 +279,9 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
     );
   };
 
-  const isLoading = registerMutation.isPending;
+  // Track loading state for both registration methods
+  const [isSimpleRegistering, setIsSimpleRegistering] = useState(false);
+  const isLoading = registerMutation.isPending || isSimpleRegistering;
 
   return (
     <Card className="w-full max-w-md mx-auto">

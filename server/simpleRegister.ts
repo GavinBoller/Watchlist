@@ -22,6 +22,9 @@ async function hashPassword(password: string): Promise<string> {
 /**
  * Simplified registration endpoint with robust error handling
  * This endpoint creates a new user and returns a JWT token
+ * 
+ * This is a production-safe implementation that works alongside the existing system
+ * It provides a more direct path to user creation with better error reporting
  */
 router.post('/simple-register', async (req: Request, res: Response) => {
   try {
@@ -79,9 +82,34 @@ router.post('/simple-register', async (req: Request, res: Response) => {
     } catch (ormError) {
       console.error('[SIMPLE AUTH] ORM user creation failed:', ormError);
       
-      // Fall back to direct SQL
+      // Fall back to direct SQL with production-specific handling
       try {
         console.log('[SIMPLE AUTH] Attempting direct SQL user creation');
+        
+        // In production, use a more robust approach with explicit transaction
+        if (isProd && pool) {
+          console.log('[SIMPLE AUTH] Using production-optimized SQL transaction');
+          const client = await pool.connect();
+          try {
+            await client.query('BEGIN');
+            const { rows } = await client.query(
+              'INSERT INTO users (username, password, display_name) VALUES ($1, $2, $3) RETURNING id, username, display_name, created_at',
+              [username, hashedPassword, displayName || null]
+            );
+            await client.query('COMMIT');
+            newUser = rows[0];
+            console.log('[SIMPLE AUTH] User created successfully with production transaction:', username);
+            return; // Exit the SQL fallback block since we've created the user
+          } catch (txError) {
+            await client.query('ROLLBACK');
+            console.error('[SIMPLE AUTH] Production transaction failed:', txError);
+            throw txError;
+          } finally {
+            client.release();
+          }
+        }
+        
+        // Standard direct SQL for development or when pool isn't available
         const result = await executeDirectSql(
           'INSERT INTO users (username, password, display_name) VALUES ($1, $2, $3) RETURNING id, username, display_name, created_at',
           [username, hashedPassword, displayName || null],
