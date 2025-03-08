@@ -25,6 +25,7 @@ import {
 import { jwtAuthenticate } from "./jwtMiddleware";
 import { jwtAuthRouter } from "./jwtAuthRoutes";
 import { simpleJwtRouter } from "./simpleJwtAuth";
+import { simpleRegisterRouter } from "./simpleRegister";
 
 // Extend the Express Session interface to include our custom properties
 // This ensures TypeScript recognizes our custom session data
@@ -337,6 +338,10 @@ async function startServer() {
     // Register simplified JWT routes for emergencies
     console.log('[SERVER] Adding simplified JWT authentication routes');
     app.use('/api', simpleJwtRouter);
+    
+    // Register simplified registration endpoint for robust user creation
+    console.log('[SERVER] Adding simplified registration endpoint');
+    app.use('/api', simpleRegisterRouter);
     
     // Register emergency recovery endpoints for production
     // These provide special recovery mechanisms for user accounts that
