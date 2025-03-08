@@ -65,11 +65,51 @@ router.post('/simple-register', async (req: Request, res: Response) => {
     // Create user record
     console.log('[SIMPLE REGISTER] Creating user');
     try {
-      const user = await storage.createUser({
-        username,
-        password: hashedPassword,
-        displayName: displayName || username,
-      });
+      // Extra logging for production troubleshooting
+      console.log(`[SIMPLE REGISTER] Attempting to create user with username: ${username}`);
+      
+      // Use a try-catch with transaction management for better reliability
+      let user;
+      try {
+        // Attempt to create user directly - simplified approach for reliability
+        user = await storage.createUser({
+          username,
+          password: hashedPassword,
+          displayName: displayName || username,
+        });
+        console.log(`[SIMPLE REGISTER] User creation successful: ${username}`);
+      } catch (innerError) {
+        console.error('[SIMPLE REGISTER] Inner user creation error:', innerError);
+        
+        // Handle specific database errors with better messaging
+        if (innerError instanceof Error) {
+          // Re-throw to be handled by outer catch block
+          if (innerError.message.includes('unique') || innerError.message.includes('duplicate')) {
+            console.log('[SIMPLE REGISTER] Detected duplicate username issue');
+            return res.status(409).json({ 
+              error: 'Username already exists',
+              code: 'DUPLICATE_USERNAME'
+            });
+          }
+          
+          // Database connection issues
+          if (innerError.message.includes('connection') || 
+              innerError.message.includes('timeout') ||
+              innerError.message.includes('ECONNREFUSED')) {
+            
+            console.log('[SIMPLE REGISTER] Database connection issue detected, sending 503 response');
+            return res.status(503).json({
+              error: 'Registration service temporarily unavailable, please try again in a moment',
+              retryAfter: 3,
+              temporaryError: true,
+              code: 'SERVICE_UNAVAILABLE'
+            });
+          }
+        }
+        
+        // Re-throw other errors to be handled by outer catch
+        throw innerError;
+      }
       
       // Generate JWT token
       console.log('[SIMPLE REGISTER] Generating JWT token');
@@ -87,15 +127,28 @@ router.post('/simple-register', async (req: Request, res: Response) => {
       
       // Provide a helpful error message for different types of errors
       let errorMessage = 'Failed to create user account';
+      let statusCode = 500;
+      let errorCode = 'REGISTRATION_FAILED';
+      
       if (createError instanceof Error) {
-        if (createError.message.includes('unique constraint')) {
+        console.error('[SIMPLE REGISTER] Error type:', createError.constructor.name);
+        console.error('[SIMPLE REGISTER] Error message:', createError.message);
+        
+        if (createError.message.includes('unique constraint') || createError.message.includes('duplicate')) {
           errorMessage = 'Username already exists';
-        } else if (createError.message.includes('connection')) {
+          statusCode = 409;
+          errorCode = 'DUPLICATE_USERNAME';
+        } else if (createError.message.includes('connection') || createError.message.includes('timeout')) {
           errorMessage = 'Database connection issue, please try again';
+          statusCode = 503;
+          errorCode = 'SERVICE_UNAVAILABLE';
         }
       }
       
-      return res.status(500).json({ error: errorMessage });
+      return res.status(statusCode).json({ 
+        error: errorMessage,
+        code: errorCode
+      });
     }
   } catch (error) {
     console.error('[SIMPLE REGISTER] Unexpected error:', error);

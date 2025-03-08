@@ -70,12 +70,22 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
         setIsSimpleRegistering(true);
         registerMutation.reset();
         
-        // Attempt simplified registration
-        const result = await simpleRegister({
+        // Add a visual delay indicator for user feedback
+        const registrationPromise = simpleRegister({
           username,
           password,
           displayName: displayName || undefined
         });
+        
+        // Show a toast for better user feedback
+        toast({
+          title: "Registering account",
+          description: "Creating your account...",
+          duration: 5000,
+        });
+        
+        // Await the registration result
+        const result = await registrationPromise;
         
         console.log("Simplified registration successful");
         
@@ -114,10 +124,20 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
         // Store registration failure in localStorage so we can use simple registration next time
         localStorage.setItem('registration_failure', 'true');
         
+        // Always reset loading state when there's an error
+        setIsSimpleRegistering(false);
+        
+        // Get a better error message
+        const errorMessage = error instanceof Error 
+          ? error.message 
+          : "Registration failed. Please try again.";
+        
         // Fall back to standard registration below
         toast({
           title: "Initial registration attempt failed",
-          description: "Trying alternative registration method...",
+          description: errorMessage.includes('Username already exists')
+            ? "Username already exists, please choose another."
+            : "Trying alternative registration method...",
           variant: "destructive",
         });
       }
