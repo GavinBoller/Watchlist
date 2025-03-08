@@ -88,14 +88,28 @@ const WatchlistPage = () => {
         console.log(`Fetching watchlist for user ${currentUser.username} (ID: ${currentUser.id})`);
         
         // Add redundant auth headers to help with "user not found" issues
+        // Get JWT token from localStorage
+        const token = localStorage.getItem('jwt_token');
+        
+        const headers: Record<string, string> = {
+          'X-User-ID': currentUser.id.toString(),
+          'X-Username': currentUser.username,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        };
+        
+        // Add JWT token if available
+        if (token) {
+          console.log('[WATCHLIST] Including JWT token in watchlist fetch request');
+          headers['Authorization'] = `Bearer ${token}`;
+        } else {
+          console.warn('[WATCHLIST] No JWT token available for watchlist fetch');
+        }
+        
         const res = await fetch(`/api/watchlist/${currentUser.id}`, {
-          headers: {
-            'X-User-ID': currentUser.id.toString(),
-            'X-Username': currentUser.username,
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache'
-          },
-          cache: 'no-store'
+          headers,
+          cache: 'no-store',
+          credentials: 'include' // Include cookies for session-based auth as fallback
         });
         
         // Check for recovery headers
