@@ -132,20 +132,26 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
           ? error.message 
           : "Registration failed. Please try again.";
         
-        // Check for specific 501 Not Implemented error which means the endpoint isn't available in production
+        // Check for specific error types that need special handling
         const is501Error = errorMessage.includes('501') || errorMessage.includes('Not Implemented');
+        const is500Error = errorMessage.includes('500') || errorMessage.includes('failed on all endpoints');
+        const isUsernameError = errorMessage.includes('Username already exists');
         
         // Fall back to standard registration below
         toast({
           title: is501Error 
             ? "Using alternative registration method" 
-            : "Initial registration attempt failed",
-          description: errorMessage.includes('Username already exists')
+            : is500Error
+              ? "Trying emergency registration method" 
+              : "Initial registration attempt failed",
+          description: isUsernameError
             ? "Username already exists, please choose another."
             : is501Error
               ? "The first method wasn't available, trying another way..."
-              : "Trying alternative registration method...",
-          variant: is501Error ? "default" : "destructive",
+              : is500Error
+                ? "Server issue detected, using fallback mechanism..."
+                : "Trying alternative registration method...",
+          variant: is501Error || is500Error ? "default" : "destructive",
         });
       }
     }
