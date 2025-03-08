@@ -190,29 +190,29 @@ const WatchlistPage = () => {
   });
 
   // Filter and sort watchlist
-  const filteredAndSortedWatchlist = () => {
+  const filteredAndSortedWatchlist = (): WatchlistEntryWithMovie[] => {
     if (!watchlist) return [];
 
     // First filter by media type, genre, and search query
-    let filtered = watchlist;
+    let filtered: WatchlistEntryWithMovie[] = watchlist;
     
     // Filter by media type
     if (mediaTypeFilter !== 'all') {
-      filtered = filtered.filter(entry => 
+      filtered = filtered.filter((entry: WatchlistEntryWithMovie) => 
         entry.movie.mediaType === mediaTypeFilter
       );
     }
     
     // Filter by status
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(entry => 
+      filtered = filtered.filter((entry: WatchlistEntryWithMovie) => 
         entry.status === statusFilter
       );
     }
     
     // Filter by genre
     if (selectedGenre && selectedGenre !== 'all') {
-      filtered = filtered.filter(entry => 
+      filtered = filtered.filter((entry: WatchlistEntryWithMovie) => 
         entry.movie.genres?.includes(selectedGenre)
       );
     }
@@ -220,7 +220,7 @@ const WatchlistPage = () => {
     // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(entry => 
+      filtered = filtered.filter((entry: WatchlistEntryWithMovie) => 
         entry.movie.title.toLowerCase().includes(query) || 
         (entry.movie.overview && entry.movie.overview.toLowerCase().includes(query)) ||
         (entry.notes && entry.notes.toLowerCase().includes(query))
@@ -228,7 +228,7 @@ const WatchlistPage = () => {
     }
 
     // Then sort
-    return [...filtered].sort((a, b) => {
+    return [...filtered].sort((a: WatchlistEntryWithMovie, b: WatchlistEntryWithMovie) => {
       switch (sortOrder) {
         case 'date_desc':
           return new Date(b.watchedDate || 0).getTime() - new Date(a.watchedDate || 0).getTime();
@@ -312,10 +312,22 @@ const WatchlistPage = () => {
 
   // Confirm delete
   const confirmDelete = async () => {
-    if (!entryToDelete) return;
+    if (!entryToDelete || !currentUser) return;
     
     try {
-      await apiRequest('DELETE', `/api/watchlist/${entryToDelete}`, undefined);
+      // Include the userId as a query parameter to satisfy the hasJwtWatchlistAccess middleware
+      const userId = currentUser.id;
+      
+      console.log(`[WATCHLIST] Deleting entry ${entryToDelete} for user ${userId}`);
+      
+      // First try to include userId in the URL query params
+      await apiRequest('DELETE', `/api/watchlist/${entryToDelete}?userId=${userId}`, undefined, {
+        headers: {
+          // Add backup user information to help server with auth checks
+          'X-User-ID': userId.toString(),
+          'X-Username': currentUser.username
+        }
+      });
       
       toast({
         title: "Entry removed",
@@ -323,9 +335,7 @@ const WatchlistPage = () => {
       });
       
       // Invalidate the watchlist cache
-      if (currentUser) {
-        queryClient.invalidateQueries({ queryKey: [`/api/watchlist/${currentUser.id}`] });
-      }
+      queryClient.invalidateQueries({ queryKey: [`/api/watchlist/${userId}`] });
     } catch (error) {
       console.error('Error deleting watchlist entry:', error);
       toast({
@@ -344,9 +354,9 @@ const WatchlistPage = () => {
     if (!watchlist) return [];
     
     const genreSet = new Set<string>();
-    watchlist.forEach(entry => {
+    watchlist.forEach((entry: WatchlistEntryWithMovie) => {
       const genres = entry.movie.genres || '';
-      genres.split(',').forEach(genre => {
+      genres.split(',').forEach((genre: string) => {
         if (genre.trim()) genreSet.add(genre.trim());
       });
     });
@@ -358,8 +368,8 @@ const WatchlistPage = () => {
   const getWatchlistStats = () => {
     if (!watchlist) return { total: 0, movies: 0, tv: 0 };
     
-    const movies = watchlist.filter(entry => entry.movie.mediaType === 'movie').length;
-    const tv = watchlist.filter(entry => entry.movie.mediaType === 'tv').length;
+    const movies = watchlist.filter((entry: WatchlistEntryWithMovie) => entry.movie.mediaType === 'movie').length;
+    const tv = watchlist.filter((entry: WatchlistEntryWithMovie) => entry.movie.mediaType === 'tv').length;
     
     return {
       total: watchlist.length,
@@ -619,7 +629,7 @@ const WatchlistPage = () => {
           
           {filteredAndSortedWatchlist().length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-3">
-              {filteredAndSortedWatchlist().map(entry => (
+              {filteredAndSortedWatchlist().map((entry: WatchlistEntryWithMovie) => (
                 <WatchlistEntry 
                   key={entry.id} 
                   entry={entry} 

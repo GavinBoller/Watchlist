@@ -161,8 +161,19 @@ export async function hasJwtWatchlistAccess(req: Request, res: Response, next: N
     return res.status(401).json({ error: 'Unauthorized: Authentication required' });
   }
   
-  const userId = Number(req.params.userId) || Number(req.body.userId);
+  // Check all possible locations for userId
+  const userId = Number(req.params.userId) || 
+                Number(req.body.userId) || 
+                Number(req.query.userId) || 
+                (req.headers['x-user-id'] ? Number(req.headers['x-user-id']) : null);
+                
   if (!userId) {
+    console.log('[JWT AUTH] Missing userId in request for hasJwtWatchlistAccess');
+    console.log('[JWT AUTH] Request path:', req.path);
+    console.log('[JWT AUTH] Request method:', req.method);
+    console.log('[JWT AUTH] Request params:', req.params);
+    console.log('[JWT AUTH] Request query:', req.query);
+    console.log('[JWT AUTH] Request headers:', req.headers['x-user-id'] || 'Not provided');
     return res.status(400).json({ error: 'Bad Request: userId is required' });
   }
   
