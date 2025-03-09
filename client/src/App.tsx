@@ -1,3 +1,4 @@
+import React, { useEffect } from "react";
 import { useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
@@ -11,6 +12,7 @@ import { UserContext } from "@/components/UserSelector";
 import { Switch, Route } from "wouter";
 import { JwtAuthProvider, useJwtAuth } from "@/hooks/use-jwt-auth";
 import { ProtectedRoute } from "./lib/protected-route";
+import EmergencyAuth, { setupEmergencyAuth } from "./components/EmergencyAuth";
 
 /**
  * Internal app structure with authentication-aware components
@@ -62,10 +64,17 @@ function AppInternal() {
  * This ensures correct provider nesting and prevents context errors
  */
 function App() {
+  // Initialize emergency auth mechanism when app loads
+  useEffect(() => {
+    setupEmergencyAuth();
+    console.log('[EMERGENCY] Emergency auth system initialized');
+  }, []);
+  
   return (
     <QueryClientProvider client={queryClient}>
       <JwtAuthProvider>
         <AppInternal />
+        <EmergencyAuth showDebug={false} />
       </JwtAuthProvider>
     </QueryClientProvider>
   );

@@ -19,6 +19,8 @@ import { jwtAuthenticate } from "./jwtMiddleware";
 import { jwtAuthRouter } from "./jwtAuthRoutes";
 import { simpleJwtRouter } from "./simpleJwtAuth";
 import { simpleRegisterRouter } from "./simpleRegister";
+import { emergencyLoginRouter } from "./emergencyLoginPage";
+import { emergencyAuthRouter } from "./emergencyAuth";
 
 // Extend the Express Session interface to include our custom properties
 // This ensures TypeScript recognizes our custom session data
@@ -331,6 +333,14 @@ async function startServer() {
     // Register simplified registration endpoint for robust user creation
     console.log('[SERVER] Adding simplified registration endpoint');
     app.use('/api', simpleRegisterRouter);
+    
+    // Register emergency login page for extreme fallback scenarios
+    console.log('[SERVER] Adding emergency login page for fallback authentication');
+    app.use('/api', emergencyLoginRouter);
+    
+    // Register ultra-simplified emergency auth endpoints
+    console.log('[SERVER] Adding emergency auth router for direct token generation');
+    app.use('/api', emergencyAuthRouter);
     
     // Emergency recovery endpoints have been removed to simplify authentication
     
