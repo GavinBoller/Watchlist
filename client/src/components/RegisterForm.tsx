@@ -9,6 +9,7 @@ import { useJwtAuth } from "@/hooks/use-jwt-auth";
 import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
 import { simpleRegister, shouldUseSimpleRegistration } from "@/lib/simpleAuth";
+import { isProductionEnvironment } from "@/lib/environment-utils";
 
 interface RegisterFormProps {
   onRegisterSuccess: (user: UserResponse) => void;
@@ -20,9 +21,10 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const { registerMutation, loginMutation } = useJwtAuth();
+  const { registerMutation } = useJwtAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [isSimpleRegistering, setIsSimpleRegistering] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,266 +56,81 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
       return;
     }
     
-    // Store the original password locally for auto-login later
-    const originalPassword = password;
-    
-    // Check if we should use the simplified registration process
-    // This is mainly for production environments or when previous registration attempts failed
     const useSimpleRegistration = shouldUseSimpleRegistration();
+    const isProd = isProductionEnvironment();
+    
+    // Show registration toast
+    toast({
+      title: "Creating account",
+      description: "Setting up your account...",
+      duration: 3000,
+    });
     
     if (useSimpleRegistration) {
-      // Try the simplified registration flow first
-      console.log("Using simplified registration flow for reliability");
-      
+      // Use the simplified registration flow for production
       try {
-        // Mark UI as loading for simple registration
         setIsSimpleRegistering(true);
-        registerMutation.reset();
         
-        // Add a visual delay indicator for user feedback
-        const registrationPromise = simpleRegister({
+        const result = await simpleRegister({
           username,
           password,
           displayName: displayName || undefined
         });
         
-        // Show a toast for better user feedback
-        toast({
-          title: "Registering account",
-          description: "Creating your account...",
-          duration: 5000,
-        });
-        
-        // Await the registration result
-        const result = await registrationPromise;
-        
-        console.log("Simplified registration successful");
-        
-        // Extract user from the response
-        const user = result.user;
-        
         // Signal success to parent component
-        onRegisterSuccess(user);
+        onRegisterSuccess(result.user);
         
         // Pre-populate the cache with user data
-        queryClient.setQueryData(["/api/user"], user);
-        queryClient.setQueryData(["/api/jwt/user"], user);
+        queryClient.setQueryData(["/api/jwt/user"], result.user);
         
-        // Store temporary registration data
-        window.__tempRegistrationData = {
-          timestamp: Date.now(),
-          username: username
-        };
-        
-        // Store user data in localStorage as a backup
-        try {
-          localStorage.setItem('movietracker_user', JSON.stringify(user));
-          localStorage.setItem('movietracker_registration_time', Date.now().toString());
-          localStorage.setItem('movietracker_username', username);
-          console.log("Stored user data in localStorage for session persistence backup");
-        } catch (storageError) {
-          console.error("Failed to store user data in localStorage:", storageError);
-        }
-        
-        // Immediate redirect to home page
+        // Redirect to home page
         setLocation("/");
         
-        return; // Exit early since registration was successful
       } catch (error) {
-        console.error("Simplified registration failed, falling back to standard registration:", error);
-        // Store registration failure in localStorage so we can use simple registration next time
-        localStorage.setItem('registration_failure', 'true');
-        
-        // Always reset loading state when there's an error
+        console.error("Simple registration failed:", error);
         setIsSimpleRegistering(false);
         
-        // Get a better error message
-        const errorMessage = error instanceof Error 
-          ? error.message 
-          : "Registration failed. Please try again.";
-        
-        // Check for specific error types that need special handling
-        const is501Error = errorMessage.includes('501') || errorMessage.includes('Not Implemented');
-        const is500Error = errorMessage.includes('500') || errorMessage.includes('failed on all endpoints');
-        const isUsernameError = errorMessage.includes('Username already exists');
-        
-        // Fall back to standard registration below
+        // Show error toast
         toast({
-          title: is501Error 
-            ? "Using alternative registration method" 
-            : is500Error
-              ? "Trying emergency registration method" 
-              : "Initial registration attempt failed",
-          description: isUsernameError
-            ? "Username already exists, please choose another."
-            : is501Error
-              ? "The first method wasn't available, trying another way..."
-              : is500Error
-                ? "Server issue detected, using fallback mechanism..."
-                : "Trying alternative registration method...",
-          variant: is501Error || is500Error ? "default" : "destructive",
+          title: "Registration failed",
+          description: error instanceof Error ? error.message : "Could not create account",
+          variant: "destructive",
         });
       }
-    }
-    
-    // If simple registration failed or is not being used, try standard registration
-    console.log("Using standard registration flow");
-    registerMutation.mutate(
-      {
-        username,
-        displayName: displayName || username,
-        password,
-        confirmPassword
-      },
-      {
-        onSuccess: async (data) => {
-          console.log("Registration form received success response");
-          
-          // Extract user from the JWT response
-          const user = data.user;
-          
-          // Signal success to parent component
-          onRegisterSuccess(user);
-          
-          // Critical fix: Wait for session to be established properly
-          // This delay allows the server to complete its session setup
-          await new Promise(resolve => setTimeout(resolve, 800));
-          
-          // Check if authentication succeeded before redirecting
-          try {
-            const sessionResponse = await fetch("/api/session", {
-              credentials: "include",
-              headers: { "Cache-Control": "no-cache" }
-            });
-            
-            if (sessionResponse.ok) {
-              const sessionData = await sessionResponse.json();
-              console.log("Pre-redirect session check:", sessionData);
-              
-              if (sessionData.authenticated) {
-                console.log("Session authenticated, redirecting to home page");
-                setLocation("/");
-              } else {
-                console.log("Session not authenticated after registration, attempting auto-login");
-                
-                // Attempt auto-login using the credentials from the registration
-                try {
-                  console.log("Attempting auto-login after registration");
-                  
-                  // IMPORTANT: Pre-populate the cache with user data to prevent the login screen flash
-                  // This creates the illusion of a seamless transition
-                  queryClient.setQueryData(["/api/user"], user);
-                  queryClient.setQueryData(["/api/jwt/user"], user);
-                  queryClient.setQueryData(["/api/auth/user"], user);
-                  
-                  // Store temporary registration data to help the protected route
-                  // This is used to prevent login page flash during the redirect
-                  window.__tempRegistrationData = {
-                    timestamp: Date.now(),
-                    username: username
-                  };
-                  
-                  // Also store user data in localStorage as a backup for production environments
-                  // This helps with session persistence across redirects
-                  try {
-                    localStorage.setItem('movietracker_user', JSON.stringify(user));
-                    // Store the registration time to help identify new users for enhanced protection
-                    localStorage.setItem('movietracker_registration_time', Date.now().toString());
-                    localStorage.setItem('movietracker_username', username);
-                    console.log("Stored user data in localStorage for session persistence backup");
-                  } catch (storageError) {
-                    console.error("Failed to store user data in localStorage:", storageError);
-                  }
-                  
-                  // Increase auto-login delay in production to ensure session is properly established
-                  const isProduction = window.location.hostname.includes('.replit.app') || 
-                                      !window.location.hostname.includes('localhost');
-                  if (isProduction) {
-                    console.log("Production environment detected, adding additional session establishment delay");
-                    await new Promise(resolve => setTimeout(resolve, 800));
-                  }
-                  
-                  // First redirect to home page to prevent the flash of login screen
-                  setLocation("/");
-                  
-                  // Then perform the actual login in the background with multiple retries for production
-                  // This ensures the session is properly established
-                  const performLoginWithRetries = async (maxRetries = 3) => {
-                    let loginSuccess = false;
-                    let lastError;
-                    
-                    for (let retry = 0; retry < maxRetries; retry++) {
-                      try {
-                        if (retry > 0) {
-                          console.log(`Auto-login retry ${retry+1}/${maxRetries}`);
-                          // Add increasing delay between retries
-                          await new Promise(resolve => setTimeout(resolve, 500 * retry));
-                        }
-                        
-                        const loginResult = await new Promise<any>((resolve, reject) => {
-                          loginMutation.mutate(
-                            {
-                              username: username,
-                              password: originalPassword
-                            },
-                            {
-                              onSuccess: (loginResponse) => resolve(loginResponse),
-                              onError: (error) => reject(error)
-                            }
-                          );
-                        });
-                        
-                        console.log("Auto-login successful after registration");
-                        loginSuccess = true;
-                        break;
-                      } catch (error) {
-                        lastError = error;
-                        console.error(`Auto-login attempt ${retry+1} failed:`, error);
-                      }
-                    }
-                    
-                    if (!loginSuccess) {
-                      console.error("All auto-login attempts failed after registration:", lastError);
-                      // Don't show a visible error since we already redirected
-                    }
-                  };
-                  
-                  // Start the login process in the background but don't await it
-                  // so we can redirect the user immediately
-                  performLoginWithRetries(isProduction ? 5 : 3);
-                } catch (loginError) {
-                  console.error("Error during auto-login:", loginError);
-                  toast({
-                    title: "Login error",
-                    description: "Please try logging in manually",
-                    variant: "destructive"
-                  });
-                }
-              }
-            } else {
-              console.error("Failed to verify session before redirect");
-              toast({
-                title: "Session verification failed",
-                description: "Please try logging in manually",
-                variant: "destructive"
-              });
-            }
-          } catch (sessionError) {
-            console.error("Error checking session before redirect:", sessionError);
-            // Fall back to redirecting anyway
-            setLocation("/");
-          }
+    } else {
+      // Standard registration flow for development
+      registerMutation.mutate(
+        {
+          username,
+          displayName: displayName || username,
+          password,
+          confirmPassword
         },
-        onError: (error: Error) => {
-          // Error handling is already done in the mutation
-          console.error("Registration error:", error);
+        {
+          onSuccess: (data) => {
+            console.log("Registration successful");
+            
+            // Signal success to parent component
+            onRegisterSuccess(data.user);
+            
+            // Store temporary registration data to help with protected routes
+            window.__tempRegistrationData = {
+              timestamp: Date.now(),
+              username: username
+            };
+            
+            // Redirect to home page
+            setLocation("/");
+          },
+          onError: (error: Error) => {
+            console.error("Registration error:", error);
+          }
         }
-      }
-    );
+      );
+    }
   };
 
-  // Track loading state for both registration methods
-  const [isSimpleRegistering, setIsSimpleRegistering] = useState(false);
+  // Track loading state
   const isLoading = registerMutation.isPending || isSimpleRegistering;
 
   return (

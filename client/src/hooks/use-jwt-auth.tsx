@@ -82,7 +82,8 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
           return null;
         }
 
-        return await res.json();
+        const userData = await res.json();
+        return userData;
       } catch (error) {
         console.error("[JWT AUTH] Error fetching user:", error);
         return null;
@@ -201,7 +202,7 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
   return (
     <JwtAuthContext.Provider
       value={{
-        user,
+        user: user || null,
         isLoading,
         error,
         loginMutation,
