@@ -139,6 +139,8 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
     // Prepare watchlist entry data with proper validation
     const watchlistData = {
       userId: currentUser.id,
+      // Add explicit tmdbId field to ensure it's properly recognized by the server
+      tmdbId: item.id || 0,
       tmdbMovie: {
         ...item,
         // Ensure required fields have valid values with fallbacks
@@ -166,12 +168,36 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
     try {
       console.log("Submitting watchlist data:", JSON.stringify(watchlistData, null, 2));
       
-      // Execute a simple auth check directly before continuing with proper JWT support
+      // Execute a more robust auth check before continuing
       try {
-        // Get JWT token from localStorage
-        const token = localStorage.getItem('jwt_token');
-        
         console.log('[WATCHLIST] Pre-checking authentication before adding to watchlist');
+        
+        // Try to get token with fallbacks for maximum reliability
+        let token = localStorage.getItem('jwt_token');
+        
+        // If token is missing, try backup locations
+        if (!token) {
+          // Try backup in localStorage
+          token = localStorage.getItem('movietracker_token_backup');
+          
+          // Try sessionStorage
+          if (!token) {
+            token = sessionStorage.getItem('jwt_token') || 
+                  sessionStorage.getItem('movietracker_token_backup');
+                  
+            // Try to retrieve from cookie as last resort
+            if (!token) {
+              const cookies = document.cookie.split(';');
+              for (const cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'jwt_token_backup' && value) {
+                  token = value;
+                  break;
+                }
+              }
+            }
+          }
+        }
         
         // Create headers with JWT token if available
         const headers: Record<string, string> = {
@@ -179,34 +205,62 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
           "Pragma": "no-cache"
         };
         
-        // Include JWT token if available
-        if (token) {
+        // Include JWT token if available and valid format
+        if (token && token.split('.').length === 3) {
           console.log('[WATCHLIST] Including JWT token in auth check request');
           headers['Authorization'] = `Bearer ${token}`;
+          
+          // Restore token to primary location
+          localStorage.setItem('jwt_token', token);
         } else {
-          console.warn('[WATCHLIST] No JWT token found for auth check');
+          console.warn('[WATCHLIST] No valid JWT token found for auth check');
+        }
+        
+        // Always include user details in headers if available
+        if (currentUser) {
+          headers['X-User-ID'] = currentUser.id.toString();
+          headers['X-Username'] = currentUser.username;
         }
         
         // First try with JWT endpoint
         const userCheck = await fetch("/api/jwt/user", { 
           credentials: "include",
-          headers
+          headers,
+          cache: "no-store" // Ensure fresh check
         });
         
-        if (userCheck.status === 401) {
-          // If JWT fails, try fallback to session-based auth as last resort
-          console.warn("JWT authentication failed, trying session auth as fallback");
+        if (!userCheck.ok) {
+          console.warn(`JWT authentication check returned status: ${userCheck.status}`);
           
+          // Try fallback to session-based auth
           const sessionCheck = await fetch("/api/user", {
             credentials: "include",
             headers: {
               "Cache-Control": "no-cache, no-store, must-revalidate",
               "Pragma": "no-cache"
-            }
+            },
+            cache: "no-store"
           });
           
-          if (sessionCheck.status === 401) {
-            console.error("User not authenticated when trying to add to watchlist");
+          if (!sessionCheck.ok) {
+            console.error("Authentication failed with both JWT and session methods");
+            
+            // Additional diagnostics - check if we can get token after a forced token refresh
+            try {
+              const refreshResponse = await fetch("/api/refresh-session", {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                  "Cache-Control": "no-cache, no-store",
+                  "Pragma": "no-cache"
+                }
+              });
+              
+              console.log(`Session refresh attempt status: ${refreshResponse.status}`);
+            } catch (refreshError) {
+              console.error("Error during emergency session refresh:", refreshError);
+            }
+            
             toast({
               title: "Authentication required",
               description: "Please login again to add items to your watchlist",
@@ -218,6 +272,13 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
             queryClient.invalidateQueries({ queryKey: ["/api/user"] });
             queryClient.setQueryData(["/api/jwt/user"], null);
             queryClient.setQueryData(["/api/user"], null);
+            
+            // Clear any logout flags that might be blocking authentication
+            localStorage.removeItem('just_logged_out');
+            sessionStorage.removeItem('just_logged_out');
+            if (typeof window !== 'undefined') {
+              window.__loggedOut = false;
+            }
             
             // Redirect to auth page after showing toast
             setTimeout(() => {
@@ -242,13 +303,46 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
         'Pragma': 'no-cache'
       };
       
-      // Get JWT token and explicitly add it to the Authorization header
-      const token = localStorage.getItem('jwt_token');
+      // Get JWT token with fallbacks for reliability
+      let token = localStorage.getItem('jwt_token');
+      
+      // If token is missing, try backup locations
+      if (!token) {
+        // Try backup in localStorage
+        token = localStorage.getItem('movietracker_token_backup');
+        
+        // Try sessionStorage
+        if (!token) {
+          token = sessionStorage.getItem('jwt_token') || 
+                sessionStorage.getItem('movietracker_token_backup');
+                
+          // Try to retrieve from cookie as last resort
+          if (!token) {
+            const cookies = document.cookie.split(';');
+            for (const cookie of cookies) {
+              const [name, value] = cookie.trim().split('=');
+              if (name === 'jwt_token_backup' && value) {
+                token = value;
+                break;
+              }
+            }
+          }
+        }
+      }
+      
       if (token) {
         console.log('[WATCHLIST] Adding JWT token to request directly');
-        headers['Authorization'] = `Bearer ${token}`;
+        // Double check token format
+        if (token.split('.').length === 3) {
+          headers['Authorization'] = `Bearer ${token}`;
+          
+          // Restore token to primary location
+          localStorage.setItem('jwt_token', token);
+        } else {
+          console.warn('[WATCHLIST] Retrieved token has invalid format');
+        }
       } else {
-        console.warn('[WATCHLIST] No JWT token found in localStorage');
+        console.warn('[WATCHLIST] No JWT token found in any storage location');
       }
       
       // Add backup user information to help server recovery scenarios
