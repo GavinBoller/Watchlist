@@ -13,10 +13,7 @@ import { exec } from "child_process";
 import util from "util";
 import fs from "fs";
 import crypto from "crypto";
-import { 
-  productionLogging, 
-  productionOptimizations
-} from "./productionFixes";
+// Production fixes have been removed for simplification
 // Import JWT related files
 import { jwtAuthenticate } from "./jwtMiddleware";
 import { jwtAuthRouter } from "./jwtAuthRoutes";
@@ -79,9 +76,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 configurePassport();
 
-// Add production-specific middleware after passport initialization
-app.use(productionLogging);         // Enhanced logging for production
-app.use(productionOptimizations);   // Performance optimizations
+// Production-specific middleware removed for simplicity
 
 // Register JWT authentication middleware to validate tokens
 console.log('[SERVER] Adding JWT authentication middleware');
