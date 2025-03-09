@@ -10,6 +10,33 @@ interface HeaderProps {
 
 const Header = ({ onTabChange, activeTab }: HeaderProps) => {
   const isMobile = useIsMobile();
+  const [isEmergencyMode, setIsEmergencyMode] = useState(false);
+  
+  // Check if we're using emergency authentication
+  useEffect(() => {
+    const checkEmergencyMode = () => {
+      try {
+        // Check URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const emergencyLogin = urlParams.get('emergencyLogin') === 'true';
+        const directAuth = urlParams.get('directAuth') === 'true';
+        
+        // Check session storage
+        const storedEmergencyAuth = sessionStorage.getItem('emergency_auth') === 'true';
+        
+        // Set emergency mode if any emergency login method is active
+        setIsEmergencyMode(emergencyLogin || directAuth || storedEmergencyAuth);
+      } catch (e) {
+        console.error('[EMERGENCY] Error checking emergency mode:', e);
+      }
+    };
+    
+    // Run check immediately and also when URL changes
+    checkEmergencyMode();
+    
+    window.addEventListener('popstate', checkEmergencyMode);
+    return () => window.removeEventListener('popstate', checkEmergencyMode);
+  }, []);
 
   return (
     <header className="bg-[#141414] border-b border-[#292929] sticky top-0 z-50 ios-safe-area-padding">
@@ -18,6 +45,14 @@ const Header = ({ onTabChange, activeTab }: HeaderProps) => {
           <div className="flex items-center">
             <Film className="h-6 w-6 text-[#E50914] mr-2" />
             <h1 className="text-xl sm:text-2xl font-bold text-[#E50914] tracking-tight">MovieTracker</h1>
+            
+            {/* Emergency mode indicator */}
+            {isEmergencyMode && (
+              <div className="ml-2 flex items-center bg-yellow-700/30 text-yellow-500 text-xs px-2 py-1 rounded-md">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                <span>Emergency Mode</span>
+              </div>
+            )}
           </div>
           
           {/* Mobile user selector */}
