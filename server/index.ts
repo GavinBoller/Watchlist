@@ -336,6 +336,19 @@ async function startServer() {
     console.log('[SERVER] Adding simplified registration endpoint');
     app.use('/api', simpleRegisterRouter);
     
+    // Add explicit route for debugging purposes to confirm route registration
+    app.get('/api/registration-debug', (req: Request, res: Response) => {
+      console.log('[REGISTRATION DEBUG] Registration routes are properly registered');
+      return res.status(200).json({ 
+        message: 'Registration endpoint is working correctly',
+        routes: {
+          simpleRegister: '/api/simple-register', 
+          jwtRegister: '/api/jwt/register',
+          backdoorRegister: '/api/jwt/backdoor-register'
+        }
+      });
+    });
+    
     // Register simplified login endpoint for reliable authentication
     console.log('[SERVER] Adding simplified login endpoint');
     app.use('/api', simpleLoginRouter);

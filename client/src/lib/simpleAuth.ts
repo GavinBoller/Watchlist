@@ -38,22 +38,42 @@ export async function simpleRegister(userData: {
   try {
     // Make the API request to our simple-register endpoint
     console.log('[SIMPLE AUTH] Starting registration with simple-register endpoint');
-    const response = await fetch('/api/simple-register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(userData)
-    });
+    console.log('[SIMPLE AUTH] Registration payload:', JSON.stringify({
+      ...userData, 
+      password: userData.password ? '******' : undefined // Hide actual password in logs
+    }));
+    
+    let fetchResponse: Response;
+    
+    try {
+      // Enhanced error handling for the fetch call
+      fetchResponse = await fetch('/api/simple-register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(userData)
+      });
+      
+      // Log response status for debugging
+      console.log(`[SIMPLE AUTH] Registration response status: ${fetchResponse.status}`);
+      console.log(`[SIMPLE AUTH] Registration response headers:`, Object.fromEntries(fetchResponse.headers.entries()));
+    } catch (fetchError) {
+      // Enhanced fetch error logging for network issues
+      console.error('[SIMPLE AUTH] Fetch failed during registration:', fetchError);
+      throw new Error(`Network error during registration: ${String(fetchError)}`);
+    }
     
     // Handle successful response
-    if (response.ok) {
-      const responseJson = await response.json();
+    if (fetchResponse.ok) {
+      const responseJson = await fetchResponse.json();
       
       // Save the token if provided
       if (responseJson.token) {
         saveToken(responseJson.token);
       }
+      
+      console.log('[SIMPLE AUTH] Registration successful, token saved');
       
       return { 
         user: responseJson.user, 
@@ -62,12 +82,12 @@ export async function simpleRegister(userData: {
     }
     
     // Handle error response with more detailed logging
-    const errorMessage = await safeParseResponse(response);
-    console.error(`[SIMPLE AUTH] Registration failed with status ${response.status}: ${errorMessage}`);
+    const errorMessage = await safeParseResponse(fetchResponse);
+    console.error(`[SIMPLE AUTH] Registration failed with status ${fetchResponse.status}: ${errorMessage}`);
     
     // Log more details to help diagnose the issue
-    console.error(`[SIMPLE AUTH] Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
-    console.error(`[SIMPLE AUTH] Response status: ${response.status} ${response.statusText}`);
+    console.error(`[SIMPLE AUTH] Response headers: ${JSON.stringify(Object.fromEntries(fetchResponse.headers.entries()))}`);
+    console.error(`[SIMPLE AUTH] Response status: ${fetchResponse.status} ${fetchResponse.statusText}`);
     
     throw new Error(`Registration failed: ${errorMessage}`);
   } catch (error) {

@@ -37,7 +37,8 @@ export function generateToken(user: UserPayload): string {
   };
   
   console.log(`[JWT] Generating token for user: ${user.username} (ID: ${user.id})`);
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
+  // Add type assertion to fix TypeScript error with jsonwebtoken
+  return jwt.sign(payload, JWT_SECRET as jwt.Secret, { expiresIn: TOKEN_EXPIRATION });
 }
 
 /**
@@ -51,7 +52,7 @@ export function verifyToken(token: string): UserResponse | null {
   for (const secret of ALL_JWT_SECRETS) {
     try {
       console.log('[JWT] Attempting verification with secret:', secret.substring(0, 3) + '...');
-      const decoded = jwt.verify(token, secret) as UserResponse;
+      const decoded = jwt.verify(token, secret as jwt.Secret) as UserResponse;
       console.log('[JWT] Token decoded successfully with secret starting with:', secret.substring(0, 3) + '...');
       console.log('[JWT] Token payload:', JSON.stringify(decoded));
       

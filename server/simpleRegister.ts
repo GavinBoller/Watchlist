@@ -6,6 +6,9 @@ import { storage } from './storage';
 import { generateToken, createUserResponse } from './jwtAuth';
 import { z } from 'zod';
 
+// Enhanced debugging - log when this module is imported
+console.log('[SIMPLE REGISTER MODULE] Loading simple registration module');
+
 const router = Router();
 const scryptAsync = promisify(scrypt);
 
