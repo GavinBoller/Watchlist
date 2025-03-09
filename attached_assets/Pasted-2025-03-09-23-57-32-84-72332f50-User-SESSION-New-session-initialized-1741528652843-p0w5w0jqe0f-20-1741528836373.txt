@@ -1,0 +1,212 @@
+2025-03-09 23:57:32.84
+72332f50
+User
+[SESSION] New session initialized: 1741528652843-p0w5w0jqe0f
+2025-03-09 23:57:32.84
+72332f50
+User
+[JWT AUTH] Request path: /api/logout, Authorization header present: false
+2025-03-09 23:57:32.84
+72332f50
+User
+[JWT AUTH] No token provided
+2025-03-09 23:57:32.84
+72332f50
+User
+[SESSION] New session initialized: 1741528652843-p0w5w0jqe0f
+2025-03-09 23:57:32.84
+72332f50
+User
+Logout request. User authenticated: false, Emergency mode: false
+2025-03-09 23:57:32.84
+72332f50
+User
+Session ID: 1741528652843-p0w5w0jqe0f
+2025-03-09 23:57:32.84
+72332f50
+User
+Session cookie configuration: watchlist.sid, secure: true, sameSite: lax
+2025-03-09 23:57:32.84
+72332f50
+User
+[SESSION] New session initialized: 1741528652844-de60i924c2
+2025-03-09 23:57:32.84
+72332f50
+User
+1:57:32 PM [express] POST /api/logout 200 in 3ms :: {"message":"Logout successful","time":"2025-03-0…
+2025-03-09 23:57:32.84
+72332f50
+User
+Background session destruction completed successfully
+2025-03-09 23:57:32.84
+72332f50
+User
+[SESSION] New session initialized: 1741528652845-oi1gcr2wqk
+2025-03-09 23:57:32.84
+72332f50
+User
+1:57:32 PM [express] POST /api/logout 200 in 2ms :: {"message":"Logout successful","time":"2025-03-0…
+2025-03-09 23:57:32.84
+72332f50
+User
+Background session destruction completed successfully
+2025-03-09 23:57:32.85
+72332f50
+User
+[SESSION] New session initialized: 1741528652850-qiz2z2cmnn
+2025-03-09 23:57:32.85
+72332f50
+User
+[JWT AUTH] Request path: /favicon.ico, Authorization header present: false
+2025-03-09 23:57:32.85
+72332f50
+User
+[JWT AUTH] No token provided
+2025-03-09 23:57:33.02
+72332f50
+User
+[SESSION] New session initialized: 1741528653023-wyvkaak5ho
+2025-03-09 23:57:33.02
+72332f50
+User
+[JWT AUTH] Request path: /assets/index-JTDZIPJy.css, Authorization header present: false
+2025-03-09 23:57:33.02
+72332f50
+User
+[JWT AUTH] No token provided
+2025-03-09 23:57:33.02
+72332f50
+User
+[SESSION] New session initialized: 1741528653024-62ausnex4t
+2025-03-09 23:57:33.02
+72332f50
+User
+[JWT AUTH] Request path: /assets/index-DJOHiu-I.js, Authorization header present: false
+2025-03-09 23:57:33.02
+72332f50
+User
+[JWT AUTH] No token provided
+2025-03-09 23:57:33.12
+72332f50
+User
+[JWT AUTH] Request path: /auth, Authorization header present: false
+2025-03-09 23:57:33.12
+72332f50
+User
+[JWT AUTH] No token provided
+2025-03-09 23:57:33.12
+72332f50
+User
+[SESSION] New session initialized: 1741528652850-qiz2z2cmnn
+2025-03-09 23:57:33.23
+72332f50
+User
+[JWT AUTH] Request path: /api/logout, Authorization header present: false
+2025-03-09 23:57:33.23
+72332f50
+User
+[JWT AUTH] No token provided
+2025-03-09 23:57:33.23
+72332f50
+User
+[SESSION] New session initialized: 1741528653024-62ausnex4t
+2025-03-09 23:57:33.23
+72332f50
+User
+Logout request. User authenticated: false, Emergency mode: false
+2025-03-09 23:57:33.23
+72332f50
+User
+Session ID: 1741528653024-62ausnex4t
+2025-03-09 23:57:33.23
+72332f50
+User
+Session cookie configuration: watchlist.sid, secure: true, sameSite: lax
+2025-03-09 23:57:33.23
+72332f50
+User
+[SESSION] New session initialized: 1741528653235-1hf88z12tko
+2025-03-09 23:57:33.23
+72332f50
+User
+1:57:33 PM [express] POST /api/logout 200 in 1ms :: {"message":"Logout successful","time":"2025-03-0…
+2025-03-09 23:57:33.23
+72332f50
+User
+Background session destruction completed successfully
+2025-03-09 23:57:33.35
+72332f50
+User
+[JWT AUTH] Request path: /assets/index-DJOHiu-I.js, Authorization header present: false
+2025-03-09 23:57:33.35
+72332f50
+User
+[JWT AUTH] No token provided
+2025-03-09 23:57:33.36
+72332f50
+User
+[JWT AUTH] Request path: /assets/index-JTDZIPJy.css, Authorization header present: false
+2025-03-09 23:57:33.36
+72332f50
+User
+[JWT AUTH] No token provided
+2025-03-09 23:57:33.57
+72332f50
+User
+[JWT AUTH] Request path: /api/logout, Authorization header present: false
+2025-03-09 23:57:33.57
+72332f50
+User
+[JWT AUTH] No token provided
+2025-03-09 23:57:33.57
+72332f50
+User
+Logout request. User authenticated: false, Emergency mode: false
+2025-03-09 23:57:33.57
+72332f50
+User
+Session ID: 1741528652850-qiz2z2cmnn
+2025-03-09 23:57:33.57
+72332f50
+User
+Session cookie configuration: watchlist.sid, secure: true, sameSite: lax
+2025-03-09 23:57:33.58
+72332f50
+User
+[SESSION] New session initialized: 1741528653580-mzzklfmtx0j
+2025-03-09 23:57:33.58
+72332f50
+User
+1:57:33 PM [express] POST /api/logout 200 in 1ms :: {"message":"Logout successful","time":"2025-03-0…
+2025-03-09 23:57:33.58
+72332f50
+User
+Background session destruction completed successfully
+2025-03-09 23:57:33.60
+72332f50
+User
+[SESSION] New session initialized: 1741528653604-fc5ig8lmxye
+2025-03-09 23:57:33.60
+72332f50
+User
+[JWT AUTH] Request path: /favicon.ico, Authorization header present: false
+2025-03-09 23:57:33.60
+72332f50
+User
+[JWT AUTH] No token provided
+2025-03-09 23:57:33.80
+72332f50
+User
+[SESSION] New session initialized: 1741528653807-326cf37adij
+2025-03-09 23:57:33.80
+72332f50
+User
+[JWT AUTH] Request path: /favicon.ico, Authorization header present: false
+2025-03-09 23:57:33.80
+72332f50
+User
+[JWT AUTH] No token provided
+2025-03-09 23:58:24.67
+72332f50
+User
+[DB] Database connection verified
