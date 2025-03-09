@@ -806,8 +806,21 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     console.log(`[STORAGE] Creating user with username: ${insertUser.username}`);
     
+    // First ensure database is ready - use dynamic import for ESM compatibility
+    const { ensureDatabaseReady } = await import('./db');
+    
     try {
-      // First attempt with Drizzle ORM
+      console.log(`[STORAGE] Verifying database connection before user creation`);
+      await ensureDatabaseReady();
+      console.log(`[STORAGE] Database connection verified`);
+      
+      // Check if db is defined before attempting to use it
+      if (!db) {
+        console.error(`[STORAGE] Drizzle ORM not initialized, falling back to direct SQL`);
+        throw new Error('ORM not initialized');
+      }
+      
+      // Attempt with Drizzle ORM
       console.log(`[STORAGE] Attempting to create user with Drizzle ORM`);
       const [user] = await db
         .insert(users)

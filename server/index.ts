@@ -214,9 +214,23 @@ async function pushDatabaseSchema() {
 async function startServer() {
   try {
     // We need to ensure the db connection is ready before we try to use it
-    console.log("Waiting for database connection to be ready...");
-    // Short timeout to make sure the database connection is ready
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log("Checking database connection status...");
+    
+    // Import the DB readiness check function - use dynamic import for ESM compatibility
+    const { ensureDatabaseReady } = await import('./db');
+    
+    // Actually verify the database connection is working
+    // This replaces the simple timeout with a real connection check
+    console.log("Actively verifying database connection...");
+    const isDbReady = await ensureDatabaseReady();
+    
+    // Log the database status
+    if (isDbReady) {
+      console.log("✅ Database connection verified and ready");
+    } else {
+      console.warn("⚠️ Database connection could not be established");
+      console.log("Continuing startup with in-memory fallbacks enabled");
+    }
     
     // In production, we need to ensure cookies work with HTTPS
     if (process.env.NODE_ENV === 'production') {
