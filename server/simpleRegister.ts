@@ -29,13 +29,10 @@ const simpleRegistrationSchema = z.object({
 });
 
 /**
- * Simplified registration endpoint with robust error handling
- * This endpoint creates a new user and returns a JWT token
- * 
- * This is a production-safe implementation that works alongside the existing system
- * It provides a more direct path to user creation with better error reporting
+ * Extracted registration handler function for direct use
+ * This allows the same logic to be used by multiple endpoints
  */
-router.post('/simple-register', async (req: Request, res: Response) => {
+export async function simpleRegisterHandler(req: Request, res: Response) {
   console.log('[SIMPLE REGISTER] Beginning registration request');
   
   // Log debug information for production diagnosis
@@ -188,6 +185,11 @@ router.post('/simple-register', async (req: Request, res: Response) => {
       errorType: error instanceof Error ? error.name : typeof error
     });
   }
-});
+}
+
+/**
+ * Register the handler with the router for normal usage
+ */
+router.post('/simple-register', simpleRegisterHandler);
 
 export const simpleRegisterRouter = router;

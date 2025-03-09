@@ -44,9 +44,11 @@ export async function simpleRegister(userData: {
     }));
     
     let fetchResponse: Response;
+    let error: Error | null = null;
     
+    // First try the normal endpoint
     try {
-      // Enhanced error handling for the fetch call
+      console.log('[SIMPLE AUTH] Trying primary registration endpoint: /api/simple-register');
       fetchResponse = await fetch('/api/simple-register', {
         method: 'POST',
         headers: {
@@ -55,13 +57,49 @@ export async function simpleRegister(userData: {
         body: JSON.stringify(userData)
       });
       
-      // Log response status for debugging
-      console.log(`[SIMPLE AUTH] Registration response status: ${fetchResponse.status}`);
-      console.log(`[SIMPLE AUTH] Registration response headers:`, Object.fromEntries(fetchResponse.headers.entries()));
+      // If successful, continue with this response
+      console.log(`[SIMPLE AUTH] Primary registration endpoint responded with status: ${fetchResponse.status}`);
+      
+      // If we got an error status, save the error but try the alternative
+      if (!fetchResponse.ok) {
+        const errorText = await fetchResponse.text();
+        error = new Error(`Primary endpoint error: ${fetchResponse.status} - ${errorText}`);
+        
+        // Don't throw yet - we'll try the fallback endpoint
+        console.log('[SIMPLE AUTH] Primary endpoint failed, will try alternative');
+        
+        // Try the alternative direct endpoint
+        console.log('[SIMPLE AUTH] Trying alternative registration endpoint: /api/simple-register-direct');
+        fetchResponse = await fetch('/api/simple-register-direct', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(userData)
+        });
+        
+        console.log(`[SIMPLE AUTH] Alternative registration endpoint responded with status: ${fetchResponse.status}`);
+      }
     } catch (fetchError) {
       // Enhanced fetch error logging for network issues
-      console.error('[SIMPLE AUTH] Fetch failed during registration:', fetchError);
-      throw new Error(`Network error during registration: ${String(fetchError)}`);
+      console.error('[SIMPLE AUTH] Fetch failed on primary endpoint:', fetchError);
+      
+      // Try the alternative direct endpoint
+      try {
+        console.log('[SIMPLE AUTH] Trying alternative registration endpoint after network error');
+        fetchResponse = await fetch('/api/simple-register-direct', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(userData)
+        });
+        
+        console.log(`[SIMPLE AUTH] Alternative registration responded with status: ${fetchResponse.status}`);
+      } catch (backupError) {
+        console.error('[SIMPLE AUTH] Both registration endpoints failed:', backupError);
+        throw new Error(`Network error during registration: ${String(fetchError)}`);
+      }
     }
     
     // Handle successful response

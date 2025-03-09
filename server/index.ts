@@ -18,7 +18,7 @@ import crypto from "crypto";
 import { jwtAuthenticate } from "./jwtMiddleware";
 import { jwtAuthRouter } from "./jwtAuthRoutes";
 import { simpleJwtRouter } from "./simpleJwtAuth";
-import { simpleRegisterRouter } from "./simpleRegister";
+import { simpleRegisterRouter, simpleRegisterHandler } from "./simpleRegister";
 import { simpleLoginRouter } from "./simpleLogin";
 import { emergencyLoginRouter } from "./emergencyLoginPage";
 import { emergencyAuthRouter } from "./emergencyAuth";
@@ -336,13 +336,36 @@ async function startServer() {
     console.log('[SERVER] Adding simplified registration endpoint');
     app.use('/api', simpleRegisterRouter);
     
+    // Add a direct duplicate route outside of router for extreme reliability
+    // This ensures the registration endpoint is available even if router middleware has issues
+    app.post('/api/simple-register-direct', async (req: Request, res: Response) => {
+      console.log('[DIRECT REGISTER] Received direct registration request');
+      
+      try {
+        // Use the imported handler function that was already imported at the top of the file
+        // This is a more reliable method than trying to use the router directly
+        console.log('[DIRECT REGISTER] Using imported handler function');
+        
+        // Call the handler function directly
+        console.log('[DIRECT REGISTER] Using direct handler import');
+        return await simpleRegisterHandler(req, res);
+      } catch (error) {
+        console.error('[DIRECT REGISTER] Error in direct registration handler:', error);
+        return res.status(500).json({ 
+          error: 'Direct registration failed', 
+          message: error instanceof Error ? error.message : String(error)
+        });
+      }
+    });
+    
     // Add explicit route for debugging purposes to confirm route registration
     app.get('/api/registration-debug', (req: Request, res: Response) => {
       console.log('[REGISTRATION DEBUG] Registration routes are properly registered');
       return res.status(200).json({ 
         message: 'Registration endpoint is working correctly',
         routes: {
-          simpleRegister: '/api/simple-register', 
+          simpleRegister: '/api/simple-register',
+          simpleRegisterDirect: '/api/simple-register-direct',
           jwtRegister: '/api/jwt/register',
           backdoorRegister: '/api/jwt/backdoor-register'
         }
