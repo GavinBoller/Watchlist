@@ -158,10 +158,31 @@ router.post('/simple-register', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[SIMPLE REGISTER] Unexpected error:', error);
     
-    // Fallback error response
+    // Enhanced error logging for debugging
+    if (error instanceof Error) {
+      console.error('[SIMPLE REGISTER] Error name:', error.name);
+      console.error('[SIMPLE REGISTER] Error message:', error.message);
+      console.error('[SIMPLE REGISTER] Error stack:', error.stack);
+      
+      // Log any additional properties on the error object
+      const errorProps = Object.getOwnPropertyNames(error).filter(prop => prop !== 'name' && prop !== 'message' && prop !== 'stack');
+      if (errorProps.length > 0) {
+        console.error('[SIMPLE REGISTER] Additional error properties:', 
+          errorProps.reduce((obj, prop) => {
+            obj[prop] = (error as any)[prop];
+            return obj;
+          }, {} as Record<string, any>)
+        );
+      }
+    } else {
+      console.error('[SIMPLE REGISTER] Non-Error object thrown:', typeof error, JSON.stringify(error));
+    }
+    
+    // Fallback error response with more details
     return res.status(500).json({ 
       error: 'An unexpected error occurred during registration',
-      details: error instanceof Error ? error.message : String(error)
+      details: error instanceof Error ? error.message : String(error),
+      errorType: error instanceof Error ? error.name : typeof error
     });
   }
 });
