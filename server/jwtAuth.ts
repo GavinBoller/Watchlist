@@ -8,12 +8,20 @@ const DEFAULT_SECRET = 'watchlist-app-extremely-secure-jwt-secret-key-8fb38d7c98
 export const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_SECRET;
 export const TOKEN_EXPIRATION = process.env.TOKEN_EXPIRATION || '7d'; // Token expiration time
 
+// Store all possible secrets for verification (allows smooth transition between environments)
+export const ALL_JWT_SECRETS = [JWT_SECRET];
+// Add the default secret as a fallback for transitioning between environments
+if (JWT_SECRET !== DEFAULT_SECRET) {
+  ALL_JWT_SECRETS.push(DEFAULT_SECRET);
+}
+
 // Log JWT secret usage (without revealing the actual secret)
 if (process.env.JWT_SECRET) {
   console.log('[JWT] Using production JWT secret from environment variable');
+  console.log('[JWT] Fallback secrets configured for smooth transition:', ALL_JWT_SECRETS.length);
 } else {
-  console.log('[JWT] Using default JWT secret for development')
-};
+  console.log('[JWT] Using default JWT secret for development');
+}
 
 // Omit password when creating payload for JWT
 type UserPayload = Omit<User, 'password'>;
@@ -34,28 +42,39 @@ export function generateToken(user: UserPayload): string {
 
 /**
  * Verify and decode a JWT token
+ * This function tries all available secrets to support tokens from different environments
  */
 export function verifyToken(token: string): UserResponse | null {
-  try {
-    console.log('[JWT] Verifying token with secret:', JWT_SECRET.substring(0, 3) + '...');
-    console.log('[JWT] Token to verify (first 20 chars):', token.substring(0, 20) + '...');
-    
-    const decoded = jwt.verify(token, JWT_SECRET) as UserResponse;
-    console.log('[JWT] Token decoded successfully:', JSON.stringify(decoded));
-    return decoded;
-  } catch (error) {
-    // Enhanced error logging to help diagnose token issues
-    console.error('[JWT] Token verification failed:', error);
-    
-    if (error instanceof jwt.JsonWebTokenError) {
-      console.error('[JWT] Specific error type:', error.name);
-      console.error('[JWT] Error message:', error.message);
-    } else if (error instanceof jwt.TokenExpiredError) {
-      console.error('[JWT] Token expired at:', error.expiredAt);
+  console.log('[JWT] Token to verify (first 20 chars):', token.substring(0, 20) + '...');
+  
+  // Try each secret until one works
+  for (const secret of ALL_JWT_SECRETS) {
+    try {
+      console.log('[JWT] Attempting verification with secret:', secret.substring(0, 3) + '...');
+      const decoded = jwt.verify(token, secret) as UserResponse;
+      console.log('[JWT] Token decoded successfully with secret starting with:', secret.substring(0, 3) + '...');
+      console.log('[JWT] Token payload:', JSON.stringify(decoded));
+      
+      // If we're using a fallback secret, refresh the token to use the current secret
+      if (secret !== JWT_SECRET) {
+        console.log('[JWT] Token was verified with a fallback secret - consider refreshing');
+      }
+      
+      return decoded;
+    } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        console.error('[JWT] Token expired at:', error.expiredAt);
+        return null; // Don't try other secrets if token is expired
+      }
+      
+      // For other errors like signature mismatch, try the next secret
+      console.log(`[JWT] Verification failed with secret starting with ${secret.substring(0, 3)}...: ${error instanceof Error ? error.message : String(error)}`);
     }
-    
-    return null;
   }
+  
+  // If we get here, all secrets failed
+  console.error('[JWT] Token verification failed with all available secrets');
+  return null;
 }
 
 /**
