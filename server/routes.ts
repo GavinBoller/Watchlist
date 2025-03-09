@@ -3,8 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { isAuthenticated, hasWatchlistAccess, validateSession } from "./auth";
 import { isJwtAuthenticated, hasJwtWatchlistAccess } from "./jwtMiddleware";
-import { extractTokenFromHeader, verifyToken } from "./jwtAuth";
+import { extractTokenFromHeader, verifyToken, JWT_SECRET } from "./jwtAuth";
 import { emergencyAuthCheck } from "./emergencyAuth";
+import jwt from 'jsonwebtoken';
 import axios from "axios";
 import { z } from "zod";
 import { 
@@ -413,8 +414,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST endpoint to add movie to watchlist with isJwtAuthenticated middleware
-  app.post("/api/watchlist", isJwtAuthenticated, emergencyAuthCheck, async (req: Request, res: Response) => {
+  // POST endpoint to add movie to watchlist - SIMPLIFIED for emergency auth compatibility
+  app.post("/api/watchlist", async (req: Request, res: Response) => {
     console.log("POST /api/watchlist - Request body:", JSON.stringify(req.body, null, 2));
     console.log("POST /api/watchlist - Headers:", JSON.stringify({
       auth: req.headers.authorization ? "Present" : "Missing",
@@ -423,14 +424,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }, null, 2));
     
     try {
-      // The isJwtAuthenticated middleware already checked authentication
-      // and populated req.user if token is valid
+      // First check for emergency auth
+      emergencyAuthCheck(req, res, () => {});
       
-      const authUser = req.user;
-      if (!authUser) {
-        console.log('[WATCHLIST] No authenticated user found');
+      // Then check for JWT auth if no emergency auth
+      if (!req.user) {
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          const token = authHeader.split('Bearer ')[1];
+          if (token) {
+            console.log('[WATCHLIST] Checking JWT auth with token');
+            try {
+              const decoded = jwt.verify(token, JWT_SECRET) as any;
+              if (decoded) {
+                console.log(`[WATCHLIST] JWT auth successful for user: ${decoded.username}`);
+                req.user = decoded;
+              }
+            } catch (tokenError) {
+              console.error('[WATCHLIST] JWT token verification failed:', tokenError);
+            }
+          }
+        }
+      }
+      
+      // Final auth check
+      if (!req.user) {
+        console.log('[WATCHLIST] No authenticated user found after all auth checks');
         
-        // Check for emergency authentication from URL parameters or headers
+        // Last resort - check query parameters
         const emergencyUser = req.query.user || req.headers['x-emergency-user'];
         const emergencyAuth = req.query.emergencyLogin === 'true' || req.headers['x-emergency-auth'] === 'true';
         
@@ -441,11 +462,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           req.user = {
             id: -1,
             username: String(emergencyUser),
-            displayName: String(emergencyUser),
-            emergency: true
-          };
+            displayName: String(emergencyUser)
+          } as any;
           
-          console.log(`[EMERGENCY] Created emergency user for watchlist action: ${req.user.username}`);
+          console.log(`[EMERGENCY] Created emergency user for watchlist action: ${(req.user as any).username}`);
         } else {
           return res.status(401).json({ 
             message: "Authentication required",
