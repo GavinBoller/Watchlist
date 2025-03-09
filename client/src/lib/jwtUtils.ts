@@ -229,34 +229,55 @@ export const refreshTokenIfNeeded = async (): Promise<boolean> => {
     const currentTime = Date.now() / 1000;
     const timeUntilExpiry = payload.exp - currentTime;
     
-    // Refresh if token expires in less than 24 hours
-    const REFRESH_BUFFER_SECONDS = 24 * 60 * 60; // 24 hours
+    // In production, we refresh tokens that are close to expiring
+    // In development, we use a longer buffer time
+    const isProd = window.location.hostname.includes('replit.app');
+    const REFRESH_BUFFER_SECONDS = isProd ? 12 * 60 * 60 : 24 * 60 * 60; // 12 hours in prod, 24 hours in dev
     
     if (timeUntilExpiry < REFRESH_BUFFER_SECONDS) {
-      console.log(`[JWT] Token will expire in ${Math.round(timeUntilExpiry / 60)} minutes, refreshing...`);
+      console.log(`[JWT] Token will expire in ${Math.round(timeUntilExpiry / 60)} minutes, refreshing... (${isProd ? 'PRODUCTION' : 'DEVELOPMENT'} mode)`);
       
       try {
-        // Call token refresh endpoint
-        const response = await fetch('/api/jwt/refresh', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        // Call token refresh endpoint with retry logic
+        const maxRetries = isProd ? 3 : 1;
+        let retryCount = 0;
+        let refreshed = false;
         
-        if (response.ok) {
-          const data = await response.json();
-          if (data.token) {
-            saveToken(data.token);
-            console.log('[JWT] Token refreshed successfully');
-            return true;
+        while (retryCount < maxRetries && !refreshed) {
+          try {
+            const response = await fetch('/api/jwt/refresh', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.token) {
+                saveToken(data.token);
+                console.log('[JWT] Token refreshed successfully');
+                refreshed = true;
+                return true;
+              }
+            } else {
+              console.warn(`[JWT] Failed to refresh token, status: ${response.status} (attempt ${retryCount + 1}/${maxRetries})`);
+            }
+          } catch (retryError) {
+            console.error(`[JWT] Error refreshing token (attempt ${retryCount + 1}/${maxRetries}):`, retryError);
           }
-        } else {
-          console.warn('[JWT] Failed to refresh token, status:', response.status);
+          
+          retryCount++;
+          if (retryCount < maxRetries) {
+            // Wait before retry (exponential backoff)
+            const backoffMs = Math.min(1000 * Math.pow(2, retryCount), 10000);
+            console.log(`[JWT] Retrying token refresh in ${backoffMs}ms...`);
+            await new Promise(resolve => setTimeout(resolve, backoffMs));
+          }
         }
       } catch (refreshError) {
-        console.error('[JWT] Error refreshing token:', refreshError);
+        console.error('[JWT] Error in refresh process:', refreshError);
       }
     }
     
