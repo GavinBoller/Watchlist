@@ -25,25 +25,8 @@ import { UserResponse } from '@shared/schema';
 import { useContext } from 'react';
 import { JwtAuthContext } from '../hooks/use-jwt-auth';
 
-// Keep this line to maintain compatibility with other components
-export const useUserContext = () => {
-  const auth = useContext(JwtAuthContext);
-  if (!auth) {
-    throw new Error("useUserContext must be used within a JwtAuthProvider");
-  }
-  
-  return {
-    currentUser: auth.user,
-    setCurrentUser: () => {}, // Deprecated
-    login: () => {}, // Deprecated
-    logout: auth.logoutMutation.mutateAsync,
-    isAuthenticated: !!auth.user
-  };
-};
-
-// Re-export UserContext for other components that use it
-import { createContext } from 'react';
-export const UserContext = createContext<any>(null);
+// Use the UserContext from the separate file
+import { UserContext } from '@/lib/user-context';
 
 interface UserSelectorProps {
   isMobile?: boolean;
@@ -57,7 +40,18 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
   }
   
   const { user, logoutMutation } = auth;
-  const isAuthenticated = !!user;
+  const [cachedUser, setCachedUser] = useState<UserResponse | null>(null);
+  
+  // Use a local state to prevent stale UI when authentication changes
+  useEffect(() => {
+    // Only update if user exists to prevent flicker during logout
+    if (user) {
+      setCachedUser(user);
+    }
+  }, [user]);
+  
+  // A user is authenticated if both the auth context says so and we have a local cached user
+  const isAuthenticated = !!user && !!cachedUser;
   
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -75,6 +69,9 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
 
   // CROSS-ENVIRONMENT UNIVERSAL LOGOUT SOLUTION
   const handleLogout = async () => {
+    // Immediately clear the local cached user to update UI
+    setCachedUser(null);
+    
     // Import environment utilities
     const {
       isProductionEnvironment,
@@ -85,6 +82,29 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     
     const isProd = isProductionEnvironment();
     console.log(`Logout initiated in ${getEnvironmentName()} environment`);
+    
+    // STEP 0: Directly clear auth state
+    try {
+      // Reset cached user locally
+      setCachedUser(null);
+      
+      // Clear JWT token immediately from memory/session/local storage
+      sessionStorage.removeItem('jwt_token');
+      localStorage.removeItem('jwt_token');
+      document.cookie = 'jwt_token=; path=/; max-age=0';
+      document.cookie = 'watchlist.sid=; path=/; max-age=0';
+      
+      // Reset query data immediately
+      queryClient.setQueryData(["/api/jwt/user"], null);
+      
+      // Force React Query to recognize the user is logged out
+      queryClient.invalidateQueries({ queryKey: ["/api/jwt/user"] });
+      
+      // Reset logoutMutation state 
+      logoutMutation.reset();
+    } catch (e) {
+      console.error("Error during immediate auth state reset:", e);
+    }
     
     // STEP 1: Show overlay for visual feedback
     const overlayDiv = document.createElement('div');

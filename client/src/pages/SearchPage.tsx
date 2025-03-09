@@ -9,7 +9,7 @@ import { AddToWatchlistModal } from '@/components/AddToWatchlistModal';
 import { DetailsModal } from '@/components/DetailsModal';
 import { TMDBMovie } from '@shared/schema';
 import { searchMovies } from '@/api/tmdb';
-import { useUserContext } from '@/components/UserSelector';
+import { useUserContext } from '@/lib/user-context';
 import { useToast } from '@/hooks/use-toast';
 import { 
   DropdownMenu, 

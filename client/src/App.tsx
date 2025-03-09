@@ -8,7 +8,7 @@ import Header from "@/components/Header";
 import SearchPage from "@/pages/SearchPage";
 import WatchlistPage from "@/pages/WatchlistPage";
 import AuthPage from "@/pages/auth-page";
-import { UserContext } from "@/components/UserSelector";
+import { UserContext } from "@/lib/user-context";
 import { Switch, Route } from "wouter";
 import { JwtAuthProvider, useJwtAuth } from "@/hooks/use-jwt-auth";
 import { ProtectedRoute } from "./lib/protected-route";

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useUserContext } from '@/components/UserSelector';
+import { useUserContext } from '@/lib/user-context';
 import WatchlistEntry from '@/components/WatchlistEntry';
 import { DetailsModal } from '@/components/DetailsModal';
 import { TMDBMovie, WatchlistEntryWithMovie } from '@shared/schema';

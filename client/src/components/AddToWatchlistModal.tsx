@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { TMDBMovie } from '@shared/schema';
-import { useUserContext } from './UserSelector';
+import { useUserContext } from '@/lib/user-context';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';

@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { useUserContext } from './UserSelector';
+import { useUserContext } from '@/lib/user-context';
 import { useToast } from '@/hooks/use-toast';
 
 interface NewUserModalProps {
