@@ -1,0 +1,204 @@
+2025-03-10 00:12:38.33
+eb934520
+User
+[SESSION] Authentication lost in session 1741529538136-3w9mv8gulok
+2025-03-10 00:12:38.34
+eb934520
+User
+[JWT AUTH] Request path: /favicon.ico, Authorization header present: false
+2025-03-10 00:12:38.34
+eb934520
+User
+[JWT AUTH] No token provided
+2025-03-10 00:12:38.36
+eb934520
+User
+[DB] Found user: Gavin206 (ID: 50)
+2025-03-10 00:12:38.36
+eb934520
+User
+[JWT AUTH] isJwtAuthenticated check for path: /api/watchlist/50
+2025-03-10 00:12:38.36
+eb934520
+User
+[JWT AUTH] Request method: GET
+2025-03-10 00:12:38.36
+eb934520
+User
+[JWT AUTH] Authorization header: Present
+2025-03-10 00:12:38.36
+eb934520
+User
+[JWT AUTH] Content-Type: Not set
+2025-03-10 00:12:38.36
+eb934520
+User
+[JWT AUTH] User already authenticated via middleware: Gavin206 (50)
+2025-03-10 00:12:38.36
+eb934520
+User
+[WATCHLIST] Verifying database connection before operation...
+2025-03-10 00:12:38.39
+eb934520
+User
+[DB] Database connection verified
+2025-03-10 00:12:38.39
+eb934520
+User
+[WATCHLIST] Database connection verified successfully
+2025-03-10 00:12:38.39
+eb934520
+User
+[WATCHLIST] Fetching watchlist for user ID: 50
+2025-03-10 00:12:38.39
+eb934520
+User
+[WATCHLIST] Attempting to fetch watchlist (attempt 1/3)...
+2025-03-10 00:12:38.39
+eb934520
+User
+[DB] Looking up user with ID: 50
+2025-03-10 00:12:38.42
+eb934520
+User
+[DB] Found user: Gavin206 (ID: 50)
+2025-03-10 00:12:38.42
+eb934520
+User
+[WATCHLIST] Found user: Gavin206 (ID: 50)
+2025-03-10 00:12:38.43
+eb934520
+User
+2:12:38 PM [express] GET /api/movies/external-ids/117690 304 in 98ms :: {"id":117690,"imdb_id":null,…
+2025-03-10 00:12:38.44
+eb934520
+User
+2:12:38 PM [express] GET /api/movies/external-ids/1399762 304 in 110ms :: {"id":1399762,"imdb_id":nu…
+2025-03-10 00:12:38.63
+eb934520
+User
+[WATCHLIST] Standard fetch successful: 6 entries
+2025-03-10 00:12:38.63
+eb934520
+User
+2:12:38 PM [express] GET /api/watchlist/50 200 in 265ms :: [{"id":85,"userId":50,"movieId":10,"watch…
+2025-03-10 00:12:42.40
+eb934520
+User
+[JWT AUTH] Request path: /api/logout, Authorization header present: false
+2025-03-10 00:12:42.40
+eb934520
+User
+[JWT AUTH] No token provided
+2025-03-10 00:12:42.40
+eb934520
+User
+[SESSION] Authentication lost in session 1741529538136-3w9mv8gulok
+2025-03-10 00:12:42.40
+eb934520
+User
+Logout request. User authenticated: false, Emergency mode: false
+2025-03-10 00:12:42.40
+eb934520
+User
+Session ID: 1741529538136-3w9mv8gulok
+2025-03-10 00:12:42.40
+eb934520
+User
+Session cookie configuration: watchlist.sid, secure: true, sameSite: lax
+2025-03-10 00:12:42.40
+eb934520
+User
+[JWT AUTH] Request path: /auth, Authorization header present: false
+2025-03-10 00:12:42.40
+eb934520
+User
+[JWT AUTH] No token provided
+2025-03-10 00:12:42.40
+eb934520
+User
+[SESSION] New session initialized: 1741529562401-8ntmd2ubfl3
+2025-03-10 00:12:42.40
+eb934520
+User
+2:12:42 PM [express] POST /api/logout 200 in 3ms :: {"message":"Logout successful","time":"2025-03-0…
+2025-03-10 00:12:42.40
+eb934520
+User
+Background session destruction completed successfully
+2025-03-10 00:12:42.42
+eb934520
+User
+[SESSION] New session initialized: 1741529562423-1enqvv4y1c3
+2025-03-10 00:12:42.42
+eb934520
+User
+[JWT AUTH] Request path: /api/logout, Authorization header present: false
+2025-03-10 00:12:42.42
+eb934520
+User
+[JWT AUTH] No token provided
+2025-03-10 00:12:42.42
+eb934520
+User
+[SESSION] New session initialized: 1741529562423-1enqvv4y1c3
+2025-03-10 00:12:42.42
+eb934520
+User
+Logout request. User authenticated: false, Emergency mode: false
+2025-03-10 00:12:42.42
+eb934520
+User
+Session ID: 1741529562423-1enqvv4y1c3
+2025-03-10 00:12:42.42
+eb934520
+User
+Session cookie configuration: watchlist.sid, secure: true, sameSite: lax
+2025-03-10 00:12:42.42
+eb934520
+User
+[SESSION] New session initialized: 1741529562424-9n2j0fyrki8
+2025-03-10 00:12:42.42
+eb934520
+User
+[JWT AUTH] Request path: /favicon.ico, Authorization header present: false
+2025-03-10 00:12:42.42
+eb934520
+User
+[JWT AUTH] No token provided
+2025-03-10 00:12:42.42
+eb934520
+User
+[SESSION] New session initialized: 1741529562425-d56021mx118
+2025-03-10 00:12:42.42
+eb934520
+User
+2:12:42 PM [express] POST /api/logout 200 in 4ms :: {"message":"Logout successful","time":"2025-03-0…
+2025-03-10 00:12:42.42
+eb934520
+User
+Background session destruction completed successfully
+2025-03-10 00:12:42.68
+eb934520
+User
+[JWT AUTH] Request path: /assets/index-JTDZIPJy.css, Authorization header present: false
+2025-03-10 00:12:42.68
+eb934520
+User
+[JWT AUTH] No token provided
+2025-03-10 00:12:42.68
+eb934520
+User
+[JWT AUTH] Request path: /assets/index-C1VmWYfm.js, Authorization header present: false
+2025-03-10 00:12:42.68
+eb934520
+User
+[JWT AUTH] No token provided
+2025-03-10 00:12:42.75
+eb934520
+User
+[JWT AUTH] Request path: /auth, Authorization header present: false
+2025-03-10 00:12:42.75
+eb934520
+User
+[JWT AUTH] No token provided

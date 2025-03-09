@@ -88,22 +88,50 @@ const WatchlistPage = () => {
         console.log(`Fetching watchlist for user ${currentUser.username} (ID: ${currentUser.id})`);
         
         // Add redundant auth headers to help with "user not found" issues
-        // Get JWT token from localStorage
-        const token = localStorage.getItem('jwt_token');
+        // Get JWT token with multiple fallbacks for reliability
+        let token = localStorage.getItem('jwt_token');
+        
+        // If token is missing, try backup locations
+        if (!token) {
+          // Try backup in localStorage
+          token = localStorage.getItem('movietracker_token_backup');
+          
+          // Try sessionStorage
+          if (!token) {
+            token = sessionStorage.getItem('jwt_token') || 
+                  sessionStorage.getItem('movietracker_token_backup');
+                  
+            // Try to retrieve from cookie as last resort
+            if (!token) {
+              const cookies = document.cookie.split(';');
+              for (const cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'jwt_token_backup' && value) {
+                  token = value;
+                  break;
+                }
+              }
+            }
+          }
+        }
         
         const headers: Record<string, string> = {
           'X-User-ID': currentUser.id.toString(),
           'X-Username': currentUser.username,
+          'X-Request-Timestamp': Date.now().toString(),
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache'
         };
         
-        // Add JWT token if available
-        if (token) {
+        // Add JWT token if available and valid format
+        if (token && token.split('.').length === 3) {
           console.log('[WATCHLIST] Including JWT token in watchlist fetch request');
           headers['Authorization'] = `Bearer ${token}`;
+          
+          // Restore token to primary location
+          localStorage.setItem('jwt_token', token);
         } else {
-          console.warn('[WATCHLIST] No JWT token available for watchlist fetch');
+          console.warn('[WATCHLIST] No valid JWT token found for watchlist fetch');
         }
         
         const res = await fetch(`/api/watchlist/${currentUser.id}`, {
