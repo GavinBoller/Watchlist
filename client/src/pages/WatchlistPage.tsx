@@ -77,8 +77,51 @@ const WatchlistPage = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchQuery]);
 
+  // Mobile browser detection
+  const isMobileSafari = typeof navigator !== 'undefined' && 
+    /iPhone|iPad|iPod/i.test(navigator.userAgent) && 
+    /AppleWebKit/i.test(navigator.userAgent) &&
+    !(/Chrome/i.test(navigator.userAgent));
+  
+  // Mobile Safari specific auto-refresh state
+  const [hasAutoRefreshed, setHasAutoRefreshed] = useState(false);
+  
+  // Effect for mobile Safari auto-refresh
+  useEffect(() => {
+    if (isMobileSafari && currentUser && !hasAutoRefreshed) {
+      // Brief delay to let page fully load before refresh
+      const timer = setTimeout(() => {
+        // Only auto-refresh once per session
+        setHasAutoRefreshed(true);
+        
+        // For Safari on iOS, we need to refresh token storage
+        try {
+          const token = localStorage.getItem('jwt_token');
+          if (token) {
+            // Save to sessionStorage as a backup
+            sessionStorage.setItem('jwt_token', token);
+            sessionStorage.setItem('movietracker_token_backup', token);
+            
+            // Also create a cookie backup
+            document.cookie = `jwt_token_backup=${token}; path=/; max-age=3600; SameSite=Strict`;
+            
+            console.log("[MOBILE] Created token backups for iOS Safari compatibility");
+          }
+        } catch (e) {
+          console.error("[MOBILE] Error creating token backups:", e);
+        }
+        
+        // Force a refresh of the watchlist data
+        queryClient.invalidateQueries({ queryKey: [`/api/watchlist/${currentUser.id}`] });
+        console.log("[MOBILE] Triggering auto-refresh for iOS Safari compatibility");
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [currentUser, isMobileSafari, hasAutoRefreshed]);
+  
   // Fetch watchlist with enhanced error recovery for production
-  const { data: watchlist, isLoading } = useQuery<WatchlistEntryWithMovie[]>({ 
+  const { data: watchlist, isLoading, refetch } = useQuery<WatchlistEntryWithMovie[]>({ 
     queryKey: currentUser ? [`/api/watchlist/${currentUser.id}`] : [],
     enabled: !!currentUser,
     queryFn: async ({ queryKey }) => {
@@ -460,7 +503,7 @@ const WatchlistPage = () => {
           </h2>
           
           {/* Media Type Stats */}
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 items-center">
             <Badge variant="outline" className="flex items-center">
               <Film className="h-3 w-3 mr-1" />
               {stats.movies} {stats.movies === 1 ? 'Movie' : 'Movies'}
@@ -469,6 +512,22 @@ const WatchlistPage = () => {
               <Tv2 className="h-3 w-3 mr-1" />
               {stats.tv} {stats.tv === 1 ? 'TV Show' : 'TV Shows'}
             </Badge>
+            {/* Safari Mobile-specific refresh button */}
+            {isMobileSafari && (
+              <button 
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: [`/api/watchlist/${currentUser.id}`] });
+                  toast({
+                    title: "Refreshing watchlist",
+                    description: "Loading the latest data...",
+                  });
+                }}
+                className="ml-2 p-1 rounded-full hover:bg-gray-700"
+                aria-label="Refresh watchlist"
+              >
+                <RefreshCw className="h-4 w-4 text-gray-400" />
+              </button>
+            )}
           </div>
         </div>
         

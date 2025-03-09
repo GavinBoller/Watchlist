@@ -1,0 +1,201 @@
+2025-03-10 00:32:06.70
+882838d3
+User
+[DB] Looking up user with ID: 50
+2025-03-10 00:32:06.73
+882838d3
+User
+[DB] Found user: Gavin206 (ID: 50)
+2025-03-10 00:32:06.73
+882838d3
+User
+[SESSION] User authenticated in session 1741530720463-8vc9zbb9w8v: User ID 50 (Gavin206)
+2025-03-10 00:32:06.73
+882838d3
+User
+2:32:06 PM [express] GET /api/jwt/user 200 in 1ms :: {"id":50,"username":"Gavin206","displayName":"G…
+2025-03-10 00:32:06.99
+882838d3
+User
+[JWT AUTH] Request path: /api/watchlist/50, Authorization header present: true
+2025-03-10 00:32:06.99
+882838d3
+User
+[JWT] Token to verify (first 20 chars): eyJhbGciOiJIUzI1NiIs...
+2025-03-10 00:32:06.99
+882838d3
+User
+[JWT] Attempting verification with secret: wat...
+2025-03-10 00:32:06.99
+882838d3
+User
+[JWT] Token decoded successfully with secret starting with: wat...
+2025-03-10 00:32:06.99
+882838d3
+User
+[JWT] Token payload: {"id":50,"username":"Gavin206","displayName":"Gavin206","iat":1741530713,"exp":1742135513}
+2025-03-10 00:32:06.99
+882838d3
+User
+[JWT AUTH] Token verified successfully for user: Gavin206 (ID: 50)
+2025-03-10 00:32:06.99
+882838d3
+User
+[DB] Looking up user with ID: 50
+2025-03-10 00:32:07.02
+882838d3
+User
+[DB] Found user: Gavin206 (ID: 50)
+2025-03-10 00:32:07.02
+882838d3
+User
+[JWT AUTH] isJwtAuthenticated check for path: /api/watchlist/50
+2025-03-10 00:32:07.02
+882838d3
+User
+[JWT AUTH] Request method: GET
+2025-03-10 00:32:07.02
+882838d3
+User
+[JWT AUTH] Authorization header: Present
+2025-03-10 00:32:07.02
+882838d3
+User
+[JWT AUTH] Content-Type: Not set
+2025-03-10 00:32:07.02
+882838d3
+User
+[JWT AUTH] User already authenticated via middleware: Gavin206 (50)
+2025-03-10 00:32:07.02
+882838d3
+User
+[WATCHLIST] Verifying database connection before operation...
+2025-03-10 00:32:07.05
+882838d3
+User
+[DB] Database connection verified
+2025-03-10 00:32:07.05
+882838d3
+User
+[WATCHLIST] Database connection verified successfully
+2025-03-10 00:32:07.05
+882838d3
+User
+[WATCHLIST] Fetching watchlist for user ID: 50
+2025-03-10 00:32:07.05
+882838d3
+User
+[WATCHLIST] Attempting to fetch watchlist (attempt 1/3)...
+2025-03-10 00:32:07.05
+882838d3
+User
+[DB] Looking up user with ID: 50
+2025-03-10 00:32:07.08
+882838d3
+User
+[DB] Found user: Gavin206 (ID: 50)
+2025-03-10 00:32:07.08
+882838d3
+User
+[WATCHLIST] Found user: Gavin206 (ID: 50)
+2025-03-10 00:32:07.25
+882838d3
+User
+[WATCHLIST] Standard fetch successful: 5 entries
+2025-03-10 00:32:07.25
+882838d3
+User
+2:32:07 PM [express] GET /api/watchlist/50 200 in 235ms :: [{"id":85,"userId":50,"movieId":10,"watch…
+2025-03-10 00:32:07.49
+882838d3
+User
+[JWT AUTH] Request path: /api/movies/external-ids/117690, Authorization header present: false
+2025-03-10 00:32:07.49
+882838d3
+User
+[JWT AUTH] No token provided
+2025-03-10 00:32:07.49
+882838d3
+User
+[SESSION] Authentication lost in session 1741530720463-8vc9zbb9w8v
+2025-03-10 00:32:07.50
+882838d3
+User
+[JWT AUTH] Request path: /api/movies/external-ids/635602, Authorization header present: false
+2025-03-10 00:32:07.50
+882838d3
+User
+[JWT AUTH] No token provided
+2025-03-10 00:32:07.50
+882838d3
+User
+[SESSION] Authentication lost in session 1741530720463-8vc9zbb9w8v
+2025-03-10 00:32:07.50
+882838d3
+User
+[JWT AUTH] Request path: /api/movies/external-ids/182026, Authorization header present: false
+2025-03-10 00:32:07.50
+882838d3
+User
+[JWT AUTH] No token provided
+2025-03-10 00:32:07.50
+882838d3
+User
+[SESSION] Authentication lost in session 1741530720463-8vc9zbb9w8v
+2025-03-10 00:32:07.50
+882838d3
+User
+[JWT AUTH] Request path: /api/movies/external-ids/83867, Authorization header present: false
+2025-03-10 00:32:07.50
+882838d3
+User
+[JWT AUTH] No token provided
+2025-03-10 00:32:07.50
+882838d3
+User
+[SESSION] Authentication lost in session 1741530720463-8vc9zbb9w8v
+2025-03-10 00:32:07.51
+882838d3
+User
+[JWT AUTH] Request path: /api/movies/external-ids/105971, Authorization header present: false
+2025-03-10 00:32:07.51
+882838d3
+User
+[JWT AUTH] No token provided
+2025-03-10 00:32:07.51
+882838d3
+User
+[SESSION] Authentication lost in session 1741530720463-8vc9zbb9w8v
+2025-03-10 00:32:07.68
+882838d3
+User
+2:32:07 PM [express] GET /api/movies/external-ids/83867 200 in 173ms :: {"id":83867,"imdb_id":"tt925…
+2025-03-10 00:32:07.68
+882838d3
+User
+2:32:07 PM [express] GET /api/movies/external-ids/105971 200 in 173ms :: {"id":105971,"imdb_id":"tt1…
+2025-03-10 00:32:07.68
+882838d3
+User
+2:32:07 PM [express] GET /api/movies/external-ids/635602 200 in 183ms :: {"id":635602,"imdb_id":"tt9…
+2025-03-10 00:32:07.70
+882838d3
+User
+2:32:07 PM [express] GET /api/movies/external-ids/182026 200 in 197ms :: {"id":182026,"imdb_id":"tt1…
+2025-03-10 00:32:07.76
+882838d3
+User
+2:32:07 PM [express] GET /api/movies/external-ids/117690 200 in 268ms :: {"id":117690,"imdb_id":null…
+2025-03-10 00:32:22.25
+eb934520
+User
+[DB] Database connection verified
+2025-03-10 00:32:37.80
+882838d3
+User
+[DB] Database connection verified
+2025-03-10 00:32:49.84
+882838d3
+User
+[DB] Database connection verified
+2025-03-10
