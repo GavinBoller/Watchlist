@@ -7,7 +7,6 @@ import passport from "passport";
 import { configurePassport, isAuthenticated, hasWatchlistAccess } from "./auth";
 import authRoutes from "./authRoutes";
 import MemoryStore from "memorystore";
-import connectPgSimple from "connect-pg-simple";
 import path from "path";
 import { pool, db } from "./db";
 import { exec } from "child_process";
@@ -15,11 +14,8 @@ import util from "util";
 import fs from "fs";
 import crypto from "crypto";
 import { 
-  productionSessionRepair, 
   productionLogging, 
-  productionOptimizations, 
-  registerEmergencyEndpoints,
-  preventAutoLogout 
+  productionOptimizations
 } from "./productionFixes";
 // Import JWT related files
 import { jwtAuthenticate } from "./jwtMiddleware";
@@ -85,9 +81,7 @@ configurePassport();
 
 // Add production-specific middleware after passport initialization
 app.use(productionLogging);         // Enhanced logging for production
-app.use(productionSessionRepair);   // Session repair mechanisms
 app.use(productionOptimizations);   // Performance optimizations
-app.use(preventAutoLogout);         // Prevent automatic logout issues for all users
 
 // Register JWT authentication middleware to validate tokens
 console.log('[SERVER] Adding JWT authentication middleware');
@@ -343,10 +337,7 @@ async function startServer() {
     console.log('[SERVER] Adding simplified registration endpoint');
     app.use('/api', simpleRegisterRouter);
     
-    // Register emergency recovery endpoints for production
-    // These provide special recovery mechanisms for user accounts that
-    // are experiencing persistent session issues in production
-    registerEmergencyEndpoints(app);
+    // Emergency recovery endpoints have been removed to simplify authentication
     
     // Register all API routes first
     const server = await registerRoutes(app);

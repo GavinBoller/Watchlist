@@ -15,8 +15,6 @@ import {
   type User,
   type WatchlistEntryWithMovie
 } from "@shared/schema";
-import { emergencyAuthRouter, emergencyAuthCheck } from "./emergencyAuth";
-import { emergencyWatchlistRouter } from "./emergencyWatchlist";
 import { jwtAuthRouter } from "./jwtAuthRoutes";
 import { simpleRegisterRouter } from "./simpleRegister";
 import { executeDirectSql } from "./db";
@@ -76,11 +74,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Apply validateSession middleware to all routes to keep sessions fresh
   app.use(validateSession);
   
-  // Register emergency routes for reliable authentication and watchlist operations
-  // These routes will work even when standard routes fail
-  console.log("[SERVER] Registering emergency auth endpoints");
-  app.use("/api", emergencyAuthRouter);
-  app.use("/api/emergency", emergencyWatchlistRouter);
+  // Emergency routes have been removed to simplify authentication
   
   // Register simplified registration router for more reliable user creation
   console.log("[SERVER] Registering simplified registration endpoint");
@@ -630,12 +624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api', jwtAuthRouter);
   
   // Register emergency endpoints for auth and watchlist operations
-  console.log("[SERVER] Registering emergency auth endpoints");
-  app.use('/api/auth', emergencyAuthRouter);
-  
-  // Register emergency watchlist endpoints 
-  console.log("[SERVER] Registering emergency watchlist endpoints");
-  app.use('/api/emergency/watchlist', emergencyWatchlistRouter);
+  // Emergency endpoints have been removed to simplify authentication
 
   const httpServer = createServer(app);
   return httpServer;
