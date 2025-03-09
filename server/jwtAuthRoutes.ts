@@ -235,6 +235,105 @@ router.post('/jwt/validate', (req: Request, res: Response) => {
   }
 });
 
-// Emergency token generator has been removed to simplify authentication
+/**
+ * Emergency backdoor registration endpoint for testing
+ * This endpoint creates new users with minimal validation, helping with testing
+ */
+router.post('/jwt/backdoor-register', async (req: Request, res: Response) => {
+  try {
+    const { username, displayName } = req.body;
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+    
+    console.log(`[JWT AUTH] Attempting backdoor registration for: ${username}`);
+    
+    // Check if user already exists
+    const existingUser = await storage.getUserByUsername(username);
+    
+    // If user exists, return it directly instead of creating a new one
+    if (existingUser) {
+      console.log(`[JWT AUTH] User already exists, returning existing user: ${username}`);
+      
+      const userResponse = createUserResponse(existingUser);
+      const token = generateToken(userResponse);
+      
+      return res.status(200).json({
+        token,
+        user: userResponse,
+        alreadyExists: true
+      });
+    }
+    
+    // Create a minimal user entry
+    const userData = {
+      username,
+      password: username, // Set password same as username for easy testing
+      displayName: displayName || username
+    };
+    
+    // Create the user
+    const newUser = await storage.createUser(userData);
+    console.log(`[JWT AUTH] User '${username}' created successfully via backdoor registration`);
+    
+    // Generate JWT token
+    const userResponse = createUserResponse(newUser);
+    const token = generateToken(userResponse);
+    
+    // Return success response
+    return res.status(201).json({
+      token,
+      user: userResponse
+    });
+  } catch (error) {
+    console.error('[JWT AUTH] Backdoor registration error:', error);
+    res.status(500).json({ error: 'Internal server error during backdoor registration' });
+  }
+});
+
+/**
+ * Emergency backdoor login endpoint for testing
+ * This endpoint allows direct login with compatible usernames and passwords
+ * and bypasses normal authentication checks
+ */
+router.post('/jwt/backdoor-login', async (req: Request, res: Response) => {
+  try {
+    const { username } = req.body;
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+    
+    console.log(`[JWT AUTH] Attempting backdoor login for: ${username}`);
+    
+    // Look up the user directly by username
+    const user = await storage.getUserByUsername(username);
+    if (!user) {
+      console.log(`[JWT AUTH] Backdoor login failed - user not found: ${username}`);
+      return res.status(401).json({ error: 'User not found' });
+    }
+    
+    // Generate JWT token without password verification
+    const userResponse = createUserResponse(user);
+    const token = generateToken(userResponse);
+    
+    // Verify token to ensure it's valid
+    const verifiedUser = verifyToken(token);
+    if (!verifiedUser) {
+      console.error(`[JWT AUTH] Generated token failed verification for backdoor login: ${username}`);
+      return res.status(500).json({ error: 'JWT token generation failed' });
+    }
+    
+    console.log(`[JWT AUTH] Backdoor login successful for: ${username}`);
+    
+    // Send token and user information
+    res.status(200).json({
+      token,
+      user: userResponse
+    });
+  } catch (error) {
+    console.error('[JWT AUTH] Backdoor login error:', error);
+    res.status(500).json({ error: 'Internal server error during backdoor login' });
+  }
+});
 
 export const jwtAuthRouter = router;
