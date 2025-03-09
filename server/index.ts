@@ -19,6 +19,7 @@ import { jwtAuthenticate } from "./jwtMiddleware";
 import { jwtAuthRouter } from "./jwtAuthRoutes";
 import { simpleJwtRouter } from "./simpleJwtAuth";
 import { simpleRegisterRouter } from "./simpleRegister";
+import { simpleLoginRouter } from "./simpleLogin";
 import { emergencyLoginRouter } from "./emergencyLoginPage";
 import { emergencyAuthRouter } from "./emergencyAuth";
 
@@ -333,6 +334,10 @@ async function startServer() {
     // Register simplified registration endpoint for robust user creation
     console.log('[SERVER] Adding simplified registration endpoint');
     app.use('/api', simpleRegisterRouter);
+    
+    // Register simplified login endpoint for reliable authentication
+    console.log('[SERVER] Adding simplified login endpoint');
+    app.use('/api', simpleLoginRouter);
     
     // Register emergency login page for extreme fallback scenarios
     console.log('[SERVER] Adding emergency login page for fallback authentication');

@@ -92,67 +92,42 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
     retry: isProd ? 0 : 1, // No retries in production to prevent potential redirect loops
   });
 
-  // Login mutation
+  // Login mutation - simplified and more reliable
   const loginMutation = useMutation({
     mutationFn: async (credentials: JwtLoginData) => {
       console.log("[JWT AUTH] Attempting login for user:", credentials.username);
       
       try {
-        // Try all login methods in a cascading fashion
+        // Try simplified login first (the most reliable method)
+        console.log("[JWT AUTH] Trying simplified login endpoint");
+        const simplifiedRes = await apiRequest("POST", "/api/simple-login", credentials);
         
-        // Method 1: Standard JWT login
-        console.log("[JWT AUTH] Trying standard login method");
-        const res = await apiRequest("POST", "/api/jwt/login", credentials);
-        if (res.ok) {
+        if (simplifiedRes.ok) {
+          console.log("[JWT AUTH] Simplified login successful");
+          return await simplifiedRes.json();
+        }
+        
+        // Fallback to standard login if simplified fails
+        console.log("[JWT AUTH] Simplified login failed, trying standard login");
+        const standardRes = await apiRequest("POST", "/api/jwt/login", credentials);
+        
+        if (standardRes.ok) {
           console.log("[JWT AUTH] Standard login successful");
-          return await res.json();
+          return await standardRes.json();
         }
         
-        // Method 2: Backdoor login
-        console.log("[JWT AUTH] Standard login failed, trying backdoor login");
-        try {
-          const backdoorRes = await apiRequest("POST", "/api/jwt/backdoor-login", { 
-            username: credentials.username 
-          });
-          
-          if (backdoorRes.ok) {
-            console.log("[JWT AUTH] Backdoor login successful");
-            return await backdoorRes.json();
-          }
-        } catch (backdoorError) {
-          console.error("[JWT AUTH] Backdoor login failed:", backdoorError);
+        // If both main methods fail, try emergency direct login
+        console.log("[JWT AUTH] Both login methods failed, trying direct login");
+        const directRes = await fetch(`/api/direct-login/${credentials.username}`);
+        
+        if (directRes.ok) {
+          console.log("[JWT AUTH] Direct login successful");
+          return await directRes.json();
         }
         
-        // Method 3: Emergency direct login (if both previous methods fail)
-        console.log("[JWT AUTH] Both login methods failed, trying one-click URL method");
-        try {
-          // Make a fetch request to the one-click login URL
-          const oneClickRes = await fetch(`/api/jwt/one-click-login/${credentials.username}`);
-          
-          if (oneClickRes.ok) {
-            // Since this returns HTML, we can't parse it as JSON directly
-            // But we know it sets localStorage and redirects
-            console.log("[JWT AUTH] One-click login was successful");
-            
-            // Manually set token and return a consistent response format
-            localStorage.setItem('movietracker_username', credentials.username);
-            return {
-              token: "manual-token-from-oneclick-login",
-              user: {
-                id: -1, // Placeholder ID, will be replaced on page refresh
-                username: credentials.username,
-                displayName: credentials.username,
-                oneClickLogin: true
-              }
-            };
-          }
-        } catch (oneClickError) {
-          console.error("[JWT AUTH] One-click login failed:", oneClickError);
-        }
-        
-        // If all methods fail, throw an error
-        const errorText = await res.text().catch(() => "Unknown error");
-        throw new Error(`All login methods failed: ${errorText}`);
+        // If all methods fail, throw an error with details from the standard attempt
+        const errorText = await standardRes.text().catch(() => "Unknown error");
+        throw new Error(`Login failed: ${errorText}`);
       } catch (error) {
         console.error("[JWT AUTH] All login attempts failed:", error);
         throw error;
