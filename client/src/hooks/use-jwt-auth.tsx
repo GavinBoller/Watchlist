@@ -230,16 +230,82 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Logout mutation
+  // Logout mutation with enhanced reliability
   const logoutMutation = useMutation({
     mutationFn: async () => {
       console.log("[JWT AUTH] Logging out user");
-      // Since JWT is stateless, we just need to remove the token
+      
+      // First, set flags to prevent token recovery
+      try {
+        localStorage.setItem('just_logged_out', 'true');
+        sessionStorage.setItem('just_logged_out', 'true');
+      } catch (e) {
+        console.error("[JWT AUTH] Error setting logout flags:", e);
+      }
+      
+      // Clear all tokens and state
       removeToken();
+      
+      // Try to perform server-side logout
+      try {
+        const { isProductionEnvironment, clearAllClientSideStorage } = await import('../lib/environment-utils');
+        const isProd = isProductionEnvironment();
+        console.log(`Logout initiated in ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'} environment`);
+        
+        // In production, do a more aggressive clearing
+        if (isProd) {
+          clearAllClientSideStorage();
+        }
+        
+        // Make server logout request with proper cache busting
+        const response = await fetch('/api/logout', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store',
+            'Pragma': 'no-cache'
+          },
+          cache: 'no-store'
+        });
+        
+        if (response.ok) {
+          console.log('Server-side logout successful');
+        } else {
+          console.warn('Server-side logout failed, but client-side logout completed');
+        }
+        
+        // Schedule flag cleanup after 10 seconds
+        setTimeout(() => {
+          try {
+            localStorage.removeItem('just_logged_out');
+            sessionStorage.removeItem('just_logged_out');
+          } catch (e) {
+            // Ignore cleanup errors
+          }
+        }, 10000);
+      } catch (e) {
+        console.error("[JWT AUTH] Error during server logout:", e);
+      }
     },
     onSuccess: () => {
-      // Clear user data
+      // Clear user data from cache
       queryClient.setQueryData(["/api/jwt/user"], null);
+      
+      // Clear any cached query data
+      queryClient.clear();
+      
+      // Additional cleanup to prevent state persistence
+      try {
+        // Clear any window global state
+        if (window.__authBackup) {
+          delete window.__authBackup;
+          console.log("[JWT AUTH] Cleared window.__authBackup state");
+        }
+      } catch (e) {
+        console.error("[JWT AUTH] Error during additional cleanup:", e);
+      }
+      
       toast({
         title: "Logged out",
         description: "You have been successfully logged out.",

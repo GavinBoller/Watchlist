@@ -63,6 +63,21 @@ export const saveToken = (token: string): void => {
  * Get JWT token from localStorage with validation and fallback recovery
  */
 export const getToken = (): string | null => {
+  // Check if the user has recently logged out
+  const hasRecentlyLoggedOut = () => {
+    try {
+      return localStorage.getItem('just_logged_out') === 'true' || 
+             sessionStorage.getItem('just_logged_out') === 'true';
+    } catch (e) {
+      return false;
+    }
+  };
+  
+  if (hasRecentlyLoggedOut()) {
+    console.log('[JWT] User recently logged out - not attempting token recovery');
+    return null;
+  }
+  
   // Try primary storage location first
   let token = null;
   
@@ -74,6 +89,16 @@ export const getToken = (): string | null => {
   
   if (!token) {
     console.log('[JWT] Token not found in primary storage, checking backups...');
+    
+    // Check if we are on the auth page - if we are, don't recover tokens
+    const isOnAuthPage = window.location.pathname === '/auth' || 
+                         window.location.pathname.includes('/login') ||
+                         window.location.pathname.includes('/register');
+                         
+    if (isOnAuthPage) {
+      console.log('[JWT] On auth page - skipping token recovery for security');
+      return null;
+    }
     
     // Try backup locations in localStorage
     try {
@@ -148,6 +173,31 @@ export const getToken = (): string | null => {
  * This is separate to prevent infinite recursion in getToken
  */
 function getBackupToken(): string | null {
+  // Check if the user has recently logged out
+  const hasRecentlyLoggedOut = () => {
+    try {
+      return localStorage.getItem('just_logged_out') === 'true' || 
+             sessionStorage.getItem('just_logged_out') === 'true';
+    } catch (e) {
+      return false;
+    }
+  };
+  
+  if (hasRecentlyLoggedOut()) {
+    console.log('[JWT] User recently logged out - not attempting backup token recovery');
+    return null;
+  }
+  
+  // Check if we are on the auth page - if we are, don't recover tokens
+  const isOnAuthPage = window.location.pathname === '/auth' || 
+                       window.location.pathname.includes('/login') ||
+                       window.location.pathname.includes('/register');
+                       
+  if (isOnAuthPage) {
+    console.log('[JWT] On auth page - skipping backup token recovery for security');
+    return null;
+  }
+  
   let token = null;
   
   // Try backup locations in localStorage
@@ -207,11 +257,79 @@ function isValidJwtFormat(token: string): boolean {
 }
 
 /**
- * Remove JWT token from localStorage
+ * Remove JWT token from all storage locations
  */
 export const removeToken = (): void => {
-  localStorage.removeItem(JWT_TOKEN_KEY);
-  console.log('[JWT] Token removed from localStorage');
+  try {
+    // Clear primary storage locations
+    localStorage.removeItem(JWT_TOKEN_KEY);
+    sessionStorage.removeItem(JWT_TOKEN_KEY);
+    
+    // Clear known backup locations
+    localStorage.removeItem('movietracker_token_backup');
+    localStorage.removeItem('movietracker_token_timestamp');
+    sessionStorage.removeItem('movietracker_token_backup');
+    
+    // Clear cookie backups
+    document.cookie = `${JWT_TOKEN_KEY}=; path=/; max-age=0`;
+    document.cookie = `jwt_token_backup=; path=/; max-age=0`;
+    
+    // Clear any additional JWT-related storage items
+    const backupKeys = [
+      'jwt_token_backup',
+      'jwt_backup',
+      'auth_token',
+      'auth_backup',
+      'token_backup',
+      'user_token',
+      'user_session'
+    ];
+    
+    // Clear from both storage types
+    backupKeys.forEach(key => {
+      try {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+      } catch (e) {
+        // Ignore individual key errors
+      }
+    });
+    
+    // Aggressively scan for other token-related keys
+    try {
+      // For localStorage
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (
+          key.includes('token') || 
+          key.includes('auth') || 
+          key.includes('jwt') || 
+          key.includes('user')
+        )) {
+          localStorage.removeItem(key);
+        }
+      }
+      
+      // For sessionStorage
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (
+          key.includes('token') || 
+          key.includes('auth') || 
+          key.includes('jwt') || 
+          key.includes('user')
+        )) {
+          sessionStorage.removeItem(key);
+        }
+      }
+    } catch (e) {
+      console.error('[JWT] Error during storage scan:', e);
+    }
+    
+    console.log('[JWT] Token removed from all storage locations');
+  } catch (error) {
+    console.error('[JWT] Error removing token:', error);
+  }
 };
 
 /**
