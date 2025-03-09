@@ -1,6 +1,7 @@
 import UserSelector from "./UserSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Search, List, Film } from "lucide-react";
+import { Search, List, Film, AlertTriangle } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface HeaderProps {
   onTabChange: (tab: "search" | "watchlist") => void;

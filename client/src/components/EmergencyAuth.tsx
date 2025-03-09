@@ -125,11 +125,36 @@ export function setupEmergencyAuth() {
         sessionStorage.setItem('emergency_timestamp', Date.now().toString());
         window.location.href = `/?emergencyLogin=true&user=${username}&directAuth=true`;
       },
+      // Method to login directly using the token you received from /api/emergency/raw-token/:username
+      loginWithToken: (token: string, username: string) => {
+        console.log(`[EMERGENCY] Direct token login for ${username}`);
+        
+        // Store token in localStorage and sessionStorage for redundancy
+        localStorage.setItem('jwt_token', token);
+        sessionStorage.setItem('jwt_token', token);
+        
+        // Set a cookie as another backup
+        document.cookie = `jwt_token=${token}; path=/; max-age=${7*24*60*60}`;
+        
+        // Also store emergency data
+        sessionStorage.setItem('emergency_user', username);
+        sessionStorage.setItem('emergency_auth', 'true');
+        sessionStorage.setItem('emergency_timestamp', Date.now().toString());
+        
+        // Redirect to home with emergency params
+        window.location.href = `/?token=${token}&emergencyLogin=true&user=${username}&directAuth=true`;
+      },
       logout: () => {
         console.log('[EMERGENCY] Manual emergency logout');
+        localStorage.removeItem('jwt_token');
+        sessionStorage.removeItem('jwt_token');
         sessionStorage.removeItem('emergency_user');
         sessionStorage.removeItem('emergency_auth');
         sessionStorage.removeItem('emergency_timestamp');
+        
+        // Clear cookie
+        document.cookie = 'jwt_token=; path=/; max-age=0';
+        
         window.location.href = '/auth';
       }
     };

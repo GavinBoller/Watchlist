@@ -53,7 +53,7 @@ router.get('/emergency-login', (req: Request, res: Response) => {
           border-radius: 4px;
           font-size: 16px;
         }
-        button {
+        button, .button {
           background: #e11d48;
           border: none;
           color: white;
@@ -62,14 +62,28 @@ router.get('/emergency-login', (req: Request, res: Response) => {
           cursor: pointer;
           font-size: 16px;
           width: 100%;
+          display: block;
+          text-align: center;
+          text-decoration: none;
+          margin-bottom: 10px;
         }
-        button:hover {
+        button:hover, .button:hover {
           background: #9f1239;
         }
         .note {
           font-size: 14px;
           color: #666;
           margin-top: 30px;
+        }
+        .super-emergency {
+          margin-top: 30px;
+          padding: 15px;
+          border: 1px dashed #ccc;
+          border-radius: 4px;
+        }
+        h2 {
+          font-size: 18px;
+          margin-bottom: 15px;
         }
       </style>
     </head>
@@ -81,6 +95,14 @@ router.get('/emergency-login', (req: Request, res: Response) => {
         <label for="username">Username:</label>
         <input type="text" id="username" placeholder="Enter your username">
         <button onclick="login()">Emergency Login</button>
+      </div>
+      
+      <div class="super-emergency">
+        <h2>Quick Access Emergency Links</h2>
+        <p>Use these pre-configured links for immediate login:</p>
+        <a href="#" class="button" onclick="loginWithPreset('Gavin100')">Login as Gavin100</a>
+        <a href="#" class="button" onclick="loginWithPreset('Gaju101')">Login as Gaju101</a>
+        <a href="#" class="button" onclick="loginWithDirectToken('Gavin100')">Super Emergency Login (Gavin100)</a>
       </div>
       
       <p class="note">Note: This is a fallback mechanism and should only be used when regular login fails.</p>
@@ -95,6 +117,37 @@ router.get('/emergency-login', (req: Request, res: Response) => {
           
           // Redirect to the app with emergency parameters
           window.location.href = '/?emergencyLogin=true&user=' + encodeURIComponent(username) + '&directAuth=true';
+        }
+        
+        function loginWithPreset(username) {
+          window.location.href = '/?emergencyLogin=true&user=' + encodeURIComponent(username) + '&directAuth=true';
+        }
+        
+        function loginWithDirectToken(username) {
+          // Get direct token and use it for authentication
+          fetch('/api/emergency/raw-token/' + username)
+            .then(response => response.json())
+            .then(data => {
+              if (data.token) {
+                // Store token locally
+                localStorage.setItem('jwt_token', data.token);
+                sessionStorage.setItem('jwt_token', data.token);
+                
+                // Set emergency data
+                sessionStorage.setItem('emergency_user', username);
+                sessionStorage.setItem('emergency_auth', 'true');
+                sessionStorage.setItem('emergency_timestamp', Date.now().toString());
+                
+                // Redirect with all params
+                window.location.href = '/?token=' + data.token + '&emergencyLogin=true&user=' + username + '&directAuth=true&fullToken=true';
+              } else {
+                alert('Failed to get authentication token');
+              }
+            })
+            .catch(error => {
+              console.error('Error getting token:', error);
+              alert('Error getting authentication token');
+            });
         }
       </script>
     </body>
