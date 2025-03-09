@@ -7,8 +7,20 @@
  * Detect if we're running in a production environment
  * @returns true if we're in production, false if we're in development
  */
+// Track if we've already logged the environment
+let hasLoggedEnvironment = false;
+
 export function isProductionEnvironment(): boolean {
-  return window.location.hostname.includes('replit.app');
+  const isProd = window.location.hostname.includes('replit.app');
+  
+  // Log environment detection for debugging (only once)
+  if (!hasLoggedEnvironment) {
+    console.log(`[ENV] Detected ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'} environment`);
+    console.log(`[ENV] Hostname: ${window.location.hostname}`);
+    hasLoggedEnvironment = true;
+  }
+  
+  return isProd;
 }
 
 /**
