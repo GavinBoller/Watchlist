@@ -4,7 +4,6 @@ import { useJwtAuth } from "../hooks/use-jwt-auth";
 import { LoginForm } from "@/components/LoginForm";
 import { RegisterForm } from "@/components/RegisterForm";
 import { PasswordResetForm } from "@/components/PasswordResetForm";
-import { GetEmergencyTokenButton } from "@/components/GetEmergencyTokenButton";
 import { UserResponse } from "@shared/schema";
 
 type AuthView = "login" | "register" | "passwordReset";
@@ -183,13 +182,12 @@ export default function AuthPage() {
             />
           )}
           
-          {/* Emergency token for troubleshooting */}
+          {/* Help text for login issues */}
           <div className="mt-6 pt-6 border-t border-border">
             <h3 className="text-sm font-medium mb-2">Having trouble logging in?</h3>
             <p className="text-xs text-muted-foreground mb-2">
-              If you're experiencing persistent login issues, try our emergency token feature.
+              If you're experiencing login issues, try resetting your password or clearing your browser cache.
             </p>
-            <GetEmergencyTokenButton />
           </div>
         </div>
       </div>

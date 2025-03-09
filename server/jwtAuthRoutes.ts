@@ -188,62 +188,6 @@ router.post('/jwt/validate', (req: Request, res: Response) => {
   }
 });
 
-/**
- * Emergency token generator for Test82 user (for development/testing)
- * This endpoint generates a token for the Test82 user without requiring a password
- * It's useful for testing and development when auth systems are being fixed
- */
-router.get('/jwt/emergency-token', async (req: Request, res: Response) => {
-  try {
-    // Only enable in development mode
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: 'This endpoint is only available in development mode' });
-    }
-    
-    // Get the Test82 user
-    const testUser = await storage.getUserByUsername('Test82');
-    if (!testUser) {
-      console.log('[JWT] Creating emergency Test82 user for token generation');
-      // Create Test82 user if it doesn't exist (for development)
-      const newUser = await storage.createUser({
-        username: 'Test82',
-        password: await hashPassword('password123'), // Simple password for testing
-        displayName: 'Test User 82'
-      });
-      
-      // Generate token
-      const userResponse = createUserResponse(newUser);
-      const token = generateToken(userResponse);
-      
-      console.log('[JWT] Emergency token generated for new Test82 user');
-      return res.status(201).json({ 
-        token, 
-        user: userResponse,
-        message: 'Test82 user created with emergency token'
-      });
-    }
-    
-    // Generate token for existing user
-    const userResponse = createUserResponse(testUser);
-    const token = generateToken(userResponse);
-    
-    // Verify token immediately to ensure it works
-    const verifiedUser = verifyToken(token);
-    if (!verifiedUser) {
-      console.error('[JWT] Emergency token failed verification immediately after generation');
-      return res.status(500).json({ error: 'Token generation failed - critical error' });
-    }
-    
-    console.log('[JWT] Emergency token generated successfully for Test82 user');
-    return res.status(200).json({ 
-      token, 
-      user: userResponse,
-      message: 'Emergency token generated for Test82 user'
-    });
-  } catch (error) {
-    console.error('[JWT] Emergency token generation error:', error);
-    return res.status(500).json({ error: 'Failed to generate emergency token' });
-  }
-});
+// Emergency token generator has been removed to simplify authentication
 
 export const jwtAuthRouter = router;
