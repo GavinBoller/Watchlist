@@ -215,9 +215,63 @@ export const removeToken = (): void => {
 };
 
 /**
- * Check if user is authenticated with JWT with validation
+ * Refresh token if it's close to expiration
+ * This proactively refreshes tokens that are within the buffer window
  */
-export const isAuthenticated = (): boolean => {
+export const refreshTokenIfNeeded = async (): Promise<boolean> => {
+  const token = getToken();
+  if (!token) return false;
+  
+  try {
+    const payload = parsePayloadFromToken(token);
+    if (!payload || !payload.exp) return false;
+    
+    const currentTime = Date.now() / 1000;
+    const timeUntilExpiry = payload.exp - currentTime;
+    
+    // Refresh if token expires in less than 24 hours
+    const REFRESH_BUFFER_SECONDS = 24 * 60 * 60; // 24 hours
+    
+    if (timeUntilExpiry < REFRESH_BUFFER_SECONDS) {
+      console.log(`[JWT] Token will expire in ${Math.round(timeUntilExpiry / 60)} minutes, refreshing...`);
+      
+      try {
+        // Call token refresh endpoint
+        const response = await fetch('/api/jwt/refresh', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.token) {
+            saveToken(data.token);
+            console.log('[JWT] Token refreshed successfully');
+            return true;
+          }
+        } else {
+          console.warn('[JWT] Failed to refresh token, status:', response.status);
+        }
+      } catch (refreshError) {
+        console.error('[JWT] Error refreshing token:', refreshError);
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('[JWT] Error checking token expiration:', error);
+    return false;
+  }
+};
+
+/**
+ * Check if user is authenticated with JWT with validation
+ * Includes attempt to refresh token if needed
+ */
+export const isAuthenticated = async (): Promise<boolean> => {
   const token = getToken();
   if (!token) return false;
   
@@ -237,6 +291,16 @@ export const isAuthenticated = (): boolean => {
       console.log('[JWT] Token is expired, removing from localStorage');
       removeToken();
       return false;
+    }
+    
+    // If token is valid but close to expiry, try to refresh it
+    // This happens in the background and doesn't affect the current authentication check
+    const REFRESH_BUFFER_SECONDS = 24 * 60 * 60; // 24 hours
+    if (payload.exp - currentTime < REFRESH_BUFFER_SECONDS) {
+      // Don't await - let it happen in the background
+      refreshTokenIfNeeded().catch(error => {
+        console.error('[JWT] Background token refresh failed:', error);
+      });
     }
     
     return true;

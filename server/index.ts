@@ -22,6 +22,7 @@ import { simpleRegisterRouter } from "./simpleRegister";
 import { simpleLoginRouter } from "./simpleLogin";
 import { emergencyLoginRouter } from "./emergencyLoginPage";
 import { emergencyAuthRouter } from "./emergencyAuth";
+import { tokenRefreshRouter } from "./tokenRefresh";
 
 // Extend the Express Session interface to include our custom properties
 // This ensures TypeScript recognizes our custom session data
@@ -346,6 +347,10 @@ async function startServer() {
     // Register ultra-simplified emergency auth endpoints
     console.log('[SERVER] Adding emergency auth router for direct token generation');
     app.use('/api', emergencyAuthRouter);
+    
+    // Register token refresh endpoint for seamless authentication
+    console.log('[SERVER] Adding token refresh endpoint for JWT renewal');
+    app.use('/api', tokenRefreshRouter);
     
     // Emergency recovery endpoints have been removed to simplify authentication
     
