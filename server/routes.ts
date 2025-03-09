@@ -366,6 +366,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // ENHANCED: Added robust recovery mechanisms for watchlist access
     const isProd = process.env.NODE_ENV === 'production';
     
+    // Verify database connection before operation
+    try {
+      console.log("[WATCHLIST] Verifying database connection before operation...");
+      const { ensureDatabaseReady } = await import('./db');
+      const isDbReady = await ensureDatabaseReady();
+      
+      if (!isDbReady) {
+        console.warn("[WATCHLIST] Database connection is not ready - using fallback mechanisms");
+        // Continue anyway, as our storage layer has fallbacks
+      } else {
+        console.log("[WATCHLIST] Database connection verified successfully");
+      }
+    } catch (dbCheckError) {
+      console.error("[WATCHLIST] Error verifying database connection:", dbCheckError);
+    }
+    
     try {
       const userId = parseInt(req.params.userId, 10);
       console.log(`[WATCHLIST] Fetching watchlist for user ID: ${userId}`);
@@ -374,43 +390,229 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid user ID" });
       }
       
+      // Security check - ensure authenticated user can only see their own watchlist
+      const authId = (req.user as any)?.id;
+      if (authId !== userId) {
+        console.error(`[WATCHLIST] Authorization mismatch: authenticated user ID ${authId} != requested userId ${userId}`);
+        return res.status(403).json({ 
+          message: "You can only view your own watchlist" 
+        });
+      }
+      
       // For safer watchlist access across environments
       let watchlistData: WatchlistEntryWithMovie[] = [];
       let userFound = false;
+      let fetchSuccess = false;
       
-      // STEP 1: Try standard approach first
-      try {
-        // Get user to verify existence
-        const user = await storage.getUser(userId);
-        
-        if (user) {
-          userFound = true;
-          console.log(`[WATCHLIST] Found user: ${user.username} (ID: ${userId})`);
+      // Multi-stage approach with fallbacks for watchlist retrieval
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`[WATCHLIST] Attempting to fetch watchlist (attempt ${attempt}/3)...`);
           
-          // Successful user lookup - get watchlist
-          watchlistData = await storage.getWatchlistEntries(userId);
-          console.log(`[WATCHLIST] Standard fetch successful: ${watchlistData.length} entries`);
+          // STEP 1: Get user to verify existence
+          const user = await storage.getUser(userId);
           
-          // Store backup in session for potential recovery
-          if (isProd && req.session) {
-            (req.session as any).lastWatchlistUser = userId;
-            (req.session as any).lastWatchlistCount = watchlistData.length;
-            (req.session as any).lastWatchlistTime = Date.now();
+          if (user) {
+            userFound = true;
+            console.log(`[WATCHLIST] Found user: ${user.username} (ID: ${userId})`);
+            
+            // Successful user lookup - get watchlist
+            watchlistData = await storage.getWatchlistEntries(userId);
+            console.log(`[WATCHLIST] Standard fetch successful: ${watchlistData.length} entries`);
+            
+            // Store backup in session for potential recovery
+            if (isProd && req.session) {
+              (req.session as any).lastWatchlistUser = userId;
+              (req.session as any).lastWatchlistCount = watchlistData.length;
+              (req.session as any).lastWatchlistTime = Date.now();
+            }
+            
+            // Also store in response header for client-side knowledge
+            res.setHeader('X-Watchlist-Count', watchlistData.length.toString());
+            res.setHeader('X-Watchlist-Timestamp', Date.now().toString());
+            
+            fetchSuccess = true;
+            break; // Success - exit retry loop
+          } else {
+            console.log(`[WATCHLIST] User with ID ${userId} not found in lookup attempt ${attempt}`);
+            
+            if (attempt === 3) {
+              return res.status(404).json({ message: "User not found" });
+            }
           }
+        } catch (primaryError) {
+          console.error(`[WATCHLIST] Error in watchlist fetch attempt ${attempt}:`, primaryError);
           
-          return res.json(watchlistData);
-        } else {
-          console.log(`[WATCHLIST] User with ID ${userId} not found in standard lookup`);
+          if (attempt === 3) {
+            // Final attempt - try direct SQL as a last resort
+            try {
+              console.log(`[WATCHLIST] Attempting direct SQL watchlist fetch as last resort...`);
+              const { executeDirectSql } = await import('./db');
+              
+              // First check if the user exists
+              const userResults = await executeDirectSql(
+                `SELECT * FROM users WHERE id = $1`, 
+                [userId]
+              );
+              
+              if (userResults && userResults.rows && userResults.rows.length > 0) {
+                userFound = true;
+                const userData = userResults.rows[0];
+                console.log(`[WATCHLIST] Found user via direct SQL: ${userData.username} (ID: ${userData.id})`);
+                
+                // Try to fetch the watchlist entries using direct SQL
+                const entryResults = await executeDirectSql(
+                  `SELECT we.*, m.* FROM watchlist_entries we
+                   JOIN movies m ON we.movie_id = m.id
+                   WHERE we.user_id = $1
+                   ORDER BY we.created_at DESC`, 
+                  [userId]
+                );
+                
+                if (entryResults && entryResults.rows && entryResults.rows.length > 0) {
+                  // Map the SQL results to our expected format
+                  watchlistData = entryResults.rows.map((row: any) => {
+                    // Structure the movie data
+                    const movie = {
+                      id: row.id,
+                      tmdbId: row.tmdb_id,
+                      title: row.title || '[Unknown]',
+                      overview: row.overview || '',
+                      posterPath: row.poster_path || '',
+                      backdropPath: row.backdrop_path || '',
+                      releaseDate: row.release_date || null,
+                      voteAverage: row.vote_average || 0,
+                      mediaType: row.media_type || 'movie',
+                      createdAt: row.created_at || new Date().toISOString()
+                    };
+                    
+                    // Structure the watchlist entry
+                    return {
+                      id: row.id,
+                      userId: row.user_id,
+                      movieId: row.movie_id,
+                      status: row.status || 'to_watch',
+                      watchedDate: row.watched_date || null,
+                      notes: row.notes || '',
+                      createdAt: row.created_at || new Date().toISOString(),
+                      movie
+                    };
+                  });
+                  
+                  console.log(`[WATCHLIST] Direct SQL watchlist fetch successful, found ${watchlistData.length} entries`);
+                  fetchSuccess = true;
+                } else {
+                  // If no results, it might be valid that the user has no entries
+                  console.log(`[WATCHLIST] Direct SQL watchlist fetch returned no entries, this may be normal`);
+                  watchlistData = [];
+                  fetchSuccess = true;
+                }
+              } else {
+                // No user found via direct SQL either
+                console.log(`[WATCHLIST] User with ID ${userId} not found via direct SQL`);
+                return res.status(404).json({ message: "User not found" });
+              }
+            } catch (directSqlError) {
+              console.error(`[WATCHLIST] Direct SQL watchlist fetch failed:`, directSqlError);
+              
+              // All attempts failed, but we'll continue with session recovery
+              console.warn(`[WATCHLIST] All direct watchlist fetch methods failed, trying session recovery`);
+            }
+          } else {
+            // Not the final attempt, wait before retrying
+            await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+          }
         }
-      } catch (primaryError) {
-        console.error(`[WATCHLIST] Error in primary watchlist fetch:`, primaryError);
       }
       
-      // If we reach here, something went wrong with the primary fetch
-      return res.status(404).json({ message: "Watchlist not found" });
+      // If we successfully fetched data through any method, return it
+      if (fetchSuccess) {
+        res.setHeader('X-Watchlist-Source', 'primary');
+        return res.json(watchlistData);
+      }
+      
+      // Last-resort recovery for production environments:
+      // Try to recover from session data if available
+      if (isProd && req.session) {
+        const storedUserId = (req.session as any).lastWatchlistUser;
+        
+        if (storedUserId === userId) {
+          console.log(`[WATCHLIST] Attempting recovery from session data for user ${userId}`);
+          const backupCount = (req.session as any).lastWatchlistCount || 0;
+          const backupTime = (req.session as any).lastWatchlistTime || 0;
+          const ageInMinutes = (Date.now() - backupTime) / (1000 * 60);
+          
+          if (backupCount > 0) {
+            // We don't have the actual data, but we know how many items were there
+            // Return a special format indicating recovery mode
+            console.log(`[WATCHLIST] Using recovery indicators with count ${backupCount} from ${ageInMinutes.toFixed(1)} minutes ago`);
+            res.setHeader('X-Watchlist-Source', 'recovery');
+            res.setHeader('X-Watchlist-Count', backupCount.toString());
+            res.setHeader('X-Watchlist-Recovery-Age', ageInMinutes.toFixed(1));
+            
+            // Return an empty array but with special headers for the client
+            return res.status(206).json({
+              recoveryMode: true,
+              message: "Watchlist data temporarily unavailable, recovery information provided", 
+              expectedCount: backupCount,
+              recoveryAge: ageInMinutes,
+              entries: []
+            });
+          }
+        }
+      }
+      
+      // If we reach here, all attempts failed, and we have no backup
+      return res.status(404).json({ message: "Watchlist not found or temporarily unavailable" });
     } catch (error) {
-      console.error("Error fetching watchlist:", error);
-      res.status(500).json({ message: "Failed to fetch watchlist" });
+      console.error("[WATCHLIST] Unhandled error in watchlist fetch:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : 'No stack trace';
+      console.error("[WATCHLIST] Error details:", errorMessage);
+      console.error("[WATCHLIST] Error stack:", errorStack);
+      
+      // Enhanced error handling - check for common error patterns
+      let statusCode = 500;
+      let userMessage = "Failed to fetch watchlist";
+      
+      // Check for database connection issues
+      if (errorMessage.includes('connection') || 
+          errorMessage.includes('pool') || 
+          errorMessage.includes('database') ||
+          errorMessage.includes('timeout')) {
+        userMessage = "Database connection issue detected. Please try again later.";
+        statusCode = 503; // Service Unavailable
+      } else if (errorMessage.includes('not found') || errorMessage.includes('404')) {
+        statusCode = 404;
+        userMessage = "The requested resource was not found.";
+      } else if (errorMessage.includes('token') || errorMessage.includes('unauthorized') || errorMessage.includes('authentication')) {
+        statusCode = 401;
+        userMessage = "Authentication error. Please log in again.";
+      } else if (errorMessage.includes('permission') || errorMessage.includes('forbidden') || errorMessage.includes('403')) {
+        statusCode = 403;
+        userMessage = "You don't have permission to access this watchlist.";
+      }
+      
+      // Prepare enhanced error response
+      interface ErrorResponse {
+        message: string;
+        error?: string;
+        stack?: string;
+        time?: string;
+        recoveryMode?: boolean;
+      }
+      
+      // Only include detailed error info in development
+      const errorResponse: ErrorResponse = isProd
+        ? { message: userMessage }
+        : { 
+            message: userMessage, 
+            error: errorMessage, 
+            stack: errorStack,
+            time: new Date().toISOString()
+          };
+      
+      res.status(statusCode).json(errorResponse);
     }
   });
 
