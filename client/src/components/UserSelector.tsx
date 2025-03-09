@@ -59,8 +59,33 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     setCachedUser(user);
   }, [user]);
   
-  // A user is authenticated if both the auth context says so and we have a local cached user
-  const isAuthenticated = !!user && !!cachedUser;
+  // Check if there's a recent logout flag - critical for UI consistency
+  const [hasRecentlyLoggedOut, setHasRecentlyLoggedOut] = useState<boolean>(false);
+  
+  useEffect(() => {
+    try {
+      // Check for logout flags
+      const justLoggedOut = localStorage.getItem('just_logged_out') === 'true' || 
+                            sessionStorage.getItem('just_logged_out') === 'true';
+      setHasRecentlyLoggedOut(justLoggedOut);
+      
+      // Also check if we're on the auth page, which implies logged out state
+      const isOnAuthPage = window.location.pathname === '/auth' || 
+                            window.location.href.includes('/login') ||
+                            window.location.href.includes('/register');
+      
+      if (isOnAuthPage) {
+        setHasRecentlyLoggedOut(true);
+        setCachedUser(null);
+      }
+    } catch (e) {
+      console.error("Error checking logout flags:", e);
+    }
+  }, []);
+  
+  // A user is authenticated if the auth context says so, we have a local cached user,
+  // AND there's no recent logout flag
+  const isAuthenticated = !!user && !!cachedUser && !hasRecentlyLoggedOut;
   
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -78,8 +103,9 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
 
   // CROSS-ENVIRONMENT UNIVERSAL LOGOUT SOLUTION
   const handleLogout = async () => {
-    // Immediately clear the local cached user to update UI
+    // Immediately clear the local cached user and set logout flag for UI
     setCachedUser(null);
+    setHasRecentlyLoggedOut(true);
     
     // Import environment utilities
     const {
