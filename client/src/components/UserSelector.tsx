@@ -74,32 +74,31 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     }
   }, [user]);
   
-  // Import and use the checkForLogoutFlags helper from jwtUtils
+  // Check for logout flags - we now use a simpler approach
   useEffect(() => {
-    const checkLogoutStatus = async () => {
-      try {
-        // Import utility functions dynamically to avoid circular dependencies
-        const { checkForLogoutFlags } = await import('../lib/jwtUtils');
-        
-        // Use the centralized logout check function
-        const justLoggedOut = checkForLogoutFlags();
-        setHasRecentlyLoggedOut(justLoggedOut);
-        
-        // Also check if we're on the auth page, which implies logged out state
-        const isOnAuthPage = window.location.pathname === '/auth' || 
-                            window.location.href.includes('/login') ||
-                            window.location.href.includes('/register');
-        
-        if (isOnAuthPage) {
-          setHasRecentlyLoggedOut(true);
-          setCachedUser(null);
-        }
-      } catch (e) {
-        console.error("Error checking logout flags:", e);
+    try {
+      // Check for standard logout flags directly
+      const localStorageFlag = localStorage.getItem('just_logged_out') === 'true';
+      const sessionStorageFlag = sessionStorage.getItem('just_logged_out') === 'true';
+      const globalFlag = typeof window !== 'undefined' && window.__loggedOut === true;
+      
+      // Set the state based on all possible logout indicators
+      const justLoggedOut = localStorageFlag || sessionStorageFlag || globalFlag;
+      setHasRecentlyLoggedOut(justLoggedOut);
+      
+      // Also check if we're on the auth page, which implies logged out state
+      const isOnAuthPage = window.location.pathname === '/auth' || 
+                          window.location.href.includes('/login') ||
+                          window.location.href.includes('/register');
+      
+      if (isOnAuthPage) {
+        console.log('[UserSelector] On auth page, setting logged out state');
+        setHasRecentlyLoggedOut(true);
+        setCachedUser(null);
       }
-    };
-    
-    checkLogoutStatus();
+    } catch (e) {
+      console.error("Error checking logout flags:", e);
+    }
   }, []);
   
   // A user is authenticated if the auth context says so, we have a local cached user,

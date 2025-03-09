@@ -20,7 +20,7 @@ export const JWT_TOKEN_KEY = 'jwt_token';
  * Shared helper to check if a user has recently logged out
  * Also clears logout flags if a valid token is found
  */
-function checkForLogoutFlags(): boolean {
+export function checkForLogoutFlags(): boolean {
   try {
     // Check all possible logout indicators
     const localStorageFlag = localStorage.getItem('just_logged_out') === 'true';
