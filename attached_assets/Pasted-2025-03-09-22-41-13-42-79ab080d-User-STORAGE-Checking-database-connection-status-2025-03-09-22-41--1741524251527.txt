@@ -1,0 +1,212 @@
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] Checking database connection status
+2025-03-09 22:41:13.42
+79ab080d
+User
+[DB] No existing database connection, initializing...
+2025-03-09 22:41:13.42
+79ab080d
+User
+[DB] Failed to initialize database: Error: Could not connect to database after multiple attempts
+2025-03-09 22:41:13.42
+79ab080d
+User
+ERROR: DATABASE_URL is not set. Database operations will fail.
+2025-03-09 22:41:13.42
+79ab080d
+User
+[DB] All initialization attempts failed: Error: DATABASE_URL environment variable is required
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] Database connection check failed (attempt 2)
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] Database connection verification failed, proceeding with caution
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] Drizzle ORM not initialized, falling back to direct SQL
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] Database error in createUser using ORM: Error: ORM not initialized
+2025-03-09 22:41:13.42
+79ab080d
+User
+at DatabaseStorage.createUser (file:///home/runner/workspace/dist/index.js:501:15)
+2025-03-09 22:41:13.42
+79ab080d
+User
+at async simpleRegisterHandler (file:///home/runner/workspace/dist/index.js:2468:16)
+2025-03-09 22:41:13.42
+79ab080d
+User
+at async file:///home/runner/workspace/dist/index.js:4885:16
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] Error type: Error
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] Error message: ORM not initialized
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] Error stack: Error: ORM not initialized
+2025-03-09 22:41:13.42
+79ab080d
+User
+at DatabaseStorage.createUser (file:///home/runner/workspace/dist/index.js:501:15)
+2025-03-09 22:41:13.42
+79ab080d
+User
+at async simpleRegisterHandler (file:///home/runner/workspace/dist/index.js:2468:16)
+2025-03-09 22:41:13.42
+79ab080d
+User
+at async file:///home/runner/workspace/dist/index.js:4885:16
+2025-03-09 22:41:13.42
+79ab080d
+User
+ERROR: DATABASE_URL is not set. Database operations will fail.
+2025-03-09 22:41:13.42
+79ab080d
+User
+Database connection attempt 4 failed: Error: DATABASE_URL environment variable is required
+2025-03-09 22:41:13.42
+79ab080d
+User
+Max connection attempts reached. Database is unavailable.
+2025-03-09 22:41:13.42
+79ab080d
+User
+[DB] Failed to initialize database: Error: Could not connect to database after multiple attempts
+2025-03-09 22:41:13.42
+79ab080d
+User
+ERROR: DATABASE_URL is not set. Database operations will fail.
+2025-03-09 22:41:13.42
+79ab080d
+User
+[DB] All initialization attempts failed: Error: DATABASE_URL environment variable is required
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] Direct SQL execution error: Error: Database pool not initialized
+2025-03-09 22:41:13.42
+79ab080d
+User
+at executeDirectSql (file:///home/runner/workspace/dist/index.js:268:13)
+2025-03-09 22:41:13.42
+79ab080d
+User
+at async DatabaseStorage.createUser (file:///home/runner/workspace/dist/index.js:535:26)
+2025-03-09 22:41:13.42
+79ab080d
+User
+at async simpleRegisterHandler (file:///home/runner/workspace/dist/index.js:2468:16)
+2025-03-09 22:41:13.42
+79ab080d
+User
+at async file:///home/runner/workspace/dist/index.js:4885:16
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] Direct SQL fallback failed: Error: Database pool not initialized
+2025-03-09 22:41:13.42
+79ab080d
+User
+at executeDirectSql (file:///home/runner/workspace/dist/index.js:268:13)
+2025-03-09 22:41:13.42
+79ab080d
+User
+at async DatabaseStorage.createUser (file:///home/runner/workspace/dist/index.js:535:26)
+2025-03-09 22:41:13.42
+79ab080d
+User
+at async simpleRegisterHandler (file:///home/runner/workspace/dist/index.js:2468:16)
+2025-03-09 22:41:13.42
+79ab080d
+User
+at async file:///home/runner/workspace/dist/index.js:4885:16
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] Fallback error name: Error
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] Fallback error message: Database pool not initialized
+2025-03-09 22:41:13.42
+79ab080d
+User
+[SIMPLE REGISTER] Inner user creation error: Error: Registration failed: Database pool not initialized
+2025-03-09 22:41:13.42
+79ab080d
+User
+at DatabaseStorage.createUser (file:///home/runner/workspace/dist/index.js:563:17)
+2025-03-09 22:41:13.42
+79ab080d
+User
+at async simpleRegisterHandler (file:///home/runner/workspace/dist/index.js:2468:16)
+2025-03-09 22:41:13.42
+79ab080d
+User
+at async file:///home/runner/workspace/dist/index.js:4885:16
+2025-03-09 22:41:13.42
+79ab080d
+User
+[SIMPLE REGISTER] Database error during user creation: Error: Registration failed: Database pool not initialized
+2025-03-09 22:41:13.42
+79ab080d
+User
+at DatabaseStorage.createUser (file:///home/runner/workspace/dist/index.js:563:17)
+2025-03-09 22:41:13.42
+79ab080d
+User
+at async simpleRegisterHandler (file:///home/runner/workspace/dist/index.js:2468:16)
+2025-03-09 22:41:13.42
+79ab080d
+User
+at async file:///home/runner/workspace/dist/index.js:4885:16
+2025-03-09 22:41:13.42
+79ab080d
+User
+[SIMPLE REGISTER] Error type: Error
+2025-03-09 22:41:13.42
+79ab080d
+User
+[SIMPLE REGISTER] Error message: Registration failed: Database pool not initialized
+2025-03-09 22:41:13.42
+79ab080d
+User
+[DB] Attempting initialization with increased timeout...
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] Attempting direct SQL fallback for user creation: Gavin203
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] Direct SQL insert with columns: "username", "password", "display_name"
+2025-03-09 22:41:13.42
+79ab080d
+User
+[STORAGE] SQL values count: 3
+2025-03-09 22:41:13.42
+79ab080d
+User
+[DB] No existing database connection, initializing...
+2025-03-09 22:41:13.42
+79ab080d
+User
+[DB] Attempting initialization with increased timeout...
+2025-03-09 22:41:13.42
+79ab080d
+User
+12:41:13 PM [express] POST /api/simple-register-direct 500 in 93ms :: {"error":"Failed to create user…

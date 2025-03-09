@@ -56,12 +56,40 @@ function createPool(
   isProduction: boolean = process.env.NODE_ENV === 'production', 
   connectionTimeoutMs: number = 10000
 ): Pool {
-  // Connection string handling with fallback
+  // Connection string handling with robust fallback
   const connectionString = process.env.DATABASE_URL;
   
   if (!connectionString) {
-    console.error("ERROR: DATABASE_URL is not set. Database operations will fail.");
-    throw new Error("DATABASE_URL environment variable is required");
+    // Log critical error but continue with initialization attempt
+    console.error("CRITICAL: DATABASE_URL is not set. Attempting recovery strategy.");
+    console.error("Environment variables available:", Object.keys(process.env).filter(key => !key.includes('SECRET')).join(', '));
+    
+    // In production deployment, different environment variable formats might be used
+    const altDbUrls = [
+      process.env.POSTGRES_URL,
+      process.env.PG_URL, 
+      process.env.POSTGRESQL_URL,
+      process.env.DATABASE_URI,
+      process.env.DB_URL,
+      process.env.REPLIT_DB_URL
+    ];
+    
+    const altDbUrl = altDbUrls.find(url => !!url);
+    
+    if (altDbUrl) {
+      console.log(`Found alternative database URL in environment variable. Using this instead.`);
+      return new Pool({
+        connectionString: altDbUrl,
+        max: 5,
+        idleTimeoutMillis: 30000, 
+        connectionTimeoutMillis: connectionTimeoutMs,
+        ssl: isProduction ? { rejectUnauthorized: false } : undefined
+      });
+    }
+    
+    // This is a critical error but we'll continue with a warning
+    console.error("WARNING: No database URL found in any environment variable. Services will be degraded.");
+    throw new Error("No database connection URL available in any environment variable");
   }
   
   console.log("Creating database pool with PostgreSQL connection...");

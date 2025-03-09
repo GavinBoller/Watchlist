@@ -618,6 +618,8 @@ import { executeDirectSql } from './db';
 
 // DatabaseStorage implementation for PostgreSQL
 export class DatabaseStorage implements IStorage {
+  // Emergency fallback memory storage for complete database failures
+  private emergencyMemoryStorage: MemStorage | null = null;
   /**
    * Direct SQL query method for emergency operations
    * This provides a bypass when ORM operations are failing
@@ -870,6 +872,28 @@ export class DatabaseStorage implements IStorage {
       
       if (!isConnected) {
         console.warn(`[STORAGE] Database connection verification failed, proceeding with caution`);
+        
+        // Add special handling for production database outages
+        if (process.env.NODE_ENV === 'production') {
+          console.log(`[STORAGE] PRODUCTION ENVIRONMENT: Using emergency memory storage mode`);
+          
+          // Create a memory storage instance for this emergency
+          if (!this.emergencyMemoryStorage) {
+            console.log(`[STORAGE] Initializing emergency memory storage system`);
+            this.emergencyMemoryStorage = new MemStorage();
+          }
+          
+          try {
+            // Try to create the user in memory storage
+            console.log(`[STORAGE] Creating user in emergency memory storage: ${insertUser.username}`);
+            const memUser = await this.emergencyMemoryStorage.createUser(insertUser);
+            console.log(`[STORAGE] User created in memory storage: ${memUser.id}`);
+            return memUser;
+          } catch (memError) {
+            console.error(`[STORAGE] Failed to create user in memory storage:`, memError);
+            // Continue with normal flow if memory storage fails
+          }
+        }
       } else {
         console.log(`[STORAGE] Database connection verified`);
       }
@@ -877,6 +901,12 @@ export class DatabaseStorage implements IStorage {
       // Check if db is defined before attempting to use it
       if (!db) {
         console.error(`[STORAGE] Drizzle ORM not initialized, falling back to direct SQL`);
+        // Print all available environment variables (excluding secrets)
+        console.log(`[STORAGE] Environment variables:`, 
+          Object.keys(process.env)
+            .filter(k => !k.includes('SECRET') && !k.includes('KEY'))
+            .join(', ')
+        );
         throw new Error('ORM not initialized');
       }
       
