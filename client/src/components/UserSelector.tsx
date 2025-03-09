@@ -36,6 +36,7 @@ declare global {
       username: string;
       timestamp: number;
     } | null;
+    __loggedOut?: boolean;
   }
 }
 
@@ -61,6 +62,17 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
   
   // Check if there's a recent logout flag - critical for UI consistency
   const [hasRecentlyLoggedOut, setHasRecentlyLoggedOut] = useState<boolean>(false);
+  
+  // Clear logout flag if user exists
+  useEffect(() => {
+    if (user) {
+      console.log("User logged in, clearing logout flags");
+      setHasRecentlyLoggedOut(false);
+      localStorage.removeItem('just_logged_out');
+      sessionStorage.removeItem('just_logged_out');
+      window.__loggedOut = false;
+    }
+  }, [user]);
   
   useEffect(() => {
     try {
@@ -128,8 +140,12 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
       let shouldRedirect = currentPath !== '/auth';
       
       // Store a flag in sessionStorage to ensure we know we're coming from logout
-      sessionStorage.setItem('jusT_logged_out', 'true');
-      localStorage.setItem('jusT_logged_out', 'true');
+      // Use correct casing to match our checking function
+      sessionStorage.setItem('just_logged_out', 'true');
+      localStorage.setItem('just_logged_out', 'true');
+      
+      // Also set a global variable as triple assurance
+      window.__loggedOut = true;
       
       // Clear JWT token immediately from memory/session/local storage
       sessionStorage.removeItem('jwt_token');

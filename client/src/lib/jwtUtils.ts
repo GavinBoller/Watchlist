@@ -1,12 +1,51 @@
 /**
  * JWT Utilities for client-side authentication
  * Streamlined version for cross-environment compatibility
+ * Enhanced with robust logout detection
  */
+
+// Add TypeScript interface for window global state
+declare global {
+  interface Window {
+    __loggedOut?: boolean;
+  }
+}
 
 import { UserResponse } from '@shared/schema';
 
 // Local storage key for JWT token
 export const JWT_TOKEN_KEY = 'jwt_token';
+
+/**
+ * Shared helper to check if a user has recently logged out
+ * Also clears logout flags if a valid token is found
+ */
+function checkForLogoutFlags(): boolean {
+  try {
+    // Check all possible logout indicators
+    const localStorageFlag = localStorage.getItem('just_logged_out') === 'true';
+    const sessionStorageFlag = sessionStorage.getItem('just_logged_out') === 'true';
+    const globalFlag = typeof window !== 'undefined' && window.__loggedOut === true;
+    
+    // If token exists but logout flag is set, clear the logout flag
+    // This helps with automatic recovery when a token is valid
+    const token = localStorage.getItem(JWT_TOKEN_KEY);
+    if (token && token.split('.').length === 3 && (localStorageFlag || sessionStorageFlag || globalFlag)) {
+      console.log('[JWT] Valid token found, clearing logout flags');
+      localStorage.removeItem('just_logged_out');
+      sessionStorage.removeItem('just_logged_out');
+      if (typeof window !== 'undefined') {
+        window.__loggedOut = false;
+      }
+      return false;
+    }
+    
+    return localStorageFlag || sessionStorageFlag || globalFlag;
+  } catch (e) {
+    console.error('[JWT] Error checking logout state:', e);
+    return false;
+  }
+}
 
 /**
  * Save JWT token to localStorage with multiple backup mechanisms
@@ -63,17 +102,8 @@ export const saveToken = (token: string): void => {
  * Get JWT token from localStorage with validation and fallback recovery
  */
 export const getToken = (): string | null => {
-  // Check if the user has recently logged out
-  const hasRecentlyLoggedOut = () => {
-    try {
-      return localStorage.getItem('just_logged_out') === 'true' || 
-             sessionStorage.getItem('just_logged_out') === 'true';
-    } catch (e) {
-      return false;
-    }
-  };
-  
-  if (hasRecentlyLoggedOut()) {
+  // Check for logout flag - this will also clear the flag if we have a valid token
+  if (checkForLogoutFlags()) {
     console.log('[JWT] User recently logged out - not attempting token recovery');
     return null;
   }
