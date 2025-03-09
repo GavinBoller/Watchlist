@@ -74,25 +74,32 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     }
   }, [user]);
   
+  // Import and use the checkForLogoutFlags helper from jwtUtils
   useEffect(() => {
-    try {
-      // Check for logout flags
-      const justLoggedOut = localStorage.getItem('just_logged_out') === 'true' || 
-                            sessionStorage.getItem('just_logged_out') === 'true';
-      setHasRecentlyLoggedOut(justLoggedOut);
-      
-      // Also check if we're on the auth page, which implies logged out state
-      const isOnAuthPage = window.location.pathname === '/auth' || 
+    const checkLogoutStatus = async () => {
+      try {
+        // Import utility functions dynamically to avoid circular dependencies
+        const { checkForLogoutFlags } = await import('../lib/jwtUtils');
+        
+        // Use the centralized logout check function
+        const justLoggedOut = checkForLogoutFlags();
+        setHasRecentlyLoggedOut(justLoggedOut);
+        
+        // Also check if we're on the auth page, which implies logged out state
+        const isOnAuthPage = window.location.pathname === '/auth' || 
                             window.location.href.includes('/login') ||
                             window.location.href.includes('/register');
-      
-      if (isOnAuthPage) {
-        setHasRecentlyLoggedOut(true);
-        setCachedUser(null);
+        
+        if (isOnAuthPage) {
+          setHasRecentlyLoggedOut(true);
+          setCachedUser(null);
+        }
+      } catch (e) {
+        console.error("Error checking logout flags:", e);
       }
-    } catch (e) {
-      console.error("Error checking logout flags:", e);
-    }
+    };
+    
+    checkLogoutStatus();
   }, []);
   
   // A user is authenticated if the auth context says so, we have a local cached user,
@@ -422,7 +429,19 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
         <AuthModal 
           isOpen={isAuthModalOpen} 
           onClose={() => setIsAuthModalOpen(false)}
-          onAuthSuccess={() => {}} // Will be handled by the context
+          onAuthSuccess={(user) => {
+            // Clear logout flags when user successfully logs in
+            setHasRecentlyLoggedOut(false);
+            localStorage.removeItem('just_logged_out');
+            sessionStorage.removeItem('just_logged_out');
+            if (typeof window !== 'undefined') {
+              window.__loggedOut = false;
+            }
+            console.log('[UserSelector] Auth success, cleared logout flags');
+            
+            // Update the cached user
+            setCachedUser(user);
+          }}
         />
       </div>
     );
@@ -474,7 +493,19 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
       <AuthModal 
         isOpen={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)}
-        onAuthSuccess={() => {}} // Will be handled by the context
+        onAuthSuccess={(user) => {
+          // Clear logout flags when user successfully logs in
+          setHasRecentlyLoggedOut(false);
+          localStorage.removeItem('just_logged_out');
+          sessionStorage.removeItem('just_logged_out');
+          if (typeof window !== 'undefined') {
+            window.__loggedOut = false;
+          }
+          console.log('[UserSelector] Auth success, cleared logout flags');
+          
+          // Update the cached user
+          setCachedUser(user);
+        }}
       />
     </div>
   );

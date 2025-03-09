@@ -60,6 +60,19 @@ export const saveToken = (token: string): void => {
     // First clear any existing tokens that might be causing issues
     localStorage.removeItem(JWT_TOKEN_KEY);
     
+    // Clear all logout flags when saving a token
+    // This ensures that when a user logs in, we don't mistakenly treat them as logged out
+    try {
+      localStorage.removeItem('just_logged_out');
+      sessionStorage.removeItem('just_logged_out');
+      if (typeof window !== 'undefined') {
+        window.__loggedOut = false;
+      }
+      console.log('[JWT] Logout flags cleared on token save');
+    } catch (flagError) {
+      console.error('[JWT] Error clearing logout flags:', flagError);
+    }
+    
     // Store the token
     localStorage.setItem(JWT_TOKEN_KEY, token);
     
@@ -203,17 +216,8 @@ export const getToken = (): string | null => {
  * This is separate to prevent infinite recursion in getToken
  */
 function getBackupToken(): string | null {
-  // Check if the user has recently logged out
-  const hasRecentlyLoggedOut = () => {
-    try {
-      return localStorage.getItem('just_logged_out') === 'true' || 
-             sessionStorage.getItem('just_logged_out') === 'true';
-    } catch (e) {
-      return false;
-    }
-  };
-  
-  if (hasRecentlyLoggedOut()) {
+  // Check for logout flag using shared function
+  if (checkForLogoutFlags()) {
     console.log('[JWT] User recently logged out - not attempting backup token recovery');
     return null;
   }
@@ -303,6 +307,18 @@ export const removeToken = (): void => {
     // Clear cookie backups
     document.cookie = `${JWT_TOKEN_KEY}=; path=/; max-age=0`;
     document.cookie = `jwt_token_backup=; path=/; max-age=0`;
+    
+    // Set the logout flags to prevent automatic token recovery
+    try {
+      localStorage.setItem('just_logged_out', 'true');
+      sessionStorage.setItem('just_logged_out', 'true');
+      if (typeof window !== 'undefined') {
+        window.__loggedOut = true;
+      }
+      console.log('[JWT] Logout flags set to prevent token recovery');
+    } catch (flagError) {
+      console.error('[JWT] Error setting logout flags:', flagError);
+    }
     
     // Clear any additional JWT-related storage items
     const backupKeys = [
