@@ -1,0 +1,172 @@
+2025-03-09 22:15:38.63
+38171e6e
+User
+[STORAGE] Error type: TypeError, Message: Cannot read properties of undefined (reading 'select')
+2025-03-09 22:15:38.63
+38171e6e
+User
+Returning undefined due to database error for username lookup
+2025-03-09 22:15:38.63
+38171e6e
+User
+[SIMPLE REGISTER] Hashing password
+2025-03-09 22:15:38.69
+38171e6e
+User
+[SIMPLE REGISTER] Creating user
+2025-03-09 22:15:38.69
+38171e6e
+User
+[SIMPLE REGISTER] Attempting to create user with username: Gavin202
+2025-03-09 22:15:38.69
+38171e6e
+User
+[STORAGE] Creating user with username: Gavin202
+2025-03-09 22:15:38.69
+38171e6e
+User
+[STORAGE] Attempting to create user with Drizzle ORM
+2025-03-09 22:15:38.69
+38171e6e
+User
+[STORAGE] Database error in createUser using ORM: TypeError: Cannot read properties of undefined (reading 'insert')
+2025-03-09 22:15:38.69
+38171e6e
+User
+at DatabaseStorage.createUser (file:///home/runner/workspace/dist/index.js:336:31)
+2025-03-09 22:15:38.69
+38171e6e
+User
+at simpleRegisterHandler (file:///home/runner/workspace/dist/index.js:2293:30)
+2025-03-09 22:15:38.69
+38171e6e
+User
+at async file:///home/runner/workspace/dist/index.js:4700:16
+2025-03-09 22:15:38.69
+38171e6e
+User
+[STORAGE] Error type: TypeError
+2025-03-09 22:15:38.69
+38171e6e
+User
+[STORAGE] Error message: Cannot read properties of undefined (reading 'insert')
+2025-03-09 22:15:38.69
+38171e6e
+User
+[STORAGE] Error stack: TypeError: Cannot read properties of undefined (reading 'insert')
+2025-03-09 22:15:38.69
+38171e6e
+User
+at DatabaseStorage.createUser (file:///home/runner/workspace/dist/index.js:336:31)
+2025-03-09 22:15:38.69
+38171e6e
+User
+at simpleRegisterHandler (file:///home/runner/workspace/dist/index.js:2293:30)
+2025-03-09 22:15:38.69
+38171e6e
+User
+at async file:///home/runner/workspace/dist/index.js:4700:16
+2025-03-09 22:15:38.69
+38171e6e
+User
+[STORAGE] Attempting direct SQL fallback for user creation: Gavin202
+2025-03-09 22:15:38.69
+38171e6e
+User
+[STORAGE] Direct SQL insert with columns: "username", "password", "display_name"
+2025-03-09 22:15:38.69
+38171e6e
+User
+[STORAGE] SQL values count: 3
+2025-03-09 22:15:38.69
+38171e6e
+User
+[STORAGE] Direct SQL execution error: Error: Database pool not initialized
+2025-03-09 22:15:38.69
+38171e6e
+User
+at executeDirectSql (file:///home/runner/workspace/dist/index.js:193:11)
+2025-03-09 22:15:38.69
+38171e6e
+User
+at DatabaseStorage.createUser (file:///home/runner/workspace/dist/index.js:367:32)
+2025-03-09 22:15:38.69
+38171e6e
+User
+at simpleRegisterHandler (file:///home/runner/workspace/dist/index.js:2293:30)
+2025-03-09 22:15:38.69
+38171e6e
+User
+at async file:///home/runner/workspace/dist/index.js:4700:16
+2025-03-09 22:15:38.69
+38171e6e
+User
+[STORAGE] Direct SQL fallback failed: Error: Database pool not initialized
+2025-03-09 22:15:38.69
+38171e6e
+User
+at executeDirectSql (file:///home/runner/workspace/dist/index.js:193:11)
+2025-03-09 22:15:38.69
+38171e6e
+User
+at DatabaseStorage.createUser (file:///home/runner/workspace/dist/index.js:367:32)
+2025-03-09 22:15:38.69
+38171e6e
+User
+at simpleRegisterHandler (file:///home/runner/workspace/dist/index.js:2293:30)
+2025-03-09 22:15:38.69
+38171e6e
+User
+at async file:///home/runner/workspace/dist/index.js:4700:16
+2025-03-09 22:15:38.69
+38171e6e
+User
+[STORAGE] Fallback error name: Error
+2025-03-09 22:15:38.69
+38171e6e
+User
+[STORAGE] Fallback error message: Database pool not initialized
+2025-03-09 22:15:38.69
+38171e6e
+User
+[SIMPLE REGISTER] Inner user creation error: Error: Registration failed: Database pool not initialized
+2025-03-09 22:15:38.69
+38171e6e
+User
+at DatabaseStorage.createUser (file:///home/runner/workspace/dist/index.js:395:17)
+2025-03-09 22:15:38.69
+38171e6e
+User
+at async simpleRegisterHandler (file:///home/runner/workspace/dist/index.js:2293:16)
+2025-03-09 22:15:38.69
+38171e6e
+User
+at async file:///home/runner/workspace/dist/index.js:4700:16
+2025-03-09 22:15:38.69
+38171e6e
+User
+[SIMPLE REGISTER] Database error during user creation: Error: Registration failed: Database pool not initialized
+2025-03-09 22:15:38.69
+38171e6e
+User
+at DatabaseStorage.createUser (file:///home/runner/workspace/dist/index.js:395:17)
+2025-03-09 22:15:38.69
+38171e6e
+User
+at async simpleRegisterHandler (file:///home/runner/workspace/dist/index.js:2293:16)
+2025-03-09 22:15:38.69
+38171e6e
+User
+at async file:///home/runner/workspace/dist/index.js:4700:16
+2025-03-09 22:15:38.69
+38171e6e
+User
+[SIMPLE REGISTER] Error type: Error
+2025-03-09 22:15:38.69
+38171e6e
+User
+[SIMPLE REGISTER] Error message: Registration failed: Database pool not initialized
+2025-03-09 22:15:38.69
+38171e6e
+User
+12:15:38 PM [express] POST /api/simple-register-direct 500 in 68ms :: {"error":"Failed to create user…

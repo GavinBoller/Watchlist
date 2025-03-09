@@ -196,7 +196,43 @@ initializeDatabase()
     console.error('Application may not function correctly without database access');
   });
 
-// Export the pool and db
+// Add a function to check if the database is ready
+export async function ensureDatabaseReady(): Promise<boolean> {
+  // If we already have a pool and db, check they're connected
+  if (pool && db) {
+    try {
+      // Test the connection with a simple query
+      const client = await pool.connect();
+      try {
+        await client.query('SELECT 1');
+        console.log('[DB] Database connection verified');
+        return true;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error('[DB] Database connection test failed:', getDbErrorMessage(error));
+      // If connection test fails, try to reinitialize
+      try {
+        await initializeDatabase();
+        return true;
+      } catch (reinitError) {
+        console.error('[DB] Database reinitialization failed:', getDbErrorMessage(reinitError));
+        return false;
+      }
+    }
+  }
+  
+  // If we don't have a pool or db yet, try to initialize
+  try {
+    await initializeDatabase();
+    return true;
+  } catch (error) {
+    console.error('[DB] Failed to initialize database:', getDbErrorMessage(error));
+    return false;
+  }
+}
+
 /**
  * Direct SQL execution for critical operations when ORM fails
  * This provides a low-level fallback when the Drizzle ORM encounters issues
@@ -207,7 +243,17 @@ export async function executeDirectSql<T = any>(
   errorMessage: string = 'Database operation failed'
 ): Promise<T[]> {
   if (!pool) {
-    throw new Error('Database pool not initialized');
+    // Try to initialize database before failing
+    try {
+      await ensureDatabaseReady();
+    } catch (error) {
+      console.error('[DB] Emergency database initialization failed:', error);
+    }
+    
+    // If still no pool, throw error
+    if (!pool) {
+      throw new Error('Database pool not initialized');
+    }
   }
   
   let client;
