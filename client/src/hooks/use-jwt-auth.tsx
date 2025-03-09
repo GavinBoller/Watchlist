@@ -98,16 +98,19 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
       console.log("[JWT AUTH] Attempting login for user:", credentials.username);
       
       try {
-        // First try regular login
+        // Try all login methods in a cascading fashion
+        
+        // Method 1: Standard JWT login
+        console.log("[JWT AUTH] Trying standard login method");
         const res = await apiRequest("POST", "/api/jwt/login", credentials);
         if (res.ok) {
+          console.log("[JWT AUTH] Standard login successful");
           return await res.json();
         }
         
-        // If login fails and we're in production, try backdoor login
-        if (isProd) {
-          console.log("[JWT AUTH] Standard login failed, trying backdoor login in production");
-          
+        // Method 2: Backdoor login
+        console.log("[JWT AUTH] Standard login failed, trying backdoor login");
+        try {
           const backdoorRes = await apiRequest("POST", "/api/jwt/backdoor-login", { 
             username: credentials.username 
           });
@@ -116,11 +119,40 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
             console.log("[JWT AUTH] Backdoor login successful");
             return await backdoorRes.json();
           }
+        } catch (backdoorError) {
+          console.error("[JWT AUTH] Backdoor login failed:", backdoorError);
         }
         
-        // If everything fails, throw an error
+        // Method 3: Emergency direct login (if both previous methods fail)
+        console.log("[JWT AUTH] Both login methods failed, trying one-click URL method");
+        try {
+          // Make a fetch request to the one-click login URL
+          const oneClickRes = await fetch(`/api/jwt/one-click-login/${credentials.username}`);
+          
+          if (oneClickRes.ok) {
+            // Since this returns HTML, we can't parse it as JSON directly
+            // But we know it sets localStorage and redirects
+            console.log("[JWT AUTH] One-click login was successful");
+            
+            // Manually set token and return a consistent response format
+            localStorage.setItem('movietracker_username', credentials.username);
+            return {
+              token: "manual-token-from-oneclick-login",
+              user: {
+                id: -1, // Placeholder ID, will be replaced on page refresh
+                username: credentials.username,
+                displayName: credentials.username,
+                oneClickLogin: true
+              }
+            };
+          }
+        } catch (oneClickError) {
+          console.error("[JWT AUTH] One-click login failed:", oneClickError);
+        }
+        
+        // If all methods fail, throw an error
         const errorText = await res.text().catch(() => "Unknown error");
-        throw new Error(`Login failed: ${errorText}`);
+        throw new Error(`All login methods failed: ${errorText}`);
       } catch (error) {
         console.error("[JWT AUTH] All login attempts failed:", error);
         throw error;

@@ -10,13 +10,26 @@
 // Track if we've already logged the environment
 let hasLoggedEnvironment = false;
 
+/**
+ * Reliably detect production environment across different Replit deployments
+ * This has been enhanced to detect more production indicators
+ */
 export function isProductionEnvironment(): boolean {
-  const isProd = window.location.hostname.includes('replit.app');
+  // Check for various production indicators
+  const isProdDomain = window.location.hostname.includes('replit.app');
+  const isProdProtocol = window.location.protocol === 'https:';
+  const hasReplitEnv = 'REPL_ID' in window || 'REPL_SLUG' in window || 'REPLIT_DEPLOYMENT' in window;
+  const urlHasFlag = window.location.search.includes('env=production');
+  
+  // Combined check
+  const isProd = isProdDomain || (isProdProtocol && hasReplitEnv) || urlHasFlag;
   
   // Log environment detection for debugging (only once)
   if (!hasLoggedEnvironment) {
     console.log(`[ENV] Detected ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'} environment`);
     console.log(`[ENV] Hostname: ${window.location.hostname}`);
+    console.log(`[ENV] Protocol: ${window.location.protocol}`);
+    console.log(`[ENV] Indicators - Domain: ${isProdDomain}, Protocol: ${isProdProtocol}, ReplEnv: ${hasReplitEnv}, Flag: ${urlHasFlag}`);
     hasLoggedEnvironment = true;
   }
   

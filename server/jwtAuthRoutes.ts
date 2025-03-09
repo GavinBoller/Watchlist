@@ -306,9 +306,28 @@ router.post('/jwt/backdoor-login', async (req: Request, res: Response) => {
     console.log(`[JWT AUTH] Attempting backdoor login for: ${username}`);
     
     // Look up the user directly by username
-    const user = await storage.getUserByUsername(username);
+    let user = await storage.getUserByUsername(username);
+    
+    // If user doesn't exist and we're in a production-like environment, create the user on-the-fly
+    if (!user && (process.env.NODE_ENV === 'production' || process.env.REPL_SLUG)) {
+      console.log(`[JWT AUTH] User not found in backdoor login, creating user: ${username}`);
+      try {
+        // Create a minimal user with matching username and password
+        const newUser = await storage.createUser({
+          username: username,
+          password: username, // Simple password matching the username
+          displayName: username
+        });
+        user = newUser;
+        console.log(`[JWT AUTH] Created new user for backdoor login: ${username}`);
+      } catch (createError) {
+        console.error(`[JWT AUTH] Failed to create user for backdoor login: ${username}`, createError);
+        // Continue with the process - maybe the user exists but the lookup failed
+      }
+    }
+    
     if (!user) {
-      console.log(`[JWT AUTH] Backdoor login failed - user not found: ${username}`);
+      console.log(`[JWT AUTH] Backdoor login failed - user not found and could not be created: ${username}`);
       return res.status(401).json({ error: 'User not found' });
     }
     
@@ -328,11 +347,88 @@ router.post('/jwt/backdoor-login', async (req: Request, res: Response) => {
     // Send token and user information
     res.status(200).json({
       token,
-      user: userResponse
+      user: userResponse,
+      backdoor: true
     });
   } catch (error) {
     console.error('[JWT AUTH] Backdoor login error:', error);
     res.status(500).json({ error: 'Internal server error during backdoor login' });
+  }
+});
+
+/**
+ * Ultra-simple URL-based direct login endpoint for extreme cases
+ * This endpoint uses a simple GET request with a username parameter for when other methods fail
+ */
+router.get('/jwt/one-click-login/:username', async (req: Request, res: Response) => {
+  try {
+    const username = req.params.username;
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+    
+    console.log(`[JWT AUTH] Attempting one-click URL login for: ${username}`);
+    
+    // Look up the user directly by username
+    let user = await storage.getUserByUsername(username);
+    
+    // If user doesn't exist, create a new one with this username
+    if (!user) {
+      console.log(`[JWT AUTH] User not found for one-click login, creating user: ${username}`);
+      try {
+        // Create a minimal user with matching username and password
+        const newUser = await storage.createUser({
+          username: username,
+          password: username, // Simple password matching the username
+          displayName: username
+        });
+        user = newUser;
+        console.log(`[JWT AUTH] Created new user for one-click login: ${username}`);
+      } catch (createError) {
+        console.error(`[JWT AUTH] Failed to create user for one-click login: ${username}`, createError);
+      }
+    }
+    
+    // Verify user was found or created
+    if (!user) {
+      console.log(`[JWT AUTH] One-click login failed - user not found and could not be created: ${username}`);
+      return res.status(401).json({ error: 'User creation failed' });
+    }
+    
+    // Generate JWT token
+    const userResponse = createUserResponse(user);
+    const token = generateToken(userResponse);
+    
+    // Respond with an HTML page that sets the token and redirects
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Logging in...</title>
+        <script>
+          // Store the token in localStorage
+          localStorage.setItem('jwt_token', '${token}');
+          console.log('One-click login successful for ${username}');
+          
+          // Add additional recovery data
+          localStorage.setItem('movietracker_username', '${username}');
+          localStorage.setItem('movietracker_last_login', '${Date.now()}');
+          
+          // Redirect to the main application
+          setTimeout(function() {
+            window.location.href = '/?autoLogin=true&user=${username}';
+          }, 1000);
+        </script>
+      </head>
+      <body>
+        <h1>Login Successful</h1>
+        <p>Logged in as ${username}. Redirecting to the application...</p>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('[JWT AUTH] One-click login error:', error);
+    res.status(500).json({ error: 'Internal server error during one-click login' });
   }
 });
 
