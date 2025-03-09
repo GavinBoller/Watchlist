@@ -631,6 +631,16 @@ export class DatabaseStorage implements IStorage {
     username: string;
     timestamp: number;
   }>();
+  
+  // Track database connection recovery attempts
+  private isRecoveringConnection = false;
+  private connectionRecoveryAttempts = 0;
+  private lastConnectionRecoveryTime = 0;
+  
+  // Track success metrics to help diagnose issues
+  private lastSuccessfulOperation = Date.now();
+  private consecutiveErrors = 0;
+  private isInDatabaseFailureMode = false;
   async directSqlQuery<T = any>(
     sql: string, 
     params: any[] = [],
@@ -650,11 +660,58 @@ export class DatabaseStorage implements IStorage {
    * This is useful when ORM operations may fail due to connection issues
    * In production, we're more aggressive with fallbacks to improve reliability
    */
+  /**
+   * Check database connection and attempt recovery if needed
+   * This method provides a reliable way to verify database connection
+   * before critical operations
+   */
+  private async checkDatabaseConnection(): Promise<boolean> {
+    try {
+      // Skip if already in recovery mode to prevent cascading calls
+      if (this.isRecoveringConnection) {
+        return false;
+      }
+      
+      this.isRecoveringConnection = true;
+      console.log('[STORAGE] Checking database connection status');
+      
+      // Import the connection check function dynamically to avoid import cycles
+      const { ensureDatabaseReady } = await import('./db');
+      const isConnected = await ensureDatabaseReady();
+      
+      if (isConnected) {
+        // Reset error counters on success
+        this.connectionRecoveryAttempts = 0;
+        this.lastSuccessfulOperation = Date.now();
+        this.consecutiveErrors = 0;
+        this.isInDatabaseFailureMode = false;
+        console.log('[STORAGE] Database connection verified successfully');
+      } else {
+        this.connectionRecoveryAttempts++;
+        this.isInDatabaseFailureMode = true;
+        console.error(`[STORAGE] Database connection check failed (attempt ${this.connectionRecoveryAttempts})`);
+      }
+      
+      this.isRecoveringConnection = false;
+      this.lastConnectionRecoveryTime = Date.now();
+      
+      return isConnected;
+    } catch (error) {
+      console.error('[STORAGE] Error during database connection check:', error);
+      this.isRecoveringConnection = false;
+      this.isInDatabaseFailureMode = true;
+      return false;
+    }
+  }
+
   private shouldUseDirectSqlFallback(error: unknown): boolean {
     if (!error) return false;
     
     // In production, be more aggressive with fallbacks
     const isProd = process.env.NODE_ENV === 'production';
+    
+    // Track consecutive errors to help diagnose systemic issues
+    this.consecutiveErrors++;
     
     // Log the error details to help with debugging
     if (error instanceof Error) {
@@ -806,13 +863,16 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     console.log(`[STORAGE] Creating user with username: ${insertUser.username}`);
     
-    // First ensure database is ready - use dynamic import for ESM compatibility
-    const { ensureDatabaseReady } = await import('./db');
-    
     try {
+      // Use our enhanced connection verification method
       console.log(`[STORAGE] Verifying database connection before user creation`);
-      await ensureDatabaseReady();
-      console.log(`[STORAGE] Database connection verified`);
+      const isConnected = await this.checkDatabaseConnection();
+      
+      if (!isConnected) {
+        console.warn(`[STORAGE] Database connection verification failed, proceeding with caution`);
+      } else {
+        console.log(`[STORAGE] Database connection verified`);
+      }
       
       // Check if db is defined before attempting to use it
       if (!db) {

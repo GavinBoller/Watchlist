@@ -37,8 +37,10 @@ export function generateToken(user: UserPayload): string {
   };
   
   console.log(`[JWT] Generating token for user: ${user.username} (ID: ${user.id})`);
-  // Add type assertion to fix TypeScript error with jsonwebtoken
-  return jwt.sign(payload, JWT_SECRET as jwt.Secret, { expiresIn: TOKEN_EXPIRATION });
+  // Handle the JWT signing with proper type casting
+  const secret = JWT_SECRET as string;
+  const options = { expiresIn: TOKEN_EXPIRATION };
+  return jwt.sign(payload, secret, options);
 }
 
 /**

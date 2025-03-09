@@ -3,6 +3,12 @@ import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
 import * as schema from "@shared/schema";
 
+// Add global db declaration for TypeScript
+declare global {
+  // eslint-disable-next-line no-var
+  var db: ReturnType<typeof drizzle> | undefined;
+}
+
 // Configure neon to use WebSockets
 neonConfig.webSocketConstructor = ws;
 
@@ -186,14 +192,32 @@ async function initializeDatabase(): Promise<boolean> {
   }
 }
 
-// Initialize the database
+// Initialize the database with better error handling and retry logic
 initializeDatabase()
   .then(() => {
     console.log('Database connected and ready for use');
+    
+    // Export the db instance for global use
+    // This line is critical to ensure the db is available to all parts of the application
+    (global as any).db = db;
+    
+    // Log successful Drizzle ORM setup
+    console.log('Drizzle ORM initialized with database connection');
+    
+    // Add a simple health check timer to ensure connection stays alive
+    setInterval(async () => {
+      try {
+        await ensureDatabaseReady();
+        // No need to log success on every check to reduce noise
+      } catch (error) {
+        console.error('Database health check failed:', error);
+      }
+    }, 60000); // Check every minute
   })
   .catch(err => {
     console.error('Fatal database initialization error:', getDbErrorMessage(err));
     console.error('Application may not function correctly without database access');
+    console.error('Will attempt to recover on first operation');
   });
 
 // Add a function to check if the database is ready
