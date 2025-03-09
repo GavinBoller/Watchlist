@@ -36,8 +36,9 @@ export async function simpleRegister(userData: {
   displayName?: string;
 }): Promise<{ user: UserResponse, token: string }> {  
   try {
-    // Make the API request
-    const response = await fetch('/api/jwt/register', {
+    // Make the API request to our simple-register endpoint
+    console.log('[SIMPLE AUTH] Starting registration with simple-register endpoint');
+    const response = await fetch('/api/simple-register', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -60,8 +61,14 @@ export async function simpleRegister(userData: {
       };
     }
     
-    // Handle error response
+    // Handle error response with more detailed logging
     const errorMessage = await safeParseResponse(response);
+    console.error(`[SIMPLE AUTH] Registration failed with status ${response.status}: ${errorMessage}`);
+    
+    // Log more details to help diagnose the issue
+    console.error(`[SIMPLE AUTH] Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
+    console.error(`[SIMPLE AUTH] Response status: ${response.status} ${response.statusText}`);
+    
     throw new Error(`Registration failed: ${errorMessage}`);
   } catch (error) {
     console.error('[AUTH] Registration failed:', error);
