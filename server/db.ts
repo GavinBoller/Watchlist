@@ -48,8 +48,14 @@ function getDbErrorMessage(error: unknown): string {
 
 /**
  * Create a database pool with appropriate settings for the current environment
+ * @param isProduction Whether the pool should use production settings 
+ * @param connectionTimeoutMs Custom connection timeout in milliseconds (optional)
+ * @returns A configured database connection pool
  */
-function createPool(isProduction: boolean = process.env.NODE_ENV === 'production'): Pool {
+function createPool(
+  isProduction: boolean = process.env.NODE_ENV === 'production', 
+  connectionTimeoutMs: number = 10000
+): Pool {
   // Connection string handling with fallback
   const connectionString = process.env.DATABASE_URL;
   
@@ -60,14 +66,18 @@ function createPool(isProduction: boolean = process.env.NODE_ENV === 'production
   
   console.log("Creating database pool with PostgreSQL connection...");
   
+  // Adjust max connections based on environment
+  // In production we can use more, in development fewer to avoid connection limits
+  const maxConnections = isProduction ? 10 : 5;
+  
   // Use simple, reliable pool configurations
   const poolConfig = {
     connectionString,
     // Default connection limits
-    max: 10,
+    max: maxConnections,
     // Standard timeout values
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: connectionTimeoutMs,
     // SSL required for cloud database providers
     ssl: isProduction ? { rejectUnauthorized: false } : undefined,
   };
@@ -236,24 +246,84 @@ export async function ensureDatabaseReady(): Promise<boolean> {
       }
     } catch (error) {
       console.error('[DB] Database connection test failed:', getDbErrorMessage(error));
+      
+      // Enhanced error diagnosis
+      if (error instanceof Error) {
+        console.error(`[DB] Error type: ${error.name}, Message: ${error.message}`);
+        console.error(`[DB] Stack: ${error.stack?.substring(0, 200)}...`);
+      }
+      
+      console.log('[DB] Attempting database connection recovery...');
+      
       // If connection test fails, try to reinitialize
       try {
+        // Re-initialize the database with default settings
         await initializeDatabase();
+        console.log('[DB] Database connection successfully recovered');
         return true;
       } catch (reinitError) {
         console.error('[DB] Database reinitialization failed:', getDbErrorMessage(reinitError));
-        return false;
+        
+        // Attempt one more time with increased timeout
+        try {
+          console.log('[DB] Attempting final recovery with increased timeout...');
+          // Create a new pool with increased timeout
+          const emergencyPool = createPool(process.env.NODE_ENV === 'production', 30000);
+          const emergencyClient = await emergencyPool.connect();
+          try {
+            await emergencyClient.query('SELECT 1');
+            
+            // If successful, replace the existing pool
+            pool = emergencyPool;
+            db = drizzle({ client: pool, schema });
+            (global as any).db = db;
+            
+            console.log('[DB] Emergency recovery successful');
+            return true;
+          } finally {
+            emergencyClient.release();
+          }
+        } catch (finalError) {
+          console.error('[DB] All recovery attempts failed:', getDbErrorMessage(finalError));
+          return false;
+        }
       }
     }
   }
   
   // If we don't have a pool or db yet, try to initialize
+  console.log('[DB] No existing database connection, initializing...');
   try {
+    // Initialize with default settings
     await initializeDatabase();
+    console.log('[DB] Database initialized successfully');
     return true;
   } catch (error) {
     console.error('[DB] Failed to initialize database:', getDbErrorMessage(error));
-    return false;
+    
+    // One last attempt with increased timeout
+    try {
+      console.log('[DB] Attempting initialization with increased timeout...');
+      // Create a new pool with increased timeout
+      const emergencyPool = createPool(process.env.NODE_ENV === 'production', 30000);
+      const emergencyClient = await emergencyPool.connect();
+      try {
+        await emergencyClient.query('SELECT 1');
+        
+        // If successful, use this pool
+        pool = emergencyPool;
+        db = drizzle({ client: pool, schema });
+        (global as any).db = db;
+        
+        console.log('[DB] Emergency initialization successful');
+        return true;
+      } finally {
+        emergencyClient.release();
+      }
+    } catch (finalError) {
+      console.error('[DB] All initialization attempts failed:', getDbErrorMessage(finalError));
+      return false;
+    }
   }
 }
 
