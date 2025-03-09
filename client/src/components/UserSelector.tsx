@@ -28,6 +28,17 @@ import { JwtAuthContext } from '../hooks/use-jwt-auth';
 // Use the UserContext from the separate file
 import { UserContext } from '@/lib/user-context';
 
+// Add TypeScript interface for window global state
+declare global {
+  interface Window {
+    __authBackup?: {
+      userId: number;
+      username: string;
+      timestamp: number;
+    } | null;
+  }
+}
+
 interface UserSelectorProps {
   isMobile?: boolean;
 }
@@ -83,23 +94,68 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     
     // STEP 0: Directly clear auth state
     try {
-      // Reset cached user locally
+      // Reset cached user locally - do this twice for extra certainty
       setCachedUser(null);
+      
+      // Capture the current route
+      let currentPath = window.location.pathname;
+      let shouldRedirect = currentPath !== '/auth';
+      
+      // Store a flag in sessionStorage to ensure we know we're coming from logout
+      sessionStorage.setItem('jusT_logged_out', 'true');
+      localStorage.setItem('jusT_logged_out', 'true');
       
       // Clear JWT token immediately from memory/session/local storage
       sessionStorage.removeItem('jwt_token');
+      sessionStorage.removeItem('auth_backup');
       localStorage.removeItem('jwt_token');
+      localStorage.removeItem('auth_backup');
+      
+      // Clear all JWT backup tokens
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('token') || key.includes('user') || key.includes('auth'))) {
+          localStorage.removeItem(key);
+        }
+      }
+      
+      // Clear cookies
       document.cookie = 'jwt_token=; path=/; max-age=0';
       document.cookie = 'watchlist.sid=; path=/; max-age=0';
+      document.cookie = 'auth_backup=; path=/; max-age=0';
       
-      // Reset query data immediately
+      // Extra cookie clearing for development environments
+      if (!isProd) {
+        // Clear cookies with various paths
+        const paths = ['/', '/api', '/auth', '/watchlist'];
+        paths.forEach(path => {
+          document.cookie = `jwt_token=; path=${path}; max-age=0`;
+          document.cookie = `watchlist.sid=; path=${path}; max-age=0`;
+        });
+      }
+      
+      // Reset query data immediately and clear caches
       queryClient.setQueryData(["/api/jwt/user"], null);
+      queryClient.setQueryData(["/api/user"], null);
       
       // Force React Query to recognize the user is logged out
       queryClient.invalidateQueries({ queryKey: ["/api/jwt/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       
       // Reset logoutMutation state 
       logoutMutation.reset();
+      
+      // Clear any global window state that might be holding user data
+      if (window.__authBackup) {
+        try {
+          delete window.__authBackup;
+        } catch (e) {
+          window.__authBackup = null;
+        }
+      }
+      
+      // Force a re-render by setting state
+      setCachedUser(null);
     } catch (e) {
       console.error("Error during immediate auth state reset:", e);
     }
