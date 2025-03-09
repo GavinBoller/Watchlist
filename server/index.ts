@@ -3,11 +3,23 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { config } from "dotenv";
 import session from "express-session";
+import path from "path";
+
+// Force dotenv to load environment variables more aggressively
+// This ensures environment variables from .env file are loaded early
+config({ path: path.join(process.cwd(), '.env') });
+
+// Check for critical environment variables
+const DATABASE_URL = process.env.DATABASE_URL;
+console.log("Environment check: DATABASE_URL is " + (DATABASE_URL ? "set" : "NOT SET"));
+if (!DATABASE_URL) {
+  console.warn("CRITICAL: DATABASE_URL environment variable is missing!");
+  console.warn("Available environment variables:", Object.keys(process.env).filter(key => !key.includes('SECRET')).join(', '));
+}
 import passport from "passport";
 import { configurePassport, isAuthenticated, hasWatchlistAccess } from "./auth";
 import authRoutes from "./authRoutes";
 import MemoryStore from "memorystore";
-import path from "path";
 import { pool, db } from "./db";
 import { exec } from "child_process";
 import util from "util";
@@ -36,10 +48,10 @@ declare module 'express-session' {
   }
 }
 
-// Load environment variables from .env file
-config();
+// Environment variables already loaded at the top of the file
+// No need to call config() again
 
-// Create Promise-based exec
+// Create Promise-based exec functions (used by schema push)
 const execPromise = util.promisify(exec);
 
 // Initialize Express app
@@ -152,7 +164,7 @@ async function pushDatabaseSchema() {
       }, null, 2));
     }
     
-    const execPromise = util.promisify(exec);
+    // Use the previously defined execPromise
     
     // Temporarily modify drizzle push to avoid conflicts with session table
     // Instead of using drizzle-kit push directly, we'll create a custom approach
