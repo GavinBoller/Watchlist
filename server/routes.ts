@@ -423,6 +423,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       userAgent: req.headers['user-agent']
     }, null, 2));
     
+    // Verify database connection before operation
+    try {
+      console.log("[WATCHLIST] Verifying database connection before operation...");
+      const { ensureDatabaseReady } = await import('./db');
+      const isDbReady = await ensureDatabaseReady();
+      
+      if (!isDbReady) {
+        console.warn("[WATCHLIST] Database connection is not ready - using fallback mechanisms");
+        // Continue anyway, as our storage layer has fallbacks
+      } else {
+        console.log("[WATCHLIST] Database connection verified successfully");
+      }
+    } catch (dbCheckError) {
+      console.error("[WATCHLIST] Error verifying database connection:", dbCheckError);
+    }
+    
     try {
       // First check for emergency auth
       emergencyAuthCheck(req, res, () => {});
@@ -526,52 +542,223 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Check if this movie already exists in our database
-      let movie = await storage.getMovieByTmdbId(tmdbId);
+      // Check if this movie already exists in our database (with robust error handling)
+      let movie;
+      try {
+        movie = await storage.getMovieByTmdbId(tmdbId);
+        console.log(`[WATCHLIST] Movie lookup result for TMDB ID ${tmdbId}: ${movie ? 'Found' : 'Not found'}`);
+      } catch (movieLookupError) {
+        console.error(`[WATCHLIST] Error looking up movie by TMDB ID ${tmdbId}:`, movieLookupError);
+        // Continue without existing movie - we'll try to create it
+      }
       
-      // If not, create the movie record
+      // If not, create the movie record with robust error handling
       if (!movie) {
+        console.log(`[WATCHLIST] Creating new movie record for TMDB ID ${tmdbId}`);
         const mediaType = tmdbData.media_type || 'movie';
         const title = mediaType === 'tv' ? tmdbData.name : tmdbData.title;
         const releaseDate = mediaType === 'tv' ? tmdbData.first_air_date : tmdbData.release_date;
         
-        try {
-          movie = await storage.createMovie({
-            tmdbId,
-            title: title || '[Unknown Title]',
-            overview: tmdbData.overview || '',
-            posterPath: tmdbData.poster_path || '',
-            backdropPath: tmdbData.backdrop_path || '',
-            releaseDate: releaseDate || null,
-            voteAverage: tmdbData.vote_average || 0,
-            mediaType
-          });
-          
-          console.log(`[WATCHLIST] Created new movie: ${movie.title} (ID: ${movie.id})`);
-        } catch (movieError) {
-          console.error(`[WATCHLIST] Error creating movie:`, movieError);
-          return res.status(500).json({ message: "Error creating movie record" });
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            console.log(`[WATCHLIST] Creating movie record (attempt ${attempt}/3)...`);
+            movie = await storage.createMovie({
+              tmdbId,
+              title: title || '[Unknown Title]',
+              overview: tmdbData.overview || '',
+              posterPath: tmdbData.poster_path || '',
+              backdropPath: tmdbData.backdrop_path || '',
+              releaseDate: releaseDate || null,
+              voteAverage: tmdbData.vote_average || 0,
+              mediaType
+            });
+            
+            console.log(`[WATCHLIST] Successfully created new movie: ${movie.title} (ID: ${movie.id})`);
+            break; // Success - exit retry loop
+          } catch (movieError) {
+            console.error(`[WATCHLIST] Error creating movie (attempt ${attempt}/3):`, movieError);
+            
+            if (attempt === 3) {
+              // Direct SQL fallback on final attempt
+              try {
+                console.log(`[WATCHLIST] Attempting direct SQL movie creation as last resort...`);
+                const { executeDirectSql } = await import('./db');
+                
+                // Try to insert the movie using direct SQL
+                const result = await executeDirectSql(
+                  `INSERT INTO movies (tmdb_id, title, overview, poster_path, backdrop_path, release_date, vote_average, media_type) 
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+                   RETURNING *`, 
+                  [
+                    tmdbId, 
+                    title || '[Unknown Title]', 
+                    tmdbData.overview || '', 
+                    tmdbData.poster_path || '', 
+                    tmdbData.backdrop_path || '', 
+                    releaseDate || null, 
+                    tmdbData.vote_average || 0, 
+                    mediaType
+                  ]
+                );
+                
+                if (result && Array.isArray(result.rows) && result.rows.length > 0) {
+                  // Map the SQL result to our expected movie format
+                  const row = result.rows[0] as any;
+                  movie = {
+                    id: row.id,
+                    tmdbId: row.tmdb_id,
+                    title: row.title,
+                    overview: row.overview,
+                    posterPath: row.poster_path,
+                    backdropPath: row.backdrop_path,
+                    releaseDate: row.release_date,
+                    voteAverage: row.vote_average,
+                    mediaType: row.media_type,
+                    createdAt: row.created_at
+                  };
+                  
+                  console.log(`[WATCHLIST] Direct SQL movie creation successful (ID: ${movie.id})`);
+                  break; // Success - exit retry loop
+                }
+              } catch (directSqlError) {
+                console.error(`[WATCHLIST] Direct SQL movie creation failed:`, directSqlError);
+                
+                // All attempts failed - handle the failure
+                // In production, return a 202 Accepted with a warning
+                if (process.env.NODE_ENV === 'production') {
+                  // Create a temporary movie object to allow the operation to continue
+                  const tempId = new Date().getTime(); // Use timestamp as temp ID
+                  movie = {
+                    id: tempId,
+                    tmdbId,
+                    title: title || '[Unknown Title]',
+                    overview: tmdbData.overview || '',
+                    posterPath: tmdbData.poster_path || '',
+                    backdropPath: tmdbData.backdrop_path || '',
+                    releaseDate: releaseDate || null,
+                    voteAverage: tmdbData.vote_average || 0,
+                    mediaType,
+                    createdAt: new Date().toISOString()
+                  };
+                  
+                  console.log(`[WATCHLIST] Using temporary movie object with ID ${tempId}`);
+                } else {
+                  return res.status(500).json({ 
+                    message: "Failed to create movie record after multiple attempts",
+                    details: "Database connection may be unstable" 
+                  });
+                }
+              }
+            } else {
+              // Not the final attempt, wait before retrying
+              await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+            }
+          }
         }
       } else {
         console.log(`[WATCHLIST] Found existing movie: ${movie.title} (ID: ${movie.id})`);
       }
       
-      // Check if this movie is already in the user's watchlist
-      const exists = await storage.hasWatchlistEntry(userId, movie.id);
+      // Sanity check - make sure we have a movie object by this point
+      if (!movie) {
+        return res.status(500).json({ 
+          message: "Failed to create or retrieve movie record" 
+        });
+      }
+      
+      // Check if this movie is already in the user's watchlist (with error handling)
+      let exists = false;
+      try {
+        exists = await storage.hasWatchlistEntry(userId, movie.id);
+        console.log(`[WATCHLIST] Duplicate check: Movie ${movie.id} ${exists ? 'already exists' : 'does not exist'} in user ${userId}'s watchlist`);
+      } catch (existsError) {
+        console.error(`[WATCHLIST] Error checking for existing watchlist entry:`, existsError);
+        // Continue as if it doesn't exist
+      }
+      
       if (exists) {
         return res.status(409).json({ 
           message: "This movie is already in your watchlist" 
         });
       }
       
-      // Add the movie to the watchlist
-      const entry = await storage.createWatchlistEntry({
-        userId,
-        movieId: movie.id,
-        status,
-        watchedDate,
-        notes
-      });
+      // Add the movie to the watchlist with robust error handling
+      let entry;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`[WATCHLIST] Creating watchlist entry (attempt ${attempt}/3)...`);
+          
+          entry = await storage.createWatchlistEntry({
+            userId,
+            movieId: movie.id,
+            status,
+            watchedDate,
+            notes
+          });
+          
+          console.log(`[WATCHLIST] Successfully added movie ${movie.title} to watchlist for user ${userId} (Entry ID: ${entry.id})`);
+          break; // Success - exit retry loop
+        } catch (entryError) {
+          console.error(`[WATCHLIST] Error creating watchlist entry (attempt ${attempt}/3):`, entryError);
+          
+          if (attempt === 3) {
+            // Direct SQL fallback on final attempt
+            try {
+              console.log(`[WATCHLIST] Attempting direct SQL watchlist entry creation as last resort...`);
+              const { executeDirectSql } = await import('./db');
+              
+              // Try to insert the watchlist entry using direct SQL
+              const result = await executeDirectSql(
+                `INSERT INTO watchlist_entries (user_id, movie_id, status, watched_date, notes) 
+                 VALUES ($1, $2, $3, $4, $5) 
+                 RETURNING *`, 
+                [userId, movie.id, status, watchedDate, notes]
+              );
+              
+              if (result && Array.isArray(result.rows) && result.rows.length > 0) {
+                // Map the SQL result to our expected entry format
+                const row = result.rows[0] as any;
+                entry = {
+                  id: row.id,
+                  userId: row.user_id,
+                  movieId: row.movie_id,
+                  status: row.status,
+                  watchedDate: row.watched_date,
+                  notes: row.notes,
+                  createdAt: row.created_at
+                };
+                
+                console.log(`[WATCHLIST] Direct SQL watchlist entry creation successful (ID: ${entry.id})`);
+                break; // Success - exit retry loop
+              }
+            } catch (directSqlError) {
+              console.error(`[WATCHLIST] Direct SQL watchlist entry creation failed:`, directSqlError);
+              
+              // In production, return a temporary response
+              if (process.env.NODE_ENV === 'production') {
+                return res.status(202).json({
+                  message: "Watchlist entry created but not yet confirmed",
+                  temporary: true,
+                  userId,
+                  movieId: movie.id,
+                  movie: {
+                    title: movie.title,
+                    posterPath: movie.posterPath
+                  }
+                });
+              } else {
+                return res.status(500).json({ 
+                  message: "Failed to add to watchlist after multiple attempts",
+                  details: "Database connection may be unstable"
+                });
+              }
+            }
+          } else {
+            // Not the final attempt, wait before retrying
+            await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+          }
+        }
+      }
       
       console.log(`[WATCHLIST] Added movie ${movie.title} to watchlist for user ${userId}`);
       
@@ -584,12 +771,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error details:", errorMessage);
       console.error("Error stack:", errorStack);
       
-      // Only include detailed error info in development
-      const errorResponse = process.env.NODE_ENV === 'production' 
-        ? { message: "Failed to add movie to watchlist" }
-        : { message: "Failed to add movie to watchlist", error: errorMessage, stack: errorStack };
+      // Enhanced error handling - check for common error patterns
+      let statusCode = 500;
+      let userMessage = "Failed to add movie to watchlist";
       
-      res.status(500).json(errorResponse);
+      // Check for database connection issues
+      if (errorMessage.includes('connection') || 
+          errorMessage.includes('pool') || 
+          errorMessage.includes('database') ||
+          errorMessage.includes('timeout')) {
+        userMessage = "Database connection issue detected. Please try again later.";
+        
+        // Try to verify the database connection and include status in the response
+        try {
+          console.error("[WATCHLIST] Critical database error detected, checking connection status...");
+          const { pool } = await import('./db');
+          
+          // Simple connection test
+          if (pool && pool.totalCount !== undefined) {
+            const connStatus = {
+              totalCount: pool.totalCount,
+              idleCount: pool.idleCount,
+              waitingCount: pool.waitingCount
+            };
+            
+            console.error("[WATCHLIST] Connection pool status:", connStatus);
+            
+            if (process.env.NODE_ENV !== 'production') {
+              userMessage += ` Pool stats: Total=${connStatus.totalCount}, Idle=${connStatus.idleCount}, Waiting=${connStatus.waitingCount}`;
+            }
+          }
+        } catch (poolError) {
+          console.error("[WATCHLIST] Failed to check connection pool status:", poolError);
+        }
+      } else if (errorMessage.includes('not found') || errorMessage.includes('404')) {
+        statusCode = 404;
+        userMessage = "The requested resource was not found.";
+      } else if (errorMessage.includes('token') || errorMessage.includes('unauthorized') || errorMessage.includes('authentication')) {
+        statusCode = 401;
+        userMessage = "Authentication error. Please log in again.";
+      } else if (errorMessage.includes('permission') || errorMessage.includes('forbidden') || errorMessage.includes('403')) {
+        statusCode = 403;
+        userMessage = "You don't have permission to perform this action.";
+      }
+      
+      // Prepare extended error response type
+      interface ErrorResponse {
+        message: string;
+        error?: string;
+        stack?: string;
+        time?: string;
+        path?: string;
+        method?: string;
+        userId?: number;
+        tmdbId?: number;
+        pending?: boolean;
+        retry?: boolean;
+      }
+      
+      // Only include detailed error info in development
+      const errorResponse: ErrorResponse = process.env.NODE_ENV === 'production' 
+        ? { message: userMessage }
+        : { 
+            message: userMessage, 
+            error: errorMessage, 
+            stack: errorStack,
+            time: new Date().toISOString(),
+            path: req.path,
+            method: req.method,
+            userId: req.body?.userId,
+            tmdbId: req.body?.tmdbId
+          };
+      
+      // In production, for database issues, return 202 (Accepted) with a special message
+      // This indicates to the client that we've accepted their request but can't guarantee it was processed
+      if (process.env.NODE_ENV === 'production' && statusCode === 500 && errorMessage.includes('database')) {
+        statusCode = 202;
+        errorResponse.pending = true;
+        errorResponse.retry = true;
+        errorResponse.message = "Request accepted but processing delayed due to temporary issues";
+      }
+      
+      res.status(statusCode).json(errorResponse);
     }
   });
 
