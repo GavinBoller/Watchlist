@@ -13,6 +13,7 @@ import {
   getToken,
   parseUserFromToken,
 } from "@/lib/jwtUtils";
+import { isProductionEnvironment } from "@/lib/environment-utils";
 
 type JwtLoginData = {
   username: string;
@@ -44,8 +45,9 @@ export const JwtAuthContext = createContext<JwtAuthContextType | null>(null);
 
 export function JwtAuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+  const isProd = isProductionEnvironment();
 
-  // Get user data from JWT token with enhanced fallback mechanisms
+  // Get user data from JWT token with simplified approach
   const {
     data: user,
     error,
@@ -56,29 +58,6 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
     queryFn: async () => {
       console.log("[JWT AUTH] Starting user authentication check");
       
-      // Try emergency token as last resort if we detect repeated auth failures
-      const needsEmergencyToken = localStorage.getItem('jwt_auth_failures') && 
-                               parseInt(localStorage.getItem('jwt_auth_failures') || '0') > 3;
-      
-      if (needsEmergencyToken) {
-        console.log("[JWT AUTH] Multiple auth failures detected, trying emergency token");
-        try {
-          const response = await fetch('/api/jwt/emergency-token');
-          if (response.ok) {
-            const data = await response.json();
-            if (data.token && data.user) {
-              console.log("[JWT AUTH] Emergency token obtained successfully");
-              saveToken(data.token);
-              localStorage.removeItem('jwt_auth_failures');
-              return data.user;
-            }
-          }
-        } catch (err) {
-          console.error("[JWT AUTH] Failed to get emergency token:", err);
-        }
-      }
-      
-      // Normal authentication flow
       try {
         // Check if we have a token
         const token = getToken();
@@ -93,54 +72,39 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
         });
 
         if (!res.ok) {
-          // If API fails with 401, try to parse user from token as fallback
-          if (res.status === 401) {
-            console.log("[JWT AUTH] 401 from /api/jwt/user endpoint, token may be invalid");
-            
-            // Increment auth failure counter
-            const failures = parseInt(localStorage.getItem('jwt_auth_failures') || '0');
-            localStorage.setItem('jwt_auth_failures', (failures + 1).toString());
-            
-            // Try to parse user from token as fallback
-            const userFromToken = parseUserFromToken();
-            if (userFromToken) {
-              console.log("[JWT AUTH] Using parsed user from token:", userFromToken.username);
-              return userFromToken;
-            }
+          console.log(`[JWT AUTH] Token validation failed: ${res.status} ${res.statusText}`);
+          
+          // In production, remove invalid token
+          if (isProd && res.status === 401) {
+            removeToken();
           }
-          throw new Error(`Authentication failed: ${res.statusText}`);
+          
+          return null;
         }
 
-        // Success! Clear failure counter
-        localStorage.removeItem('jwt_auth_failures');
         return await res.json();
       } catch (error) {
         console.error("[JWT AUTH] Error fetching user:", error);
-        
-        // As final fallback, try to parse user from token
-        const userFromToken = parseUserFromToken();
-        if (userFromToken) {
-          console.log("[JWT AUTH] Using parsed user from token as final fallback");
-          return userFromToken;
-        }
-        
         return null;
       }
     },
-    retry: 1,
-    retryDelay: 1000,
+    retry: isProd ? 0 : 1, // No retries in production to prevent potential redirect loops
   });
 
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: async (credentials: JwtLoginData) => {
+      console.log("[JWT AUTH] Attempting login for user:", credentials.username);
+      
       const res = await apiRequest("POST", "/api/jwt/login", credentials);
       if (!res.ok) {
-        throw new Error(`Login failed: ${res.statusText}`);
+        const errorText = await res.text().catch(() => "Unknown error");
+        throw new Error(`Login failed: ${errorText}`);
       }
       return await res.json();
     },
     onSuccess: (data: JwtLoginResponse) => {
+      console.log("[JWT AUTH] Login successful for:", data.user.username);
       // Save JWT token to localStorage
       saveToken(data.token);
       // Update user data
@@ -151,6 +115,7 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      console.error("[JWT AUTH] Login error:", error.message);
       toast({
         title: "Login failed",
         description: error.message,
@@ -162,13 +127,20 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
   // Register mutation
   const registerMutation = useMutation({
     mutationFn: async (userData: JwtRegisterData) => {
-      const res = await apiRequest("POST", "/api/jwt/register", userData);
+      console.log("[JWT AUTH] Attempting to register user:", userData.username);
+      
+      // In production, use the simplified registration endpoint for better reliability
+      const endpoint = isProd ? "/api/simple-register" : "/api/jwt/register";
+      
+      const res = await apiRequest("POST", endpoint, userData);
       if (!res.ok) {
-        throw new Error(`Registration failed: ${res.statusText}`);
+        const errorText = await res.text().catch(() => "Unknown error");
+        throw new Error(`Registration failed: ${errorText}`);
       }
       return await res.json();
     },
     onSuccess: (data: JwtLoginResponse) => {
+      console.log("[JWT AUTH] Registration successful for:", data.user.username);
       // Save JWT token to localStorage
       saveToken(data.token);
       // Update user data
@@ -179,6 +151,7 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      console.error("[JWT AUTH] Registration error:", error.message);
       toast({
         title: "Registration failed",
         description: error.message,
@@ -190,8 +163,8 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
   // Logout mutation
   const logoutMutation = useMutation({
     mutationFn: async () => {
+      console.log("[JWT AUTH] Logging out user");
       // Since JWT is stateless, we just need to remove the token
-      // No need for server call, but we'll keep the API structure consistent
       removeToken();
     },
     onSuccess: () => {
@@ -203,11 +176,16 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      console.error("[JWT AUTH] Logout error:", error.message);
       toast({
         title: "Logout failed",
         description: error.message,
         variant: "destructive",
       });
+      
+      // Even if the server logout fails, remove the token anyway
+      removeToken();
+      queryClient.setQueryData(["/api/jwt/user"], null);
     },
   });
 
