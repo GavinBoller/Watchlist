@@ -90,11 +90,30 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
         console.error("Simple registration failed:", error);
         setIsSimpleRegistering(false);
         
-        // Show error toast
+        // Extract a more meaningful error message
+        let errorMessage = "Could not create account";
+        if (error instanceof Error) {
+          errorMessage = error.message;
+          
+          // Clean up the error message for better readability
+          if (errorMessage.includes('Registration Failed - 500')) {
+            errorMessage = 'Server error during registration. Please try again in a moment.';
+          } else if (errorMessage.includes('duplicate key') || 
+                     errorMessage.includes('unique constraint') ||
+                     errorMessage.includes('already exists')) {
+            errorMessage = 'Username already exists. Please choose a different username.';
+          } else if (errorMessage.includes('network') || 
+                     errorMessage.includes('Failed to fetch')) {
+            errorMessage = 'Network error. Please check your connection and try again.';
+          }
+        }
+        
+        // Show detailed error toast
         toast({
           title: "Registration failed",
-          description: error instanceof Error ? error.message : "Could not create account",
+          description: errorMessage,
           variant: "destructive",
+          duration: 5000,
         });
       }
     } else {
