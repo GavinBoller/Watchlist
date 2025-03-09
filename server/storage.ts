@@ -648,15 +648,44 @@ export class DatabaseStorage implements IStorage {
   /**
    * Helper method to determine if we should use direct SQL as fallback
    * This is useful when ORM operations may fail due to connection issues
+   * In production, we're more aggressive with fallbacks to improve reliability
    */
   private shouldUseDirectSqlFallback(error: unknown): boolean {
     if (!error) return false;
     
+    // In production, be more aggressive with fallbacks
+    const isProd = process.env.NODE_ENV === 'production';
+    
+    // Log the error details to help with debugging
+    if (error instanceof Error) {
+      console.error(`[STORAGE] Error type: ${error.name}, Message: ${error.message}`);
+    } else {
+      console.error(`[STORAGE] Non-Error object: ${String(error)}`);
+    }
+    
     const errorMessage = error instanceof Error ? error.message : String(error);
-    return errorMessage.includes('connection') || 
-           errorMessage.includes('timeout') || 
-           errorMessage.includes('ECONNREFUSED') || 
-           errorMessage.includes('terminated');
+    
+    // Common database connection/disruption error patterns
+    const isConnectionError = 
+      errorMessage.includes('connection') || 
+      errorMessage.includes('timeout') || 
+      errorMessage.includes('ECONNREFUSED') || 
+      errorMessage.includes('terminated') ||
+      errorMessage.includes('unexpected') ||
+      errorMessage.includes('network') ||
+      errorMessage.includes('closed') || 
+      errorMessage.includes('ended') ||
+      errorMessage.includes('not connected');
+    
+    // Common ORM-specific errors
+    const isOrmError =
+      errorMessage.includes('relation') ||
+      errorMessage.includes('driver') ||
+      errorMessage.includes('pool') ||
+      errorMessage.includes('SQLError');
+      
+    // In production, we're more liberal with fallbacks to improve reliability
+    return isConnectionError || (isProd && isOrmError);
   }
   
   async getUser(id: number): Promise<User | undefined> {
@@ -775,53 +804,97 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
+    console.log(`[STORAGE] Creating user with username: ${insertUser.username}`);
+    
     try {
       // First attempt with Drizzle ORM
+      console.log(`[STORAGE] Attempting to create user with Drizzle ORM`);
       const [user] = await db
         .insert(users)
         .values(insertUser)
         .returning();
+      
+      console.log(`[STORAGE] User created successfully with Drizzle ORM: ${user.id}`);
       return user;
     } catch (error) {
-      console.error("Database error in createUser using ORM:", error);
+      console.error("[STORAGE] Database error in createUser using ORM:", error);
+      
+      // Enhanced error logging for debugging
+      if (error instanceof Error) {
+        console.error(`[STORAGE] Error type: ${error.name}`);
+        console.error(`[STORAGE] Error message: ${error.message}`);
+        console.error(`[STORAGE] Error stack: ${error.stack}`);
+      }
       
       // Check for common error types
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
       if (errorMessage.includes('duplicate key') || errorMessage.includes('unique constraint')) {
+        console.log(`[STORAGE] Detected duplicate username: ${insertUser.username}`);
         throw new Error('Username already exists');
       }
       
-      // Try direct SQL as fallback for connection issues
-      if (this.shouldUseDirectSqlFallback(error)) {
+      // Always try direct SQL as fallback in production
+      const isProd = process.env.NODE_ENV === 'production';
+      const shouldFallback = isProd || this.shouldUseDirectSqlFallback(error);
+      
+      if (shouldFallback) {
         try {
-          console.log("Attempting direct SQL fallback for createUser");
+          console.log(`[STORAGE] Attempting direct SQL fallback for user creation: ${insertUser.username}`);
           
-          // Direct SQL insertion with proper value escaping
-          const columns = Object.keys(insertUser).map(key => `"${key}"`).join(', ');
-          const placeholders = Object.keys(insertUser).map((_, index) => `$${index + 1}`).join(', ');
-          const values = Object.values(insertUser);
+          // Direct SQL insertion with proper value escaping for better reliability
+          // Explicitly name columns for better cross-environment compatibility
+          const safeInsertData = {
+            username: insertUser.username,
+            password: insertUser.password,
+            display_name: insertUser.displayName || insertUser.username
+          };
           
-          const rows = await executeDirectSql<User>(
-            `INSERT INTO "users" (${columns}) VALUES (${placeholders}) RETURNING *`,
-            values,
-            'Failed to create user'
-          );
+          const columns = Object.keys(safeInsertData).map(key => `"${key}"`).join(', ');
+          const placeholders = Object.keys(safeInsertData).map((_, index) => `$${index + 1}`).join(', ');
+          const values = Object.values(safeInsertData);
           
-          if (rows.length === 0) {
-            throw new Error('User creation did not return any data');
+          console.log(`[STORAGE] Direct SQL insert with columns: ${columns}`);
+          console.log(`[STORAGE] SQL values count: ${values.length}`);
+          
+          // Robust error handling for the SQL fallback
+          try {
+            const rows = await executeDirectSql<User>(
+              `INSERT INTO "users" (${columns}) VALUES (${placeholders}) RETURNING *`,
+              values,
+              'Failed to create user'
+            );
+            
+            if (rows.length === 0) {
+              console.error(`[STORAGE] User creation did not return data`);
+              throw new Error('User creation did not return any data');
+            }
+            
+            console.log(`[STORAGE] User created successfully with direct SQL: ${rows[0].id}`);
+            return rows[0];
+          } catch (sqlError) {
+            console.error("[STORAGE] Direct SQL execution error:", sqlError);
+            throw sqlError;
           }
-          
-          return rows[0];
         } catch (fallbackError) {
-          console.error("Direct SQL fallback also failed:", fallbackError);
+          console.error("[STORAGE] Direct SQL fallback failed:", fallbackError);
           
-          const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : 'Unknown error';
-          if (fallbackMessage.includes('duplicate key') || fallbackMessage.includes('unique constraint')) {
-            throw new Error('Username already exists');
+          // Enhanced diagnosis
+          if (fallbackError instanceof Error) {
+            console.error(`[STORAGE] Fallback error name: ${fallbackError.name}`);
+            console.error(`[STORAGE] Fallback error message: ${fallbackError.message}`);
+            
+            const fallbackMessage = fallbackError.message;
+            if (fallbackMessage.includes('duplicate key') || fallbackMessage.includes('unique constraint')) {
+              throw new Error('Username already exists');
+            }
+            
+            if (fallbackMessage.includes('connection') || fallbackMessage.includes('timeout')) {
+              throw new Error('Database connection issue. Please try again in a few moments.');
+            }
           }
           
-          throw fallbackError;
+          throw new Error(`Registration failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown database error'}`);
         }
       }
       
