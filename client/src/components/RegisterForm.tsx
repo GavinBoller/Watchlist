@@ -76,9 +76,16 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
           password,
           displayName: displayName || undefined
         });
-        
+                
         // Signal success to parent component
         onRegisterSuccess(result.user);
+        
+        // Show success message
+        toast({
+          title: "Account created successfully",
+          description: "Your account has been created and you are now logged in.",
+          duration: 3000,
+        });
         
         // Pre-populate the cache with user data
         queryClient.setQueryData(["/api/jwt/user"], result.user);

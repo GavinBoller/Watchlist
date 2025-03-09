@@ -93,142 +93,61 @@ router.post('/jwt/login', async (req: Request, res: Response) => {
 });
 
 /**
- * JWT Register endpoint with enhanced error handling and reliability
+ * JWT Register endpoint with simplified, reliable implementation
  */
 router.post('/jwt/register', async (req: Request, res: Response) => {
   console.log(`[JWT AUTH] Registration attempt for username: ${req.body?.username || 'unknown'}`);
-  
-  // Log important information to help diagnose production issues
-  console.log(`[JWT AUTH] Client IP: ${req.ip}`);
-  console.log(`[JWT AUTH] Environment: ${process.env.NODE_ENV || 'development'}`);
-  
+
   try {
-    // Validate input with zod schema
+    // 1. Validate input with zod schema
     const result = insertUserSchema.safeParse(req.body);
     if (!result.success) {
-      console.error(`[JWT AUTH] Validation error:`, result.error);
       return res.status(400).json({ 
         error: 'Invalid user data', 
         details: result.error.errors.map(err => ({ path: err.path.join('.'), message: err.message }))
       });
     }
     
-    // Extract validated data
+    // 2. Extract validated data
     const { username, password, displayName } = result.data;
     
-    // Add retry logic for database operations in production
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    while (retryCount <= maxRetries) {
-      try {
-        // Check if username already exists
-        console.log(`[JWT AUTH] Checking if username '${username}' already exists (attempt ${retryCount + 1})`);
-        const existingUser = await storage.getUserByUsername(username);
-        if (existingUser) {
-          console.log(`[JWT AUTH] User '${username}' already exists`);
-          return res.status(400).json({ 
-            error: 'Username already exists',
-            code: 'DUPLICATE_USERNAME'
-          });
-        }
-        
-        // Hash password
-        console.log('[JWT AUTH] Hashing password');
-        const hashedPassword = await hashPassword(password);
-        
-        // Prepare user data
-        const userData = {
-          username,
-          password: hashedPassword,
-          displayName: displayName || username
-        };
-        
-        // Create user with retry handling
-        console.log(`[JWT AUTH] Creating user '${username}' (attempt ${retryCount + 1})`);
-        const newUser = await storage.createUser(userData);
-        console.log(`[JWT AUTH] User '${username}' created successfully`);
-        
-        // Generate JWT token
-        console.log('[JWT AUTH] Generating and verifying JWT token');
-        const userResponse = createUserResponse(newUser);
-        const token = generateToken(userResponse);
-        
-        // Verify token immediately to ensure it works
-        const verifiedUser = verifyToken(token);
-        if (!verifiedUser) {
-          console.error(`[JWT AUTH] Generated token failed verification for new user ${username}`);
-          console.error('[JWT AUTH] This is a critical security issue - using hardcoded secret for reliability');
-          return res.status(500).json({ 
-            error: 'Authentication token generation failed',
-            code: 'TOKEN_GENERATION_FAILED'
-          });
-        }
-        
-        console.log(`[JWT AUTH] Registration successful and token verified for user ${username}`);
-        
-        // Send token and user information
-        return res.status(201).json({
-          token,
-          user: userResponse
-        });
-      } catch (dbError) {
-        retryCount++;
-        
-        // Log detailed error information
-        console.error(`[JWT AUTH] Database operation failed (attempt ${retryCount}/${maxRetries + 1}):`, dbError);
-        
-        if (dbError instanceof Error) {
-          const errorMessage = dbError.message || 'Unknown database error';
-          
-          // Check for duplicate key error
-          if (errorMessage.includes('duplicate key') || 
-              errorMessage.includes('unique constraint') ||
-              errorMessage.includes('already exists')) {
-            
-            console.log(`[JWT AUTH] Detected duplicate key error for '${username}'`);
-            return res.status(409).json({ 
-              error: 'Username already exists',
-              code: 'DUPLICATE_USERNAME'
-            });
-          }
-          
-          // Check for connection errors
-          if (errorMessage.includes('connection') || 
-              errorMessage.includes('timeout') ||
-              errorMessage.includes('ECONNREFUSED')) {
-            
-            console.log(`[JWT AUTH] Database connection issue detected on attempt ${retryCount}`);
-            
-            // Retry if we haven't exceeded max retries
-            if (retryCount <= maxRetries) {
-              const delayMs = 500 * Math.pow(2, retryCount - 1); // Exponential backoff
-              console.log(`[JWT AUTH] Will retry in ${delayMs}ms...`);
-              await new Promise(resolve => setTimeout(resolve, delayMs));
-              continue;
-            }
-          }
-        }
-        
-        // If we've used all retries or it's not a retryable error, throw to outer catch
-        if (retryCount > maxRetries) {
-          console.error(`[JWT AUTH] All ${maxRetries + 1} attempts failed, giving up.`);
-          throw dbError;
-        }
-      }
+    // 3. Check if username already exists
+    const existingUser = await storage.getUserByUsername(username);
+    if (existingUser) {
+      return res.status(400).json({ 
+        error: 'Username already exists',
+        code: 'DUPLICATE_USERNAME'
+      });
     }
     
-    // This should never be reached due to the while loop structure
-    throw new Error('Registration failed after all retries');
+    // 4. Hash password
+    const hashedPassword = await hashPassword(password);
     
+    // 5. Prepare user data
+    const userData = {
+      username,
+      password: hashedPassword,
+      displayName: displayName || username
+    };
+    
+    // 6. Create user
+    const newUser = await storage.createUser(userData);
+    console.log(`[JWT AUTH] User '${username}' created successfully`);
+    
+    // 7. Generate JWT token
+    const userResponse = createUserResponse(newUser);
+    const token = generateToken(userResponse);
+    
+    // 8. Return success response
+    return res.status(201).json({
+      token,
+      user: userResponse
+    });
   } catch (error) {
     console.error('[JWT AUTH] Registration error:', error);
     
-    // Provide more specific error messages based on the type of error
+    // Provide specific error messages based on the error type
     if (error instanceof Error) {
-      console.error('[JWT AUTH] Error name:', error.name);
-      console.error('[JWT AUTH] Error message:', error.message);
-      
       const errorMessage = error.message;
       
       if (errorMessage.includes('duplicate key') || 
@@ -242,18 +161,16 @@ router.post('/jwt/register', async (req: Request, res: Response) => {
                 errorMessage.includes('timeout') ||
                 errorMessage.includes('ECONNREFUSED')) {
         return res.status(503).json({ 
-          error: 'Registration service temporarily unavailable, please try again in a moment',
-          code: 'SERVICE_UNAVAILABLE',
-          retryAfter: 3
+          error: 'Database connection issue. Please try again in a moment.',
+          code: 'DATABASE_CONNECTION_ERROR'
         });
       }
     }
     
-    // Generic error with detailed information
-    res.status(500).json({ 
-      error: 'Server error during registration - try again in a moment',
-      code: 'REGISTRATION_FAILED',
-      retryAfter: 5
+    // Generic error for all other cases
+    return res.status(500).json({ 
+      error: 'Registration failed. Please try again.',
+      code: 'REGISTRATION_FAILED'
     });
   }
 });

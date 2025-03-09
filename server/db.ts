@@ -45,20 +45,24 @@ function getDbErrorMessage(error: unknown): string {
  */
 function createPool(isProduction: boolean = process.env.NODE_ENV === 'production'): Pool {
   // Connection string handling with fallback
-  const connectionString = process.env.DATABASE_URL || 'postgresql://user:password@localhost:5432/dummy';
+  const connectionString = process.env.DATABASE_URL;
   
-  // Use different pool configurations based on environment
+  if (!connectionString) {
+    console.error("ERROR: DATABASE_URL is not set. Database operations will fail.");
+    throw new Error("DATABASE_URL environment variable is required");
+  }
+  
+  console.log("Creating database pool with PostgreSQL connection...");
+  
+  // Use simple, reliable pool configurations
   const poolConfig = {
     connectionString,
-    // Use different connection limits for production vs development
-    max: isProduction ? 5 : 10,
-    // How long a client is allowed to remain idle before being closed
+    // Default connection limits
+    max: 10,
+    // Standard timeout values
     idleTimeoutMillis: 30000,
-    // How long to wait for a connection to become available
-    connectionTimeoutMillis: isProduction ? 15000 : 10000,
-    // Max number of connection attempts per client
-    maxUses: 5000, // Recycle connections after 5000 uses
-    // SSL required for most cloud database providers
+    connectionTimeoutMillis: 10000,
+    // SSL required for cloud database providers
     ssl: isProduction ? { rejectUnauthorized: false } : undefined,
   };
   
@@ -126,22 +130,18 @@ function scheduleReconnect(): void {
 }
 
 /**
- * Initialize the database connection with retries
+ * Initialize the database connection with simple retry logic
  */
 async function initializeDatabase(): Promise<boolean> {
   try {
-    if (!process.env.DATABASE_URL) {
-      console.warn(
-        "Warning: DATABASE_URL is not set. Using fallback connection string for development."
-      );
-    }
-
     // Create a new connection pool
     const isProd = process.env.NODE_ENV === 'production';
     const newPool = createPool(isProd);
     
-    // Setup health monitoring on the new pool
-    setupConnectionHealthMonitoring(newPool);
+    // Setup basic error handling on the pool
+    newPool.on('error', (err) => {
+      console.error('Database pool error:', err);
+    });
 
     // Test the connection before proceeding
     let client;
@@ -170,46 +170,31 @@ async function initializeDatabase(): Promise<boolean> {
   } catch (error) {
     console.error(`Database connection attempt ${connectionAttempts + 1} failed:`, getDbErrorMessage(error));
     
-    // For serious connection issues, retry a few times with exponential backoff
-    if (connectionAttempts < MAX_CONNECTION_ATTEMPTS) {
+    // Use a simple retry mechanism - try up to 3 times with a short delay
+    if (connectionAttempts < 3) {
       connectionAttempts++;
-      const delay = Math.min(1000 * Math.pow(2, connectionAttempts), 30000); // Max 30 second delay
+      const delay = 1000 * connectionAttempts; // 1s, 2s, 3s delay
       console.log(`Retrying database connection in ${delay/1000} seconds...`);
       
       await new Promise(resolve => setTimeout(resolve, delay));
       return initializeDatabase();
     } else {
-      console.error('Max connection attempts reached. Using fallback database configuration.');
-      
-      // Create a dummy pool and db that will be replaced when proper connection is available
-      // This prevents the application from crashing if database is temporarily unavailable
-      if (!pool) {
-        pool = new Pool({ 
-          connectionString: 'postgresql://user:password@localhost:5432/dummy',
-          // Never actually try to connect with this dummy pool
-          max: 0
-        });
-        db = drizzle({ client: pool, schema });
-      }
-      
-      // Schedule a reconnection attempt in the background
-      scheduleReconnect();
-      return false;
+      // After 3 tries, give up and report the error
+      console.error('Max connection attempts reached. Database is unavailable.');
+      throw new Error('Could not connect to database after multiple attempts');
     }
   }
 }
 
-// Initialize the database with retries
-initializeDatabase().then(success => {
-  if (success) {
-    console.log('Database ready for use');
-  } else {
-    console.warn('Using fallback database configuration. Some features may not work properly.');
-    console.log('The application will automatically reconnect when the database becomes available.');
-  }
-}).catch(err => {
-  console.error('Fatal database initialization error:', getDbErrorMessage(err));
-});
+// Initialize the database
+initializeDatabase()
+  .then(() => {
+    console.log('Database connected and ready for use');
+  })
+  .catch(err => {
+    console.error('Fatal database initialization error:', getDbErrorMessage(err));
+    console.error('Application may not function correctly without database access');
+  });
 
 // Export the pool and db
 /**
