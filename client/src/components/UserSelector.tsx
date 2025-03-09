@@ -44,10 +44,8 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
   
   // Use a local state to prevent stale UI when authentication changes
   useEffect(() => {
-    // Only update if user exists to prevent flicker during logout
-    if (user) {
-      setCachedUser(user);
-    }
+    // Update whenever user changes (including to null during logout)
+    setCachedUser(user);
   }, [user]);
   
   // A user is authenticated if both the auth context says so and we have a local cached user
@@ -263,8 +261,10 @@ const UserSelector = ({ isMobile = false }: UserSelectorProps) => {
     setSheetOpen(false);
   };
 
-  // Get display name from the new auth system
-  const displayName = user?.displayName || user?.username || "Guest";
+  // Get display name from the cached user to ensure consistency
+  const displayName = isAuthenticated 
+    ? (cachedUser?.displayName || cachedUser?.username) 
+    : "Guest";
 
   // Use a bottom sheet for mobile devices
   if (actualIsMobile && isMobile) {
