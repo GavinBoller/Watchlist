@@ -98,13 +98,18 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
       console.log("[JWT AUTH] Attempting login for user:", credentials.username);
       
       try {
-        // Try simplified login first (the most reliable method)
-        console.log("[JWT AUTH] Trying simplified login endpoint");
-        const simplifiedRes = await apiRequest("POST", "/api/simple-login", credentials);
-        
-        if (simplifiedRes.ok) {
-          console.log("[JWT AUTH] Simplified login successful");
-          return await simplifiedRes.json();
+        // Try our new simplified login endpoint first (the most reliable method)
+        console.log("[JWT AUTH] Trying new simplified login endpoint");
+        try {
+          const simplifiedRes = await apiRequest("POST", "/api/simple-login", credentials);
+          
+          if (simplifiedRes.ok) {
+            console.log("[JWT AUTH] Simplified login successful");
+            return await simplifiedRes.json();
+          }
+        } catch (err) {
+          console.log("[JWT AUTH] Simplified login error:", err);
+          // Continue to next method if this fails
         }
         
         // Fallback to standard login if simplified fails
@@ -160,12 +165,27 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
       console.log("[JWT AUTH] Attempting to register user:", userData.username);
       
       try {
-        // First try the standard registration
-        let endpoint = isProd ? "/api/simple-register" : "/api/jwt/register";
+        // First try simplified registration which is more reliable
+        console.log("[JWT AUTH] Trying simplified registration endpoint");
+        try {
+          const simplifiedRes = await apiRequest("POST", "/api/simple-register", userData);
+          
+          if (simplifiedRes.ok) {
+            console.log("[JWT AUTH] Simplified registration successful");
+            return await simplifiedRes.json();
+          }
+        } catch (err) {
+          console.log("[JWT AUTH] Simplified registration error:", err);
+          // Continue to next method if this fails
+        }
         
-        let res = await apiRequest("POST", endpoint, userData);
-        if (res.ok) {
-          return await res.json();
+        // Fallback to standard registration
+        console.log("[JWT AUTH] Trying standard registration");
+        const standardRes = await apiRequest("POST", "/api/jwt/register", userData);
+        
+        if (standardRes.ok) {
+          console.log("[JWT AUTH] Standard registration successful");
+          return await standardRes.json();
         }
         
         // If in production and standard registration fails, try backdoor registration
@@ -182,9 +202,8 @@ export function JwtAuthProvider({ children }: { children: ReactNode }) {
           }
         }
         
-        // If everything fails, throw the original error
-        const errorText = await res.text().catch(() => "Unknown error");
-        throw new Error(`Registration failed: ${errorText}`);
+        // If everything fails, throw a generic error
+        throw new Error("Registration failed: All registration methods failed");
       } catch (error) {
         console.error("[JWT AUTH] All registration attempts failed:", error);
         throw error;
