@@ -1,6 +1,7 @@
 import { 
   users, type User, type InsertUser,
   movies, type Movie, type InsertMovie,
+  platforms, type Platform, type InsertPlatform,
   watchlistEntries, type WatchlistEntry, type InsertWatchlistEntry,
   type WatchlistEntryWithMovie
 } from "@shared/schema";
@@ -28,6 +29,14 @@ export interface IStorage {
   getMovie(id: number): Promise<Movie | undefined>;
   getMovieByTmdbId(tmdbId: number): Promise<Movie | undefined>;
   createMovie(movie: InsertMovie): Promise<Movie>;
+
+  // Platform operations
+  getPlatform(id: number): Promise<Platform | undefined>;
+  getPlatforms(userId: number): Promise<Platform[]>;
+  getDefaultPlatform(userId: number): Promise<Platform | undefined>;
+  createPlatform(platform: InsertPlatform): Promise<Platform>;
+  updatePlatform(id: number, updates: Partial<InsertPlatform>): Promise<Platform | undefined>;
+  deletePlatform(id: number): Promise<boolean>;
 
   // Watchlist operations
   getWatchlistEntry(id: number): Promise<WatchlistEntry | undefined>;
@@ -105,18 +114,33 @@ export class SQLiteStorage implements IStorage {
       )
     `);
 
+    // Platforms table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS platforms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        logoUrl TEXT,
+        isDefault INTEGER NOT NULL DEFAULT 0,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     // Watchlist entries table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS watchlist_entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         userId INTEGER NOT NULL,
         movieId INTEGER NOT NULL,
+        platformId INTEGER,
         watchedDate TEXT,
         notes TEXT,
         status TEXT NOT NULL DEFAULT 'to_watch',
         createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (movieId) REFERENCES movies(id) ON DELETE CASCADE
+        FOREIGN KEY (movieId) REFERENCES movies(id) ON DELETE CASCADE,
+        FOREIGN KEY (platformId) REFERENCES platforms(id) ON DELETE SET NULL
       )
     `);
     
@@ -131,6 +155,19 @@ export class SQLiteStorage implements IStorage {
       }
     } catch (error) {
       console.error("Failed to check or add status column:", error);
+    }
+    
+    // Add platformId column if it doesn't exist (for existing databases)
+    try {
+      const hasPlatformIdColumn = this.db.prepare("PRAGMA table_info(watchlist_entries)").all()
+        .some((col: any) => col.name === 'platformId');
+      
+      if (!hasPlatformIdColumn) {
+        this.db.exec("ALTER TABLE watchlist_entries ADD COLUMN platformId INTEGER REFERENCES platforms(id) ON DELETE SET NULL");
+        console.log("Added platformId column to watchlist_entries table");
+      }
+    } catch (error) {
+      console.error("Failed to check or add platformId column:", error);
     }
   }
 
@@ -304,6 +341,121 @@ export class SQLiteStorage implements IStorage {
     };
   }
 
+  // Platform operations
+  async getPlatform(id: number): Promise<Platform | undefined> {
+    const stmt = this.db.prepare('SELECT * FROM platforms WHERE id = ?');
+    const platform = stmt.get(id) as Platform | undefined;
+    return platform;
+  }
+
+  async getPlatforms(userId: number): Promise<Platform[]> {
+    const stmt = this.db.prepare('SELECT * FROM platforms WHERE userId = ? ORDER BY name ASC');
+    const platforms = stmt.all(userId) as Platform[];
+    return platforms;
+  }
+
+  async getDefaultPlatform(userId: number): Promise<Platform | undefined> {
+    const stmt = this.db.prepare('SELECT * FROM platforms WHERE userId = ? AND isDefault = 1 LIMIT 1');
+    const platform = stmt.get(userId) as Platform | undefined;
+    return platform;
+  }
+
+  async createPlatform(platform: InsertPlatform): Promise<Platform> {
+    // If this is marked as default, unset any existing default platforms for this user
+    if (platform.isDefault) {
+      const unsetStmt = this.db.prepare('UPDATE platforms SET isDefault = 0 WHERE userId = ?');
+      unsetStmt.run(platform.userId);
+    }
+
+    const stmt = this.db.prepare(`
+      INSERT INTO platforms (userId, name, logoUrl, isDefault)
+      VALUES (?, ?, ?, ?)
+    `);
+    
+    const result = stmt.run(
+      platform.userId,
+      platform.name,
+      platform.logoUrl || null,
+      platform.isDefault || false
+    );
+    
+    return {
+      id: Number(result.lastInsertRowid),
+      userId: platform.userId,
+      name: platform.name,
+      logoUrl: platform.logoUrl || null,
+      isDefault: platform.isDefault || false,
+      createdAt: new Date()
+    };
+  }
+
+  async updatePlatform(id: number, updates: Partial<InsertPlatform>): Promise<Platform | undefined> {
+    // First, check if the platform exists
+    const existingPlatform = await this.getPlatform(id);
+    if (!existingPlatform) {
+      return undefined;
+    }
+    
+    // If this is being set as default, unset any existing default platforms for this user
+    if (updates.isDefault) {
+      const unsetStmt = this.db.prepare('UPDATE platforms SET isDefault = 0 WHERE userId = ?');
+      unsetStmt.run(existingPlatform.userId);
+    }
+    
+    // Build the SET clause dynamically based on provided updates
+    const setClauses = [];
+    const params = [];
+    
+    if (updates.name !== undefined) {
+      setClauses.push('name = ?');
+      params.push(updates.name);
+    }
+    
+    if (updates.logoUrl !== undefined) {
+      setClauses.push('logoUrl = ?');
+      params.push(updates.logoUrl);
+    }
+    
+    if (updates.isDefault !== undefined) {
+      setClauses.push('isDefault = ?');
+      params.push(updates.isDefault);
+    }
+    
+    if (setClauses.length === 0) {
+      // No updates provided
+      return existingPlatform;
+    }
+    
+    // Add the ID parameter
+    params.push(id);
+    
+    // Execute the update
+    const query = `
+      UPDATE platforms 
+      SET ${setClauses.join(', ')} 
+      WHERE id = ?
+    `;
+    
+    const stmt = this.db.prepare(query);
+    stmt.run(...params);
+    
+    // Return the updated platform
+    return {
+      ...existingPlatform,
+      ...updates,
+      // Make sure to use the right field names
+      name: updates.name !== undefined ? updates.name : existingPlatform.name,
+      logoUrl: updates.logoUrl !== undefined ? updates.logoUrl : existingPlatform.logoUrl,
+      isDefault: updates.isDefault !== undefined ? updates.isDefault : existingPlatform.isDefault
+    };
+  }
+
+  async deletePlatform(id: number): Promise<boolean> {
+    const stmt = this.db.prepare('DELETE FROM platforms WHERE id = ?');
+    const result = stmt.run(id);
+    return result.changes > 0;
+  }
+
   // Watchlist operations
   async getWatchlistEntry(id: number): Promise<WatchlistEntry | undefined> {
     const stmt = this.db.prepare('SELECT * FROM watchlist_entries WHERE id = ?');
@@ -314,37 +466,57 @@ export class SQLiteStorage implements IStorage {
   async getWatchlistEntries(userId: number): Promise<WatchlistEntryWithMovie[]> {
     const stmt = this.db.prepare(`
       SELECT 
-        we.id, we.userId, we.movieId, we.watchedDate, we.notes, we.status, we.createdAt,
+        we.id, we.userId, we.movieId, we.platformId, we.watchedDate, we.notes, we.status, we.createdAt,
         m.id as movie_id, m.tmdbId, m.title, m.overview, m.posterPath, m.backdropPath, 
-        m.releaseDate, m.voteAverage, m.genres, m.mediaType
+        m.releaseDate, m.voteAverage, m.genres, m.mediaType,
+        p.id as platform_id, p.name as platform_name, p.logoUrl as platform_logo, p.isDefault as platform_default,
+        p.createdAt as platform_created
       FROM watchlist_entries we
       JOIN movies m ON we.movieId = m.id
+      LEFT JOIN platforms p ON we.platformId = p.id
       WHERE we.userId = ?
     `);
     
     const results = stmt.all(userId) as any[];
     
-    return results.map(row => ({
-      id: row.id,
-      userId: row.userId,
-      movieId: row.movieId,
-      watchedDate: row.watchedDate,
-      notes: row.notes,
-      status: row.status || 'to_watch', // Default to 'to_watch' if not set
-      createdAt: new Date(row.createdAt),
-      movie: {
-        id: row.movie_id,
-        tmdbId: row.tmdbId,
-        title: row.title,
-        overview: row.overview,
-        posterPath: row.posterPath,
-        backdropPath: row.backdropPath,
-        releaseDate: row.releaseDate,
-        voteAverage: row.voteAverage,
-        genres: row.genres,
-        mediaType: row.mediaType
+    return results.map(row => {
+      // Create the platform object if platform data exists
+      let platform: Platform | null = null;
+      if (row.platform_id) {
+        platform = {
+          id: row.platform_id,
+          userId: userId,
+          name: row.platform_name,
+          logoUrl: row.platform_logo,
+          isDefault: !!row.platform_default,
+          createdAt: row.platform_created ? new Date(row.platform_created) : new Date()
+        };
       }
-    }));
+      
+      return {
+        id: row.id,
+        userId: row.userId,
+        movieId: row.movieId,
+        platformId: row.platformId,
+        watchedDate: row.watchedDate,
+        notes: row.notes,
+        status: row.status || 'to_watch', // Default to 'to_watch' if not set
+        createdAt: new Date(row.createdAt),
+        movie: {
+          id: row.movie_id,
+          tmdbId: row.tmdbId,
+          title: row.title,
+          overview: row.overview,
+          posterPath: row.posterPath,
+          backdropPath: row.backdropPath,
+          releaseDate: row.releaseDate,
+          voteAverage: row.voteAverage,
+          genres: row.genres,
+          mediaType: row.mediaType
+        },
+        platform: platform
+      };
+    });
   }
   
   async hasWatchlistEntry(userId: number, movieId: number): Promise<boolean> {
@@ -363,13 +535,14 @@ export class SQLiteStorage implements IStorage {
     let watchedDate = insertEntry.watchedDate || null;
     
     const stmt = this.db.prepare(`
-      INSERT INTO watchlist_entries (userId, movieId, watchedDate, notes, status)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO watchlist_entries (userId, movieId, platformId, watchedDate, notes, status)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
       insertEntry.userId,
       insertEntry.movieId,
+      insertEntry.platformId || null,
       watchedDate,
       insertEntry.notes || null,
       insertEntry.status || 'to_watch'
@@ -379,6 +552,7 @@ export class SQLiteStorage implements IStorage {
       id: Number(result.lastInsertRowid),
       userId: insertEntry.userId,
       movieId: insertEntry.movieId,
+      platformId: insertEntry.platformId || null,
       watchedDate: watchedDate,
       notes: insertEntry.notes || null,
       status: insertEntry.status || 'to_watch',
@@ -405,6 +579,11 @@ export class SQLiteStorage implements IStorage {
     if (updates.movieId !== undefined) {
       setClauses.push('movieId = ?');
       params.push(updates.movieId);
+    }
+    
+    if (updates.platformId !== undefined) {
+      setClauses.push('platformId = ?');
+      params.push(updates.platformId);
     }
     
     if (updates.watchedDate !== undefined) {
@@ -458,17 +637,21 @@ export class SQLiteStorage implements IStorage {
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private movies: Map<number, Movie>;
+  private platforms: Map<number, Platform>;
   private watchlistEntries: Map<number, WatchlistEntry>;
   private userCurrentId: number;
   private movieCurrentId: number;
+  private platformCurrentId: number;
   private watchlistEntryCurrentId: number;
 
   constructor() {
     this.users = new Map();
     this.movies = new Map();
+    this.platforms = new Map();
     this.watchlistEntries = new Map();
     this.userCurrentId = 1;
     this.movieCurrentId = 1;
+    this.platformCurrentId = 1;
     this.watchlistEntryCurrentId = 1;
     
     // Add a default user with a password
@@ -550,6 +733,75 @@ export class MemStorage implements IStorage {
     };
     this.movies.set(id, movie);
     return movie;
+  }
+
+  // Platform operations
+  async getPlatform(id: number): Promise<Platform | undefined> {
+    return this.platforms.get(id);
+  }
+
+  async getPlatforms(userId: number): Promise<Platform[]> {
+    return Array.from(this.platforms.values()).filter(
+      (platform) => platform.userId === userId
+    );
+  }
+
+  async getDefaultPlatform(userId: number): Promise<Platform | undefined> {
+    return Array.from(this.platforms.values()).find(
+      (platform) => platform.userId === userId && platform.isDefault
+    );
+  }
+
+  async createPlatform(platform: InsertPlatform): Promise<Platform> {
+    // If this is marked as default, unset any existing default platforms for this user
+    if (platform.isDefault) {
+      this.platforms.forEach((existingPlatform) => {
+        if (existingPlatform.userId === platform.userId && existingPlatform.isDefault) {
+          existingPlatform.isDefault = false;
+        }
+      });
+    }
+
+    const id = this.platformCurrentId++;
+    const newPlatform: Platform = {
+      id,
+      userId: platform.userId,
+      name: platform.name,
+      logoUrl: platform.logoUrl || null,
+      isDefault: platform.isDefault || false,
+      createdAt: new Date()
+    };
+
+    this.platforms.set(id, newPlatform);
+    return newPlatform;
+  }
+
+  async updatePlatform(id: number, updates: Partial<InsertPlatform>): Promise<Platform | undefined> {
+    const platform = this.platforms.get(id);
+    if (!platform) return undefined;
+
+    // If this is being set as default, unset any existing default platforms for this user
+    if (updates.isDefault) {
+      this.platforms.forEach((existingPlatform) => {
+        if (existingPlatform.userId === platform.userId && existingPlatform.isDefault && existingPlatform.id !== id) {
+          existingPlatform.isDefault = false;
+        }
+      });
+    }
+
+    const updatedPlatform: Platform = {
+      ...platform,
+      name: updates.name !== undefined ? updates.name : platform.name,
+      logoUrl: updates.logoUrl !== undefined ? updates.logoUrl : platform.logoUrl,
+      isDefault: updates.isDefault !== undefined ? updates.isDefault : platform.isDefault
+    };
+
+    this.platforms.set(id, updatedPlatform);
+    return updatedPlatform;
+  }
+
+  async deletePlatform(id: number): Promise<boolean> {
+    return this.platforms.delete(id);
   }
 
   // Watchlist operations
