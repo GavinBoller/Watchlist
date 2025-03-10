@@ -44,6 +44,9 @@ const WatchlistPage = () => {
   const [editWatchedDate, setEditWatchedDate] = useState<string>('');
   const [editNotes, setEditNotes] = useState<string>('');
   const [editStatus, setEditStatus] = useState<string>('watched');
+  const [editPlatformId, setEditPlatformId] = useState<number | null>(null);
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
+  const [loadingPlatforms, setLoadingPlatforms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<WatchlistEntryWithMovie | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
