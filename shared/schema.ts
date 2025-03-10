@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, primaryKey, foreignKey, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -62,10 +62,27 @@ export const insertMovieSchema = createInsertSchema(movies).pick({
   mediaType: true,
 });
 
+export const platforms = pgTable("platforms", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  logoUrl: text("logo_url"),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPlatformSchema = createInsertSchema(platforms).pick({
+  userId: true,
+  name: true,
+  logoUrl: true,
+  isDefault: true,
+});
+
 export const watchlistEntries = pgTable("watchlist_entries", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   movieId: integer("movie_id").notNull(),
+  platformId: integer("platform_id").references(() => platforms.id, { onDelete: "set null" }),
   watchedDate: text("watched_date"), // Using text for SQLite compatibility
   notes: text("notes"),
   status: text("status").notNull().default("to_watch"), // Options: "to_watch", "watching", "watched"
@@ -77,6 +94,7 @@ export const watchlistEntries = pgTable("watchlist_entries", {
 export const insertWatchlistEntrySchema = z.object({
   userId: z.number(),
   movieId: z.number(),
+  platformId: z.number().nullable().optional(),
   watchedDate: z.string().nullable(),
   notes: z.string().nullable(),
   status: z.enum(["to_watch", "watching", "watched"]).default("to_watch"),
@@ -88,6 +106,9 @@ export type UserResponse = Omit<User, 'password'>;
 
 export type Movie = typeof movies.$inferSelect;
 export type InsertMovie = z.infer<typeof insertMovieSchema>;
+
+export type Platform = typeof platforms.$inferSelect;
+export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
 
 export type WatchlistEntry = typeof watchlistEntries.$inferSelect;
 export type InsertWatchlistEntry = z.infer<typeof insertWatchlistEntrySchema>;
@@ -117,4 +138,5 @@ export interface TMDBSearchResponse {
 // Type for watchlist entry with movie details
 export interface WatchlistEntryWithMovie extends WatchlistEntry {
   movie: Movie;
+  platform?: Platform | null;
 }
