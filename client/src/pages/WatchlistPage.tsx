@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiRequest } from '@/lib/queryClient';
 import { queryClient } from '@/lib/queryClient';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Clock, Film, Tv2, Menu, BadgePlus, Inbox, PlayCircle, Search, X, RefreshCw, Monitor, Plus } from 'lucide-react';
@@ -964,9 +964,18 @@ const WatchlistPage = () => {
 
       {/* Edit Entry Modal - iOS optimized */}
       <Dialog open={isEditModalOpen} onOpenChange={(open) => !isSubmitting && setIsEditModalOpen(open)}>
-        <DialogContent className="bg-[#292929] text-white border-gray-700 sm:max-w-md max-h-[95vh] overflow-auto">
+        <DialogContent className="bg-[#292929] text-white border-gray-700 p-4 pb-6">
+          {/* Custom close button for better mobile visibility */}
+          <button 
+            className="absolute right-4 top-4 rounded-full hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600 p-1"
+            onClick={() => setIsEditModalOpen(false)}
+          >
+            <X className="h-5 w-5" />
+            <span className="sr-only">Close</span>
+          </button>
+          
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold">
+            <DialogTitle className="text-lg font-semibold pr-6">
               {editStatus === 'to_watch' 
                 ? 'Edit Plan to Watch' 
                 : editStatus === 'watching' 
@@ -1028,7 +1037,7 @@ const WatchlistPage = () => {
                   <Input 
                     type="date" 
                     id="edit-watch-date" 
-                    className="w-full bg-gray-700 text-white rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600 h-12"
+                    className="w-full bg-gray-700 text-white rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600 h-12 text-base sm:text-sm"
                     value={editWatchedDate}
                     onChange={(e) => setEditWatchedDate(e.target.value)}
                   />
