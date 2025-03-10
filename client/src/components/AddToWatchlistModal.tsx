@@ -441,9 +441,18 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
           variant: "default",
         });
       } else {
+        // Find platform name if a platform is selected
+        const selectedPlatform = selectedPlatformId
+          ? platforms.find(p => p.id === selectedPlatformId)?.name
+          : null;
+        
+        const platformText = selectedPlatform 
+          ? ` on ${selectedPlatform}`
+          : '';
+            
         toast({
           title: `${mediaTypeLabel} added`,
-          description: `${title} has been added to your ${statusLabel}`,
+          description: `${title} has been added to your ${statusLabel}${platformText}`,
         });
       }
       
