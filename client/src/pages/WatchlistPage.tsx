@@ -996,14 +996,14 @@ const WatchlistPage = () => {
                   </Button>
                 </div>
                 <Select 
-                  value={editPlatformId ? editPlatformId.toString() : ''} 
-                  onValueChange={(value) => setEditPlatformId(value ? parseInt(value) : null)}
+                  value={editPlatformId ? editPlatformId.toString() : 'none'} 
+                  onValueChange={(value) => setEditPlatformId(value !== 'none' ? parseInt(value) : null)}
                 >
                   <SelectTrigger className="w-full bg-gray-700 text-white border-gray-600 focus:ring-[#E50914] h-12">
                     <SelectValue placeholder="Where did you watch it?" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700">
-                    <SelectItem value="">No platform</SelectItem>
+                    <SelectItem value="none">No platform</SelectItem>
                     {platforms.map((platform) => (
                       <SelectItem key={platform.id} value={platform.id.toString()}>
                         <div className="flex items-center">

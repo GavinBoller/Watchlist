@@ -658,8 +658,8 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
           <div className="mt-4">
             <Label htmlFor="platform" className="text-gray-300 mb-1 block">Platform</Label>
             <Select 
-              value={selectedPlatformId ? selectedPlatformId.toString() : ''} 
-              onValueChange={(value) => setSelectedPlatformId(value ? parseInt(value) : null)}
+              value={selectedPlatformId ? selectedPlatformId.toString() : 'none'} 
+              onValueChange={(value) => setSelectedPlatformId(value !== 'none' ? parseInt(value) : null)}
             >
               <SelectTrigger className="w-full bg-gray-800 border-gray-700">
                 <SelectValue placeholder="Select platform (optional)" />
@@ -668,6 +668,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
                 <div className="p-1 text-sm text-gray-400 border-b border-gray-700">
                   {loadingPlatforms ? 'Loading platforms...' : platforms.length === 0 ? 'No platforms added yet' : 'Your platforms'}
                 </div>
+                <SelectItem value="none">No platform</SelectItem>
                 {platforms.map((platform) => (
                   <SelectItem key={platform.id} value={platform.id.toString()}>
                     {platform.name} {platform.isDefault && '(Default)'}
