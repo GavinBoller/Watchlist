@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useUserContext } from '@/lib/user-context';
 import WatchlistEntry from '@/components/WatchlistEntry';
 import { DetailsModal } from '@/components/DetailsModal';
+import { PlatformManagementModal } from '@/components/PlatformManagementModal';
 import { TMDBMovie, WatchlistEntryWithMovie, Platform } from '@shared/schema';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -50,6 +51,7 @@ const WatchlistPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<WatchlistEntryWithMovie | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [isPlatformModalOpen, setIsPlatformModalOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
