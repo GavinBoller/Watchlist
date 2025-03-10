@@ -428,7 +428,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
       
       // Create appropriate status labels for the toast
       const statusLabel = status === 'to_watch' 
-        ? 'plan to watch list' 
+        ? 'to watch list' 
         : status === 'watching' 
           ? 'currently watching list'
           : 'watched list';
@@ -568,7 +568,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
         <DialogHeader>
           <DialogTitle className="text-lg font-bold pr-6" id="dialog-title">
             {status === 'to_watch' 
-              ? 'Add to Plan to Watch' 
+              ? 'Add to To Watch' 
               : status === 'watching' 
                 ? 'Add to Currently Watching'
                 : 'Add to Watched'}
@@ -730,7 +730,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
                     </div>
                   ) : (
                     status === 'to_watch' 
-                      ? 'Add to Plan to Watch' 
+                      ? 'Add to To Watch' 
                       : status === 'watching' 
                         ? 'Add to Currently Watching'
                         : 'Add to Watched'
@@ -768,7 +768,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
                     </div>
                   ) : (
                     status === 'to_watch' 
-                      ? 'Add to Plan to Watch' 
+                      ? 'Add to To Watch' 
                       : status === 'watching' 
                         ? 'Add to Currently Watching'
                         : 'Add to Watched'
