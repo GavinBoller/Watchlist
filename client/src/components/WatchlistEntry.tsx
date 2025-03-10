@@ -13,7 +13,7 @@ interface WatchlistEntryProps {
 }
 
 const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEntryProps) => {
-  const { movie, watchedDate, id, notes, platform } = entry;
+  const { movie, watchedDate, id, notes, platform, platformId } = entry;
   const isMobile = useIsMobile();
   const [imdbUrl, setImdbUrl] = useState<string>('');
   const [isLoadingUrl, setIsLoadingUrl] = useState<boolean>(false);
@@ -23,6 +23,9 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
   // For stored entries, the genres are already comma-separated strings of genre names
   const genres = movie.genres || '';
   const mediaType = movie.mediaType || 'movie';
+  
+  // Check if we have platform info
+  const hasPlatform = platform || platformId;
   
   // Format the watched date
   const formattedDate = watchedDate 
@@ -100,11 +103,20 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
         </div>
         
         {/* Platform */}
-        {platform && (
+        {hasPlatform ? (
           <div className="mt-2 flex items-center text-xs text-gray-300">
             <Monitor className="h-3 w-3 mr-1 flex-shrink-0" />
             <span className="whitespace-nowrap">Platform:</span> 
-            <span className="text-green-400 ml-1 truncate">{platform.name}</span>
+            <span className="text-green-400 ml-1 truncate">
+              {platform ? platform.name : 'Unknown Platform'}
+              {platform?.isDefault && <span className="ml-1 text-gray-400">(Default)</span>}
+            </span>
+          </div>
+        ) : (
+          <div className="mt-2 flex items-center text-xs text-gray-300">
+            <Monitor className="h-3 w-3 mr-1 flex-shrink-0" />
+            <span className="whitespace-nowrap">Platform:</span> 
+            <span className="text-gray-400 ml-1 truncate">None</span>
           </div>
         )}
         
