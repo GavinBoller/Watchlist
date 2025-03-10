@@ -12,7 +12,7 @@ import { queryClient } from '@/lib/queryClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Clock, Film, Tv2, Menu, BadgePlus, Inbox, PlayCircle, Search, X, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Film, Tv2, Menu, BadgePlus, Inbox, PlayCircle, Search, X, RefreshCw, Monitor, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Label } from '@/components/ui/label';
@@ -576,6 +576,22 @@ const WatchlistPage = () => {
               <Tv2 className="h-3 w-3 mr-1" />
               {stats.tv} {stats.tv === 1 ? 'TV Show' : 'TV Shows'}
             </Badge>
+            {/* Manage Platforms button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-2 flex items-center gap-1"
+              onClick={() => {
+                if (currentUser?.id) {
+                  fetchPlatforms(currentUser.id);
+                }
+                setIsPlatformModalOpen(true);
+              }}
+            >
+              <Monitor className="h-4 w-4" />
+              <span className="hidden sm:inline">Platforms</span>
+            </Button>
+            
             {/* Safari Mobile-specific refresh button */}
             {isMobileSafari && (
               <button 
