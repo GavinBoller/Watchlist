@@ -894,6 +894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           entry = await storage.createWatchlistEntry({
             userId,
             movieId: movie.id,
+            platformId,
             status,
             watchedDate,
             notes
@@ -912,10 +913,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               // Try to insert the watchlist entry using direct SQL
               const result = await executeDirectSql(
-                `INSERT INTO watchlist_entries (user_id, movie_id, status, watched_date, notes) 
-                 VALUES ($1, $2, $3, $4, $5) 
+                `INSERT INTO watchlist_entries (user_id, movie_id, platform_id, status, watched_date, notes) 
+                 VALUES ($1, $2, $3, $4, $5, $6) 
                  RETURNING *`, 
-                [userId, movie.id, status, watchedDate, notes]
+                [userId, movie.id, platformId, status, watchedDate, notes]
               );
               
               if (result && Array.isArray(result.rows) && result.rows.length > 0) {
@@ -1062,7 +1063,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/watchlist/:id", isJwtAuthenticated, hasJwtWatchlistAccess, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id, 10);
-      const { watchedDate, notes, status } = req.body;
+      const { watchedDate, notes, status, platformId } = req.body;
       
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid watchlist entry ID" });
@@ -1083,7 +1084,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedEntry = await storage.updateWatchlistEntry(id, {
         status,
         watchedDate,
-        notes
+        notes,
+        platformId
       });
       
       // Check if movie details are still valid

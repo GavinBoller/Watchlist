@@ -34,6 +34,7 @@ type StatusFilterType = 'all' | 'to_watch' | 'watching' | 'watched';
 const WatchlistPage = () => {
   const { currentUser } = useUserContext();
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
   const [mediaTypeFilter, setMediaTypeFilter] = useState<MediaFilterType>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilterType>('all');
   const [sortOrder, setSortOrder] = useState<string>('date_desc');
@@ -283,7 +284,7 @@ const WatchlistPage = () => {
   const filteredAndSortedWatchlist = (): WatchlistEntryWithMovie[] => {
     if (!watchlist) return [];
 
-    // First filter by media type, genre, and search query
+    // First filter by media type, genre, platform, and search query
     let filtered: WatchlistEntryWithMovie[] = watchlist;
     
     // Filter by media type
@@ -305,6 +306,22 @@ const WatchlistPage = () => {
       filtered = filtered.filter((entry: WatchlistEntryWithMovie) => 
         entry.movie.genres?.includes(selectedGenre)
       );
+    }
+    
+    // Filter by platform
+    if (selectedPlatform && selectedPlatform !== 'all') {
+      if (selectedPlatform === 'none') {
+        // Filter entries with no platform
+        filtered = filtered.filter((entry: WatchlistEntryWithMovie) => 
+          !entry.platformId
+        );
+      } else {
+        // Filter by specific platform ID
+        const platformId = parseInt(selectedPlatform);
+        filtered = filtered.filter((entry: WatchlistEntryWithMovie) => 
+          entry.platformId === platformId
+        );
+      }
     }
     
     // Filter by search query
