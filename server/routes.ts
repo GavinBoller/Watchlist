@@ -1127,6 +1127,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Platform routes
+  app.get("/api/platforms/:userId", isJwtAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId, 10);
+      
+      // Check if the user is authorized to access these platforms
+      if ((req.user as any)?.id !== userId) {
+        return res.status(403).json({ message: "You are not authorized to access these platforms" });
+      }
+      
+      const platforms = await storage.getPlatforms(userId);
+      res.json(platforms);
+    } catch (error) {
+      console.error("Error fetching platforms:", error);
+      res.status(500).json({ message: "Error fetching platforms", error: String(error) });
+    }
+  });
+  
+  app.post("/api/platforms", isJwtAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const { userId, name, logoUrl, isDefault } = req.body;
+      
+      // Check if the user is authorized to create a platform
+      if ((req.user as any)?.id !== userId) {
+        return res.status(403).json({ message: "You are not authorized to create platforms for this user" });
+      }
+      
+      const platform = await storage.createPlatform({
+        userId,
+        name,
+        logoUrl,
+        isDefault: isDefault || false
+      });
+      
+      res.status(201).json(platform);
+    } catch (error) {
+      console.error("Error creating platform:", error);
+      res.status(500).json({ message: "Error creating platform", error: String(error) });
+    }
+  });
+  
+  app.put("/api/platforms/:id", isJwtAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const platformId = parseInt(req.params.id, 10);
+      const updates = req.body;
+      
+      // Get the platform to check ownership
+      const existingPlatform = await storage.getPlatform(platformId);
+      if (!existingPlatform) {
+        return res.status(404).json({ message: "Platform not found" });
+      }
+      
+      // Check if the user is authorized to update this platform
+      if ((req.user as any)?.id !== existingPlatform.userId) {
+        return res.status(403).json({ message: "You are not authorized to update this platform" });
+      }
+      
+      const updatedPlatform = await storage.updatePlatform(platformId, updates);
+      res.json(updatedPlatform);
+    } catch (error) {
+      console.error("Error updating platform:", error);
+      res.status(500).json({ message: "Error updating platform", error: String(error) });
+    }
+  });
+  
+  app.delete("/api/platforms/:id", isJwtAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const platformId = parseInt(req.params.id, 10);
+      
+      // Get the platform to check ownership
+      const existingPlatform = await storage.getPlatform(platformId);
+      if (!existingPlatform) {
+        return res.status(404).json({ message: "Platform not found" });
+      }
+      
+      // Check if the user is authorized to delete this platform
+      if ((req.user as any)?.id !== existingPlatform.userId) {
+        return res.status(403).json({ message: "You are not authorized to delete this platform" });
+      }
+      
+      const deleted = await storage.deletePlatform(platformId);
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting platform:", error);
+      res.status(500).json({ message: "Error deleting platform", error: String(error) });
+    }
+  });
+
   // Register JWT auth routes
   console.log("[SERVER] Registering JWT auth endpoints");
   app.use('/api', jwtAuthRouter);
