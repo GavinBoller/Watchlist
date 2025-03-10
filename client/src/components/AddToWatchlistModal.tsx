@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { TMDBMovie } from '@shared/schema';
+import { useState, useEffect } from 'react';
+import { TMDBMovie, Platform } from '@shared/schema';
 import { useUserContext } from '@/lib/user-context';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { handleSessionExpiration, isSessionError } from '@/lib/session-utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface AddToWatchlistModalProps {
   item: TMDBMovie | null;
@@ -28,12 +29,45 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
   const [notes, setNotes] = useState<string>('');
   const [status, setStatus] = useState<string>('watched');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
+  const [selectedPlatformId, setSelectedPlatformId] = useState<number | null>(null);
+  const [loadingPlatforms, setLoadingPlatforms] = useState(false);
   
   const handleClose = () => {
     setWatchedDate(format(new Date(), 'yyyy-MM-dd'));
     setNotes('');
+    setSelectedPlatformId(null);
     onClose();
   };
+  
+  // Fetch platforms when modal opens and user is available
+  useEffect(() => {
+    if (isOpen && currentUser?.id) {
+      const fetchPlatforms = async () => {
+        setLoadingPlatforms(true);
+        try {
+          const response = await apiRequest('GET', `/api/platforms/${currentUser.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            setPlatforms(data);
+            
+            // Set default platform if available
+            const defaultPlatform = data.find((p: Platform) => p.isDefault === true);
+            if (defaultPlatform) {
+              setSelectedPlatformId(defaultPlatform.id);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching platforms:', error);
+        } finally {
+          setLoadingPlatforms(false);
+        }
+      };
+      
+      fetchPlatforms();
+    }
+  }, [isOpen, currentUser]);
+  
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -153,6 +187,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
         genre_ids: item.genre_ids || [],
         media_type: item.media_type || (item.first_air_date ? "tv" : "movie"),
       },
+      platformId: selectedPlatformId,
       watchedDate: status === 'watched' ? watchedDate || null : null,
       notes: notes || null,
       status: status,
@@ -618,6 +653,28 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
                 </Label>
               </div>
             </RadioGroup>
+          </div>
+          
+          <div className="mt-4">
+            <Label htmlFor="platform" className="text-gray-300 mb-1 block">Platform</Label>
+            <Select 
+              value={selectedPlatformId ? selectedPlatformId.toString() : ''} 
+              onValueChange={(value) => setSelectedPlatformId(value ? parseInt(value) : null)}
+            >
+              <SelectTrigger className="w-full bg-gray-800 border-gray-700">
+                <SelectValue placeholder="Select platform (optional)" />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-800 border-gray-700">
+                <div className="p-1 text-sm text-gray-400 border-b border-gray-700">
+                  {loadingPlatforms ? 'Loading platforms...' : platforms.length === 0 ? 'No platforms added yet' : 'Your platforms'}
+                </div>
+                {platforms.map((platform) => (
+                  <SelectItem key={platform.id} value={platform.id.toString()}>
+                    {platform.name} {platform.isDefault && '(Default)'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           
           {status === 'watched' && (
