@@ -342,19 +342,30 @@ const WatchlistPage = () => {
     setEditWatchedDate(entry.watchedDate ? format(new Date(entry.watchedDate), 'yyyy-MM-dd') : '');
     setEditNotes(entry.notes || '');
     setEditStatus(entry.status || 'watched'); // Set the current status
-    setEditPlatformId(entry.platformId || null);
     
-    // Fetch platforms if we haven't loaded them yet
-    if (platforms.length === 0 && currentUser?.id) {
-      fetchPlatforms(currentUser.id);
+    // Always fetch fresh platforms when editing
+    if (currentUser?.id) {
+      // First set the current platform ID from the entry
+      setEditPlatformId(entry.platformId || null);
+      
+      // Then fetch platforms to ensure we have the latest data
+      fetchPlatforms(currentUser.id).then(platformsData => {
+        // If entry has no platform but there's a default platform available, use it
+        if (!entry.platformId && platformsData.length > 0) {
+          const defaultPlatform = platformsData.find((p: Platform) => p.isDefault === true);
+          if (defaultPlatform) {
+            setEditPlatformId(defaultPlatform.id);
+          }
+        }
+      });
     }
     
     setIsEditModalOpen(true);
   };
   
   // Fetch platforms
-  const fetchPlatforms = async (userId: number) => {
-    if (loadingPlatforms) return;
+  const fetchPlatforms = async (userId: number): Promise<Platform[]> => {
+    if (loadingPlatforms) return [];
     
     setLoadingPlatforms(true);
     try {
@@ -370,11 +381,15 @@ const WatchlistPage = () => {
             setEditPlatformId(defaultPlatform.id);
           }
         }
+        
+        return data; // Return the platforms data for use in other functions
       } else {
         console.error('Failed to fetch platforms:', response.status);
+        return [];
       }
     } catch (error) {
       console.error('Error fetching platforms:', error);
+      return [];
     } finally {
       setLoadingPlatforms(false);
     }
