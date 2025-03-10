@@ -615,21 +615,7 @@ const WatchlistPage = () => {
               <Tv2 className="h-3 w-3 mr-1" />
               {stats.tv} {stats.tv === 1 ? 'TV Show' : 'TV Shows'}
             </Badge>
-            {/* Manage Platforms button */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-2 flex items-center gap-1"
-              onClick={() => {
-                if (currentUser?.id) {
-                  fetchPlatforms(currentUser.id);
-                }
-                setIsPlatformModalOpen(true);
-              }}
-            >
-              <Monitor className="h-4 w-4" />
-              <span className="hidden sm:inline">Platforms</span>
-            </Button>
+
             
             {/* Safari Mobile-specific refresh button */}
             {isMobileSafari && (
