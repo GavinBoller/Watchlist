@@ -52,22 +52,47 @@ export const tvGenreMap: Record<number, string> = {
   37: 'Western'
 };
 
-// Convert genre IDs to genre names
-export const getGenreNames = (genreIds: number[] | string, mediaType: string = 'movie'): string => {
-  const genreMap = mediaType === 'tv' ? tvGenreMap : movieGenreMap;
-  
-  if (typeof genreIds === 'string') {
+// Convert genre IDs to genre names with enhanced error handling
+export const getGenreNames = (genreIds: number[] | string | unknown, mediaType: string = 'movie'): string => {
+  try {
+    // Safety check for undefined/null input
     if (!genreIds) return '';
-    return genreIds.split(',')
-      .map(id => genreMap[Number(id)] || '')
-      .filter(Boolean)
-      .join(', ');
+    
+    const genreMap = mediaType === 'tv' ? tvGenreMap : movieGenreMap;
+    
+    // Handle string format
+    if (typeof genreIds === 'string') {
+      if (genreIds.trim() === '') return '';
+      
+      return genreIds.split(',')
+        .map(id => {
+          const numId = Number(id.trim());
+          return isNaN(numId) ? '' : (genreMap[numId] || '');
+        })
+        .filter(Boolean)
+        .join(', ');
+    }
+    
+    // Handle array format
+    if (Array.isArray(genreIds)) {
+      return genreIds
+        .filter(id => id !== null && id !== undefined)
+        .map(id => {
+          // Handle potential non-number items in array
+          const numId = typeof id === 'number' ? id : Number(id);
+          return isNaN(numId) ? '' : (genreMap[numId] || '');
+        })
+        .filter(Boolean)
+        .join(', ');
+    }
+    
+    // If unknown format, return empty string
+    console.warn('Unknown format for genre IDs:', genreIds);
+    return '';
+  } catch (error) {
+    console.error('Error processing genre IDs:', error, genreIds);
+    return '';
   }
-  
-  return genreIds
-    .map(id => genreMap[id] || '')
-    .filter(Boolean)
-    .join(', ');
 };
 
 // Get title of the movie or TV show
@@ -93,10 +118,24 @@ export const getMediaType = (item: TMDBMovie): string => {
 
 // Format for display with genres
 export const formatMovieDisplay = (item: TMDBMovie): string => {
-  const mediaType = getMediaType(item);
-  const year = getReleaseYear(getReleaseDate(item));
-  const genres = getGenreNames(item.genre_ids, mediaType);
-  return `${year}${genres ? ' • ' + genres : ''}${mediaType === 'tv' ? ' • TV Series' : ''}`;
+  try {
+    // Safely extract information with error handling
+    const mediaType = getMediaType(item);
+    const year = getReleaseYear(getReleaseDate(item));
+    
+    // Check if genre_ids is present and in the expected format
+    let genres = '';
+    if (item.genre_ids && Array.isArray(item.genre_ids)) {
+      genres = getGenreNames(item.genre_ids, mediaType);
+    } else if (item.genre_ids && typeof item.genre_ids === 'string') {
+      genres = getGenreNames(item.genre_ids, mediaType);
+    }
+    
+    return `${year}${genres ? ' • ' + genres : ''}${mediaType === 'tv' ? ' • TV Series' : ''}`;
+  } catch (error) {
+    console.warn('Error formatting movie display info:', error, item);
+    return item.release_date || item.first_air_date || '';
+  }
 };
 
 // Cache for IMDb IDs to avoid repeated API calls

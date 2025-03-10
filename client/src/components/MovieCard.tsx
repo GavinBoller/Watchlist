@@ -17,14 +17,30 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
   const [imdbUrl, setImdbUrl] = useState('');
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
   
-  // Extract movie data
-  const posterUrl = getImageUrl(movie.poster_path);
-  const title = getTitle(movie);
-  const mediaType = getMediaType(movie);
-  const displayInfo = formatMovieDisplay(movie);
+  // Safe data extraction with error handling 
+  let posterUrl, title, mediaType, displayInfo, voteAverage;
   
-  // Format vote average to one decimal place
-  const voteAverage = movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A';
+  try {
+    posterUrl = getImageUrl(movie.poster_path);
+    title = getTitle(movie);
+    mediaType = getMediaType(movie);
+    displayInfo = formatMovieDisplay(movie);
+    
+    // Format vote average to one decimal place with safety checks
+    voteAverage = (movie.vote_average !== undefined && movie.vote_average !== null) 
+      ? (typeof movie.vote_average === 'number' 
+        ? movie.vote_average.toFixed(1) 
+        : String(movie.vote_average))
+      : 'N/A';
+  } catch (error) {
+    console.error('Error processing movie data:', error, movie);
+    // Fallback values
+    posterUrl = null;
+    title = movie.title || movie.name || 'Unknown Title';
+    mediaType = movie.media_type || 'movie';
+    displayInfo = '';
+    voteAverage = 'N/A';
+  }
 
   // Get media type badge text and color
   const typeBadge = mediaType === 'tv' ? 'TV' : 'Movie';

@@ -30,19 +30,69 @@ const SearchPage = () => {
   const { currentUser } = useUserContext();
   const { toast } = useToast();
 
-  // Search query
-  const { data: searchResults, isLoading } = useQuery({ 
+  // Search query with error handling
+  const { data: searchResults, isLoading, error: searchError } = useQuery({ 
     queryKey: ['/api/movies/search', searchQuery, mediaFilter],
-    queryFn: () => searchMovies(searchQuery, mediaFilter),
+    queryFn: async () => {
+      try {
+        const results = await searchMovies(searchQuery, mediaFilter);
+        
+        // Sanitize results to ensure they have the minimal required properties
+        if (results && results.results) {
+          results.results = results.results
+            .filter(item => 
+              item && 
+              typeof item === 'object' && 
+              item.id && 
+              (item.title || item.name)
+            )
+            .map(item => ({
+              ...item,
+              // Ensure media_type is always set
+              media_type: item.media_type || (item.title ? 'movie' : 'tv'),
+              // Make sure vote_average is a number or null
+              vote_average: typeof item.vote_average === 'number' 
+                ? item.vote_average 
+                : (item.vote_average ? parseFloat(String(item.vote_average)) : null),
+              // Ensure genre_ids is always an array
+              genre_ids: Array.isArray(item.genre_ids) 
+                ? item.genre_ids 
+                : (typeof item.genre_ids === 'string' 
+                  ? item.genre_ids.split(',').map(id => parseInt(id, 10)).filter(id => !isNaN(id))
+                  : [])
+            }));
+        }
+        
+        return results;
+      } catch (error) {
+        console.error('Search query error:', error);
+        // Return a valid empty response structure rather than throwing
+        return { page: 1, results: [], total_results: 0, total_pages: 0 };
+      }
+    },
     enabled: !!searchQuery,
+    retry: 1, // Only retry once to avoid hammering the API
   });
 
   // Filter results by media type if needed
-  const filteredResults = searchResults?.results.filter(item => {
+  const filteredResults = searchResults?.results?.filter(item => {
+    // Basic validation of each item in the results
+    if (!item || typeof item !== 'object') {
+      console.warn('Invalid item in search results:', item);
+      return false;
+    }
+    
+    // Only include items with valid id and title/name
+    if (!item.id || (!item.title && !item.name)) {
+      console.warn('Item missing required fields:', item);
+      return false;
+    }
+    
+    // If all validation passes, apply the media type filter
     if (mediaFilter === 'all') return true;
     const itemType = item.media_type || (item.title ? 'movie' : 'tv');
     return itemType === mediaFilter;
-  });
+  }) || [];
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,7 +211,26 @@ const SearchPage = () => {
           {searchQuery && `${filteredResults?.length || 0} Results for "${searchQuery}"`}
         </h2>
         
-        {isLoading ? (
+        {searchError ? (
+          // Error state
+          <div className="text-center py-10 text-gray-400 flex flex-col items-center">
+            <div className="bg-red-900/30 rounded-lg p-4 max-w-md mx-auto mb-4">
+              <p className="text-white font-medium mb-2">Error loading search results</p>
+              <p className="text-sm text-gray-300">Please try again or try a different search term.</p>
+            </div>
+            <Button 
+              variant="outline" 
+              className="mt-2 bg-[#1a1a1a] hover:bg-[#3d3d3d] border-gray-700"
+              onClick={() => {
+                if (searchTerm) {
+                  setSearchQuery(searchTerm);
+                }
+              }}
+            >
+              Try Again
+            </Button>
+          </div>
+        ) : isLoading ? (
           // Skeleton loading state - optimized for mobile
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
             {[...Array(10)].map((_, index) => (
