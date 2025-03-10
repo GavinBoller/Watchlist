@@ -707,6 +707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const status = req.body.status || 'to_watch'; 
       const watchedDate = req.body.watchedDate || null;
       const notes = req.body.notes || '';
+      const platformId = req.body.platformId || null;
       
       // If there's a tmdbMovie but no tmdbId, extract it from the tmdbMovie
       if (!tmdbId && req.body.tmdbMovie && req.body.tmdbMovie.id) {
