@@ -563,7 +563,7 @@ const WatchlistPage = () => {
   
   const statusFilters = [
     { value: 'all', label: 'All', icon: Menu },
-    { value: 'to_watch', label: 'Plan to Watch', icon: Clock },
+    { value: 'to_watch', label: 'To Watch', icon: Clock },
     { value: 'watching', label: 'Watching', icon: PlayCircle },
     { value: 'watched', label: 'Watched', icon: CheckCircle },
   ];
@@ -977,7 +977,7 @@ const WatchlistPage = () => {
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold pr-6">
               {editStatus === 'to_watch' 
-                ? 'Edit Plan to Watch' 
+                ? 'Edit To Watch' 
                 : editStatus === 'watching' 
                   ? 'Edit Currently Watching'
                   : 'Edit Watched'}
@@ -1001,7 +1001,7 @@ const WatchlistPage = () => {
                     <Label htmlFor="edit-status-to-watch" className="flex items-center gap-2 cursor-pointer">
                       <Clock className="h-4 w-4 text-blue-400" />
                       <div>
-                        <div className="font-medium">Plan to Watch</div>
+                        <div className="font-medium">To Watch</div>
                         <div className="text-xs text-gray-400">Save for later</div>
                       </div>
                     </Label>
@@ -1136,7 +1136,7 @@ const WatchlistPage = () => {
                     </div>
                   ) : (
                     editStatus === 'to_watch' 
-                      ? 'Update Plan to Watch' 
+                      ? 'Update To Watch' 
                       : editStatus === 'watching' 
                         ? 'Update Currently Watching'
                         : 'Update Watched'

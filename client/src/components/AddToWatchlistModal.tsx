@@ -634,7 +634,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
                 <Label htmlFor="status-to-watch" className="flex items-center gap-2 cursor-pointer">
                   <Clock className="h-4 w-4 text-blue-400" />
                   <div>
-                    <div className="font-medium">Plan to Watch</div>
+                    <div className="font-medium">To Watch</div>
                     <div className="text-xs text-gray-400">Save for later</div>
                   </div>
                 </Label>
