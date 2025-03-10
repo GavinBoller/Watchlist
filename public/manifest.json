@@ -1,0 +1,17 @@
+{
+  "name": "Watchlist",
+  "short_name": "Watchlist",
+  "icons": [
+    {
+      "src": "/watchlist-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "theme_color": "#141414",
+  "background_color": "#141414", 
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait"
+}

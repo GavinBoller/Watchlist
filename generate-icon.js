@@ -1,60 +1,73 @@
-import fs from 'fs';
 import { createCanvas } from 'canvas';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Create a canvas to draw on
-const size = 512;
-const canvas = createCanvas(size, size);
+// Get current directory in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Create a canvas using Node.js canvas
+const canvas = createCanvas(512, 512);
 const ctx = canvas.getContext('2d');
 
-// Fill the background with dark color
-ctx.fillStyle = '#1a1a1a';
-ctx.fillRect(0, 0, size, size);
+// Fill the canvas with the background color
+ctx.fillStyle = '#141414';
+ctx.fillRect(0, 0, 512, 512);
 
-// Draw film reel icon (matching the one used in the app header)
-const centerX = size / 2;
-const centerY = size / 2;
-const reelRadius = 180;
-
-// Draw main circle
-ctx.strokeStyle = '#E50914'; // Netflix red
-ctx.lineWidth = 16;
+// Draw a rounded rectangle for iOS style
+const cornerRadius = 512 * 0.23; // 23% border radius
 ctx.beginPath();
-ctx.arc(centerX, centerY, reelRadius, 0, Math.PI * 2);
+ctx.moveTo(cornerRadius, 0);
+ctx.lineTo(512 - cornerRadius, 0);
+ctx.quadraticCurveTo(512, 0, 512, cornerRadius);
+ctx.lineTo(512, 512 - cornerRadius);
+ctx.quadraticCurveTo(512, 512, 512 - cornerRadius, 512);
+ctx.lineTo(cornerRadius, 512);
+ctx.quadraticCurveTo(0, 512, 0, 512 - cornerRadius);
+ctx.lineTo(0, cornerRadius);
+ctx.quadraticCurveTo(0, 0, cornerRadius, 0);
+ctx.closePath();
+ctx.clip();
+
+// Draw the film icon
+ctx.strokeStyle = '#E50914';
+ctx.lineWidth = 10;
+ctx.lineCap = 'round';
+ctx.lineJoin = 'round';
+
+// Main rectangle
+ctx.strokeRect(65, 65, 382, 382);
+
+// Vertical lines
+ctx.beginPath();
+ctx.moveTo(153, 65);
+ctx.lineTo(153, 447);
 ctx.stroke();
 
-// Draw film perforations (holes)
-const drawPerforation = (x, y, radius) => {
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fill();
-  ctx.strokeStyle = '#E50914';
-  ctx.lineWidth = 8;
-  ctx.stroke();
-};
+ctx.beginPath();
+ctx.moveTo(359, 65);
+ctx.lineTo(359, 447);
+ctx.stroke();
 
-// Draw the perforations around the circle
-const perforationRadius = 30;
-// Top, bottom, left, right
-drawPerforation(centerX, centerY - reelRadius + perforationRadius, perforationRadius);
-drawPerforation(centerX, centerY + reelRadius - perforationRadius, perforationRadius);
-drawPerforation(centerX - reelRadius + perforationRadius, centerY, perforationRadius);
-drawPerforation(centerX + reelRadius - perforationRadius, centerY, perforationRadius);
+// Horizontal lines
+ctx.beginPath();
+ctx.moveTo(65, 153);
+ctx.lineTo(447, 153);
+ctx.stroke();
 
-// Diagonal perforations
-const diagonalOffset = reelRadius * 0.7;
-drawPerforation(centerX - diagonalOffset, centerY - diagonalOffset, perforationRadius);
-drawPerforation(centerX + diagonalOffset, centerY + diagonalOffset, perforationRadius);
-drawPerforation(centerX - diagonalOffset, centerY + diagonalOffset, perforationRadius);
-drawPerforation(centerX + diagonalOffset, centerY - diagonalOffset, perforationRadius);
+ctx.beginPath();
+ctx.moveTo(65, 359);
+ctx.lineTo(447, 359);
+ctx.stroke();
 
-// Central hub
-drawPerforation(centerX, centerY, 45);
+// Make sure the directory exists
+if (!fs.existsSync(path.join(__dirname, 'public'))) {
+  fs.mkdirSync(path.join(__dirname, 'public'), { recursive: true });
+}
 
-// Convert canvas to PNG buffer
+// Save the canvas as a PNG file
 const buffer = canvas.toBuffer('image/png');
+fs.writeFileSync(path.join(__dirname, 'public', 'watchlist-icon.png'), buffer);
 
-// Save the image
-fs.writeFileSync('./generated-icon.png', buffer);
-
-console.log('Film reel icon generated successfully!');
+console.log('Icon generated successfully!');
