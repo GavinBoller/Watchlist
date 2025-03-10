@@ -601,7 +601,7 @@ const WatchlistPage = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-3">
           <div className="flex flex-row items-center flex-wrap mb-2 md:mb-0">
             <h2 className="text-xl font-bold font-heading flex items-center">
-              Watched
+              Watchlist
               <span className="ml-2 text-sm font-normal text-gray-400">
                 ({stats.total} {stats.total === 1 ? 'item' : 'items'})
               </span>
@@ -911,13 +911,13 @@ const WatchlistPage = () => {
             </div>
             <p className="text-gray-300 font-medium">
               {mediaTypeFilter === 'all' 
-                ? "Your watched list is empty"
-                : `No ${mediaTypeFilter === 'movie' ? 'movies' : 'TV shows'} in your list`
+                ? "Your watchlist is empty"
+                : `No ${mediaTypeFilter === 'movie' ? 'movies' : 'TV shows'} in your watchlist`
               }
             </p>
             <p className="text-gray-400 text-sm mt-1">
               {mediaTypeFilter === 'all' 
-                ? "Search for movies and TV shows to add what you've watched."
+                ? "Search for movies and TV shows to add to your watchlist."
                 : `Switch to the Search tab to add some ${mediaTypeFilter === 'movie' ? 'movies' : 'TV shows'}.`
               }
             </p>
@@ -933,7 +933,7 @@ const WatchlistPage = () => {
           </DialogHeader>
           <div className="py-4 text-center sm:text-left">
             <p className="text-gray-200">
-              Are you sure you want to remove this item from your watched list?
+              Are you sure you want to remove this item from your watchlist?
             </p>
           </div>
           <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-end mt-2">

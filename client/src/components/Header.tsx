@@ -62,7 +62,7 @@ const Header = ({ onTabChange, activeTab }: HeaderProps) => {
         <div className="flex items-center justify-between mb-2 md:mb-0 md:w-1/4">
           <div className="flex items-center">
             <Film className="h-6 w-6 text-[#E50914] mr-2" />
-            <h1 className="text-xl sm:text-2xl font-bold text-[#E50914] tracking-tight">MovieTracker</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#E50914] tracking-tight">Watchlist</h1>
             
             {/* Emergency mode indicator */}
             {isEmergencyMode && (
@@ -121,7 +121,7 @@ const Header = ({ onTabChange, activeTab }: HeaderProps) => {
                     aria-label="Watchlist tab"
                   >
                     <List className={`h-4 w-4 mr-2 ${activeTab === "watchlist" ? "text-[#E50914]" : ""}`} />
-                    <span>Watched</span>
+                    <span>My Watchlist</span>
                   </button>
                 </li>
               </ul>
@@ -151,7 +151,7 @@ const Header = ({ onTabChange, activeTab }: HeaderProps) => {
                     onClick={() => onTabChange("watchlist")}
                   >
                     <List className="h-5 w-5 mr-2" />
-                    Watched
+                    My Watchlist
                   </button>
                 </li>
               </ul>
