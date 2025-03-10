@@ -462,8 +462,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 // Try to fetch the watchlist entries using direct SQL
                 const entryResults = await executeDirectSql(
-                  `SELECT we.*, m.* FROM watchlist_entries we
+                  `SELECT we.*, m.*, p.id as platform_id, p.name as platform_name, p.is_default as platform_is_default
+                   FROM watchlist_entries we
                    JOIN movies m ON we.movie_id = m.id
+                   LEFT JOIN platforms p ON we.platform_id = p.id
                    WHERE we.user_id = $1
                    ORDER BY we.created_at DESC`, 
                   [userId]
@@ -486,16 +488,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       createdAt: row.created_at || new Date().toISOString()
                     };
                     
+                    // Create platform object if platform data exists
+                    let platform = null;
+                    if (row.platform_id) {
+                      platform = {
+                        id: row.platform_id,
+                        name: row.platform_name || 'Unknown Platform',
+                        isDefault: row.platform_is_default || false
+                      };
+                    }
+                    
                     // Structure the watchlist entry
                     return {
                       id: row.id,
                       userId: row.user_id,
                       movieId: row.movie_id,
+                      platformId: row.platform_id || null,
                       status: row.status || 'to_watch',
                       watchedDate: row.watched_date || null,
                       notes: row.notes || '',
                       createdAt: row.created_at || new Date().toISOString(),
-                      movie
+                      movie,
+                      platform
                     };
                   });
                   

@@ -783,6 +783,24 @@ const WatchlistPage = () => {
             </SelectContent>
           </Select>
           
+          <Select value={selectedPlatform} onValueChange={setSelectedPlatform}>
+            <SelectTrigger className="bg-[#292929] text-white border-gray-700 focus:ring-[#E50914] h-10">
+              <SelectValue placeholder="All Platforms" />
+            </SelectTrigger>
+            <SelectContent className="bg-[#292929] text-white border-gray-700 max-h-[50vh]">
+              <SelectItem value="all" className="py-2.5">All Platforms</SelectItem>
+              <SelectItem value="none" className="py-2.5">No Platform</SelectItem>
+              {platforms.sort((a, b) => a.name.localeCompare(b.name)).map((platform) => (
+                <SelectItem key={platform.id} value={platform.id.toString()} className="py-2.5">
+                  {platform.name}
+                  {platform.isDefault && (
+                    <span className="ml-2 text-xs text-green-500">(Default)</span>
+                  )}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
           <Select value={sortOrder} onValueChange={setSortOrder}>
             <SelectTrigger className="bg-[#292929] text-white border-gray-700 focus:ring-[#E50914] h-10">
               <SelectValue placeholder="Sort By" />
@@ -866,6 +884,7 @@ const WatchlistPage = () => {
                     onClick={() => {
                       setSearchQuery('');
                       setSelectedGenre('all');
+                      setSelectedPlatform('all');
                       setMediaTypeFilter('all');
                     }}
                     className="w-full py-2.5 h-12 text-base bg-gray-800 border-gray-600"
