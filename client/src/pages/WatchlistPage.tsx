@@ -1058,16 +1058,19 @@ const WatchlistPage = () => {
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700">
                     <SelectItem value="none">No platform</SelectItem>
-                    {platforms.map((platform) => (
-                      <SelectItem key={platform.id} value={platform.id.toString()}>
-                        <div className="flex items-center">
-                          {platform.name}
-                          {platform.isDefault && (
-                            <span className="ml-2 bg-green-700 text-white text-xs px-1.5 py-0.5 rounded-full">Default</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {platforms
+                      .slice() // Create a copy to avoid mutating the original array
+                      .sort((a, b) => a.name.localeCompare(b.name)) // Sort alphabetically by name
+                      .map((platform) => (
+                        <SelectItem key={platform.id} value={platform.id.toString()}>
+                          <div className="flex items-center">
+                            {platform.name}
+                            {platform.isDefault && (
+                              <span className="ml-2 bg-green-700 text-white text-xs px-1.5 py-0.5 rounded-full">Default</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 <div className="mt-2 text-xs text-gray-400 flex items-center">

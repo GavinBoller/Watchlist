@@ -678,11 +678,14 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
                   {loadingPlatforms ? 'Loading platforms...' : platforms.length === 0 ? 'No platforms added yet' : 'Your platforms'}
                 </div>
                 <SelectItem value="none">No platform</SelectItem>
-                {platforms.map((platform) => (
-                  <SelectItem key={platform.id} value={platform.id.toString()}>
-                    {platform.name} {platform.isDefault && '(Default)'}
-                  </SelectItem>
-                ))}
+                {platforms
+                  .slice() // Create a copy to avoid mutating the original array
+                  .sort((a, b) => a.name.localeCompare(b.name)) // Sort alphabetically by name
+                  .map((platform) => (
+                    <SelectItem key={platform.id} value={platform.id.toString()}>
+                      {platform.name} {platform.isDefault && '(Default)'}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
