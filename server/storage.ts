@@ -1822,14 +1822,28 @@ export class DatabaseStorage implements IStorage {
       
       const result: WatchlistEntryWithMovie[] = [];
       
-      // Load movie data for each entry
+      // Load movie data and platform data for each entry
       for (const entry of entries) {
         try {
           const [movie] = await db.select().from(movies).where(eq(movies.id, entry.movieId));
+          
+          // Get platform data if platformId exists
+          let platform = undefined;
+          if (entry.platformId) {
+            try {
+              const [platformData] = await db.select().from(platforms).where(eq(platforms.id, entry.platformId));
+              platform = platformData;
+            } catch (platformError) {
+              console.error(`Error fetching platform ${entry.platformId} for watchlist entry ${entry.id}:`, platformError);
+              // Continue without platform data rather than failing
+            }
+          }
+          
           if (movie) {
             result.push({
               ...entry,
-              movie
+              movie,
+              platform
             });
           }
         } catch (movieError) {
@@ -1841,10 +1855,30 @@ export class DatabaseStorage implements IStorage {
               [entry.movieId],
               'Failed to retrieve movie for watchlist entry'
             );
+            
+            // Get platform data if platformId exists
+            let platform = undefined;
+            if (entry.platformId) {
+              try {
+                const platforms = await executeDirectSql<Platform>(
+                  'SELECT * FROM "platforms" WHERE "id" = $1 LIMIT 1',
+                  [entry.platformId],
+                  'Failed to retrieve platform for watchlist entry'
+                );
+                if (platforms.length > 0) {
+                  platform = platforms[0];
+                }
+              } catch (platformError) {
+                console.error(`Failed to fetch platform ${entry.platformId} for watchlist entry ${entry.id}:`, platformError);
+                // Continue without platform data rather than failing
+              }
+            }
+            
             if (movies.length > 0) {
               result.push({
                 ...entry,
-                movie: movies[0]
+                movie: movies[0],
+                platform
               });
             }
           } catch (fallbackError) {
@@ -1871,7 +1905,7 @@ export class DatabaseStorage implements IStorage {
           
           const result: WatchlistEntryWithMovie[] = [];
           
-          // Load movie data for each entry
+          // Load movie data and platform data for each entry
           for (const entry of entries) {
             try {
               const movies = await executeDirectSql<Movie>(
@@ -1880,10 +1914,29 @@ export class DatabaseStorage implements IStorage {
                 'Failed to retrieve movie for watchlist entry'
               );
               
+              // Get platform data if platformId exists
+              let platform = undefined;
+              if (entry.platformId) {
+                try {
+                  const platforms = await executeDirectSql<Platform>(
+                    'SELECT * FROM "platforms" WHERE "id" = $1 LIMIT 1',
+                    [entry.platformId],
+                    'Failed to retrieve platform for watchlist entry'
+                  );
+                  if (platforms.length > 0) {
+                    platform = platforms[0];
+                  }
+                } catch (platformError) {
+                  console.error(`Failed to fetch platform ${entry.platformId} for watchlist entry ${entry.id}:`, platformError);
+                  // Continue without platform data rather than failing
+                }
+              }
+              
               if (movies.length > 0) {
                 result.push({
                   ...entry,
-                  movie: movies[0]
+                  movie: movies[0],
+                  platform
                 });
               }
             } catch (movieError) {
