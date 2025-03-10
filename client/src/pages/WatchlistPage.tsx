@@ -92,6 +92,20 @@ const WatchlistPage = () => {
   const [hasAutoRefreshed, setHasAutoRefreshed] = useState(false);
   
   // Effect for mobile Safari auto-refresh
+  // Listen for custom event to open platform management modal
+  useEffect(() => {
+    const handleOpenPlatformManagement = () => {
+      console.log('[PLATFORM] Received openPlatformManagement event');
+      setIsPlatformModalOpen(true);
+    };
+    
+    window.addEventListener('openPlatformManagement', handleOpenPlatformManagement);
+    
+    return () => {
+      window.removeEventListener('openPlatformManagement', handleOpenPlatformManagement);
+    };
+  }, []);
+  
   useEffect(() => {
     if (isMobileSafari && currentUser && !hasAutoRefreshed) {
       // Brief delay to let page fully load before refresh
@@ -948,7 +962,23 @@ const WatchlistPage = () => {
               )}
               
               <div className="mb-4">
-                <Label htmlFor="edit-platform" className="text-sm font-medium mb-2 block">Platform (optional)</Label>
+                <div className="flex items-center justify-between mb-2">
+                  <Label htmlFor="edit-platform" className="text-sm font-medium">Platform (optional)</Label>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      // Dispatch custom event to open platform management
+                      window.dispatchEvent(new CustomEvent('openPlatformManagement'));
+                    }}
+                    className="text-xs h-7 px-2 py-0 bg-gray-800 hover:bg-gray-700 text-gray-200"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Manage Platforms
+                  </Button>
+                </div>
                 <Select 
                   value={editPlatformId ? editPlatformId.toString() : ''} 
                   onValueChange={(value) => setEditPlatformId(value ? parseInt(value) : null)}
@@ -1047,6 +1077,22 @@ const WatchlistPage = () => {
               title: "Already in watched list",
               description: "This item is already in your watched list",
             });
+          }}
+        />
+      )}
+
+      {/* Platform Management Modal */}
+      {currentUser && (
+        <PlatformManagementModal
+          isOpen={isPlatformModalOpen}
+          onClose={() => setIsPlatformModalOpen(false)}
+          onPlatformsUpdated={() => {
+            if (currentUser) {
+              // Refresh platforms when updates are made
+              fetchPlatforms(currentUser.id);
+              // Also refresh watchlist to update platform names displayed
+              queryClient.invalidateQueries({ queryKey: [`/api/watchlist/${currentUser.id}`] });
+            }
           }}
         />
       )}

@@ -53,21 +53,9 @@ export const PlatformManagementModal = ({
     }
   }, [isOpen, user]);
   
-  // Listen for custom event to open the platform management modal from other components
-  useEffect(() => {
-    const handleOpenPlatformManagement = () => {
-      // If this component receives the event to open, we need to notify the parent
-      if (!isOpen) {
-        onClose(); // This actually opens the modal since onClose is used to toggle state
-      }
-    };
-    
-    window.addEventListener('openPlatformManagement', handleOpenPlatformManagement);
-    
-    return () => {
-      window.removeEventListener('openPlatformManagement', handleOpenPlatformManagement);
-    };
-  }, [isOpen, onClose]);
+  // This component no longer needs to listen for the custom event directly
+  // The WatchlistPage will handle that and set the isPlatformModalOpen state
+  // which gets passed to this component via the isOpen prop
 
   const fetchPlatforms = async () => {
     if (!user) return;
