@@ -60,7 +60,8 @@ export const PlatformManagementModal = ({
     setErrorMessage(null);
     
     try {
-      const data = await apiRequest<Platform[]>(`/api/platforms/${user.id}`);
+      const response = await apiRequest('GET', `/api/platforms/${user.id}`);
+      const data = await response.json();
       setPlatforms(data);
     } catch (error) {
       console.error('Failed to fetch platforms:', error);
@@ -91,10 +92,7 @@ export const PlatformManagementModal = ({
         userId: user.id
       };
       
-      await apiRequest('/api/platforms', {
-        method: 'POST',
-        body: JSON.stringify(platformData)
-      });
+      await apiRequest('POST', '/api/platforms', platformData);
       
       setNewPlatform({
         name: '',
@@ -129,10 +127,7 @@ export const PlatformManagementModal = ({
     setErrorMessage(null);
     
     try {
-      await apiRequest(`/api/platforms/${editingPlatform.id}`, {
-        method: 'PUT',
-        body: JSON.stringify(editingPlatform)
-      });
+      await apiRequest('PUT', `/api/platforms/${editingPlatform.id}`, editingPlatform);
       
       setEditingPlatform(null);
       fetchPlatforms();
@@ -162,9 +157,7 @@ export const PlatformManagementModal = ({
     setErrorMessage(null);
     
     try {
-      await apiRequest(`/api/platforms/${id}`, {
-        method: 'DELETE'
-      });
+      await apiRequest('DELETE', `/api/platforms/${id}`);
       
       fetchPlatforms();
       onPlatformsUpdated();
@@ -237,7 +230,7 @@ export const PlatformManagementModal = ({
                       </div>
                       <div className="flex items-center space-x-2 pt-1">
                         <Switch 
-                          checked={editingPlatform.isDefault} 
+                          checked={editingPlatform.isDefault === true} 
                           onCheckedChange={(checked) => setEditingPlatform({
                             ...editingPlatform,
                             isDefault: checked
