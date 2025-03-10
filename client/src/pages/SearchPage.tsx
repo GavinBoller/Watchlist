@@ -78,6 +78,13 @@ const SearchPage = () => {
 
   return (
     <div>
+      {/* Introduction Text */}
+      <div className="max-w-2xl mx-auto text-center mb-4 px-3">
+        <h2 className="text-lg sm:text-xl font-bold mb-2">
+          Search for movies and TV shows to get started
+        </h2>
+      </div>
+
       {/* Search Bar */}
       <div className="max-w-2xl mx-auto mb-4 px-3">
         <form className="relative" onSubmit={handleSearch}>
@@ -150,10 +157,8 @@ const SearchPage = () => {
 
       {/* Search Results */}
       <div className="mt-4 px-3">
-        <h2 className={`text-lg sm:text-xl font-bold mb-4 ${searchQuery ? '' : 'opacity-50'}`}>
-          {searchQuery 
-            ? `${filteredResults?.length || 0} Results for "${searchQuery}"` 
-            : 'Search for movies and TV shows to get started'}
+        <h2 className={`text-lg sm:text-xl font-bold mb-4 ${searchQuery ? '' : 'hidden'}`}>
+          {searchQuery && `${filteredResults?.length || 0} Results for "${searchQuery}"`}
         </h2>
         
         {isLoading ? (
