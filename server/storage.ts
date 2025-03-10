@@ -9,7 +9,7 @@ import Database from 'better-sqlite3';
 import { join } from 'path';
 import fs from 'fs';
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 
 // Ensure data directory exists
 const dataDir = join('.', 'data');
@@ -834,6 +834,7 @@ export class MemStorage implements IStorage {
     const entry: WatchlistEntry = {
       userId: insertEntry.userId,
       movieId: insertEntry.movieId,
+      platformId: insertEntry.platformId || null,
       watchedDate: insertEntry.watchedDate || null,
       notes: insertEntry.notes || null,
       status: insertEntry.status || 'to_watch',
@@ -872,6 +873,273 @@ import { executeDirectSql } from './db';
 export class DatabaseStorage implements IStorage {
   // Emergency fallback memory storage for complete database failures
   private emergencyMemoryStorage: MemStorage | null = null;
+  
+  // Platform operations
+  async getPlatform(id: number): Promise<Platform | undefined> {
+    try {
+      const [platform] = await db.select().from(platforms).where(eq(platforms.id, id));
+      return platform || undefined;
+    } catch (error) {
+      console.error("Database error in getPlatform:", error);
+      
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          const rows = await executeDirectSql<Platform>(
+            'SELECT * FROM "platforms" WHERE "id" = $1 LIMIT 1',
+            [id],
+            'Failed to retrieve platform'
+          );
+          return rows[0] || undefined;
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback failed for getPlatform:", fallbackError);
+          return undefined;
+        }
+      }
+      
+      return undefined;
+    }
+  }
+
+  async getPlatforms(userId: number): Promise<Platform[]> {
+    try {
+      return await db.select().from(platforms).where(eq(platforms.userId, userId));
+    } catch (error) {
+      console.error("Database error in getPlatforms:", error);
+      
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          return await executeDirectSql<Platform>(
+            'SELECT * FROM "platforms" WHERE "userId" = $1',
+            [userId],
+            'Failed to retrieve platforms'
+          );
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback failed for getPlatforms:", fallbackError);
+          return [];
+        }
+      }
+      
+      return [];
+    }
+  }
+
+  async getDefaultPlatform(userId: number): Promise<Platform | undefined> {
+    try {
+      const [platform] = await db
+        .select()
+        .from(platforms)
+        .where(and(eq(platforms.userId, userId), eq(platforms.isDefault, true)));
+      return platform || undefined;
+    } catch (error) {
+      console.error("Database error in getDefaultPlatform:", error);
+      
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          const rows = await executeDirectSql<Platform>(
+            'SELECT * FROM "platforms" WHERE "userId" = $1 AND "isDefault" = TRUE LIMIT 1',
+            [userId],
+            'Failed to retrieve default platform'
+          );
+          return rows[0] || undefined;
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback failed for getDefaultPlatform:", fallbackError);
+          return undefined;
+        }
+      }
+      
+      return undefined;
+    }
+  }
+
+  async createPlatform(platform: InsertPlatform): Promise<Platform> {
+    try {
+      // If this is set as default, unset any existing default platforms for this user
+      if (platform.isDefault) {
+        try {
+          await db
+            .update(platforms)
+            .set({ isDefault: false })
+            .where(and(eq(platforms.userId, platform.userId), eq(platforms.isDefault, true)));
+        } catch (updateError) {
+          console.error("Failed to update existing default platforms:", updateError);
+          
+          if (this.shouldUseDirectSqlFallback(updateError)) {
+            await executeDirectSql(
+              'UPDATE "platforms" SET "isDefault" = FALSE WHERE "userId" = $1 AND "isDefault" = TRUE',
+              [platform.userId],
+              'Failed to update existing default platforms'
+            );
+          }
+        }
+      }
+      
+      // Create the new platform
+      const [newPlatform] = await db.insert(platforms).values(platform).returning();
+      return newPlatform;
+    } catch (error) {
+      console.error("Database error in createPlatform:", error);
+      
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          // If this is set as default, unset any existing default platforms for this user
+          if (platform.isDefault) {
+            await executeDirectSql(
+              'UPDATE "platforms" SET "isDefault" = FALSE WHERE "userId" = $1 AND "isDefault" = TRUE',
+              [platform.userId],
+              'Failed to update existing default platforms'
+            );
+          }
+          
+          const rows = await executeDirectSql<Platform>(
+            'INSERT INTO "platforms" ("userId", "name", "logoUrl", "isDefault") VALUES ($1, $2, $3, $4) RETURNING *',
+            [platform.userId, platform.name, platform.logoUrl || null, platform.isDefault || false],
+            'Failed to create platform'
+          );
+          
+          if (rows.length === 0) {
+            throw new Error('Platform creation did not return any data');
+          }
+          
+          return rows[0];
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback failed for createPlatform:", fallbackError);
+          throw fallbackError;
+        }
+      }
+      
+      throw error;
+    }
+  }
+
+  async updatePlatform(id: number, updates: Partial<InsertPlatform>): Promise<Platform | undefined> {
+    try {
+      // Get the existing platform first
+      const existingPlatform = await this.getPlatform(id);
+      if (!existingPlatform) {
+        return undefined;
+      }
+      
+      // If this is being set as default, unset any existing default platforms for this user
+      if (updates.isDefault) {
+        try {
+          await db
+            .update(platforms)
+            .set({ isDefault: false })
+            .where(
+              and(
+                eq(platforms.userId, existingPlatform.userId),
+                eq(platforms.isDefault, true),
+                ne(platforms.id, id)
+              )
+            );
+        } catch (updateError) {
+          console.error("Failed to update existing default platforms:", updateError);
+          
+          if (this.shouldUseDirectSqlFallback(updateError)) {
+            await executeDirectSql(
+              'UPDATE "platforms" SET "isDefault" = FALSE WHERE "userId" = $1 AND "isDefault" = TRUE AND "id" != $2',
+              [existingPlatform.userId, id],
+              'Failed to update existing default platforms'
+            );
+          }
+        }
+      }
+      
+      // Update the platform
+      const [updatedPlatform] = await db
+        .update(platforms)
+        .set(updates)
+        .where(eq(platforms.id, id))
+        .returning();
+      
+      return updatedPlatform;
+    } catch (error) {
+      console.error("Database error in updatePlatform:", error);
+      
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          // Get the existing platform first
+          const existingPlatform = await this.getPlatform(id);
+          if (!existingPlatform) {
+            return undefined;
+          }
+          
+          // If this is being set as default, unset any existing default platforms for this user
+          if (updates.isDefault) {
+            await executeDirectSql(
+              'UPDATE "platforms" SET "isDefault" = FALSE WHERE "userId" = $1 AND "isDefault" = TRUE AND "id" != $2',
+              [existingPlatform.userId, id],
+              'Failed to update existing default platforms'
+            );
+          }
+          
+          // Build the SET clause dynamically
+          const setClauses = [];
+          const params = [];
+          
+          if (updates.name !== undefined) {
+            setClauses.push('"name" = $' + (params.length + 1));
+            params.push(updates.name);
+          }
+          
+          if (updates.logoUrl !== undefined) {
+            setClauses.push('"logoUrl" = $' + (params.length + 1));
+            params.push(updates.logoUrl);
+          }
+          
+          if (updates.isDefault !== undefined) {
+            setClauses.push('"isDefault" = $' + (params.length + 1));
+            params.push(updates.isDefault);
+          }
+          
+          if (setClauses.length === 0) {
+            return existingPlatform;
+          }
+          
+          // Add the ID parameter
+          params.push(id);
+          
+          const rows = await executeDirectSql<Platform>(
+            `UPDATE "platforms" SET ${setClauses.join(', ')} WHERE "id" = $${params.length} RETURNING *`,
+            params,
+            'Failed to update platform'
+          );
+          
+          return rows[0] || undefined;
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback failed for updatePlatform:", fallbackError);
+          return undefined;
+        }
+      }
+      
+      return undefined;
+    }
+  }
+
+  async deletePlatform(id: number): Promise<boolean> {
+    try {
+      const result = await db.delete(platforms).where(eq(platforms.id, id));
+      return true;
+    } catch (error) {
+      console.error("Database error in deletePlatform:", error);
+      
+      if (this.shouldUseDirectSqlFallback(error)) {
+        try {
+          await executeDirectSql(
+            'DELETE FROM "platforms" WHERE "id" = $1',
+            [id],
+            'Failed to delete platform'
+          );
+          return true;
+        } catch (fallbackError) {
+          console.error("Direct SQL fallback failed for deletePlatform:", fallbackError);
+          return false;
+        }
+      }
+      
+      return false;
+    }
+  }
   /**
    * Direct SQL query method for emergency operations
    * This provides a bypass when ORM operations are failing
