@@ -555,7 +555,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent 
-        className={`bg-[#292929] text-white border-gray-700 ${isMobile ? 'max-w-[95vw] p-4' : 'sm:max-w-md'}`}
+        className={`bg-[#292929] text-white border-gray-700 ${isMobile ? 'p-4 pb-6' : 'sm:max-w-md'}`}
         aria-labelledby="dialog-title"
         aria-describedby="dialog-description"
       >
