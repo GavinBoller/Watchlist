@@ -437,6 +437,7 @@ const WatchlistPage = () => {
         notes: editNotes || null,
         status: editStatus,
         platformId: editPlatformId,
+        userId: currentUser?.id, // Add userId to ensure server-side validation passes
       });
       
       const statusLabel = editStatus === 'to_watch' 
