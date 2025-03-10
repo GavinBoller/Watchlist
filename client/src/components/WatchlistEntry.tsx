@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { WatchlistEntryWithMovie } from '@shared/schema';
 import { getImageUrl, getGenreNames, getIMDbUrl } from '@/api/tmdb';
-import { Star, Trash2, Edit, Info, Calendar, Tv2, Film, ExternalLink } from 'lucide-react';
+import { Star, Trash2, Edit, Info, Calendar, Tv2, Film, ExternalLink, Monitor } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useState, useEffect } from 'react';
 
@@ -13,7 +13,7 @@ interface WatchlistEntryProps {
 }
 
 const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEntryProps) => {
-  const { movie, watchedDate, id, notes } = entry;
+  const { movie, watchedDate, id, notes, platform } = entry;
   const isMobile = useIsMobile();
   const [imdbUrl, setImdbUrl] = useState<string>('');
   const [isLoadingUrl, setIsLoadingUrl] = useState<boolean>(false);
@@ -98,6 +98,15 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
           <MediaTypeIcon className="h-3 w-3 mr-1 flex-shrink-0" />
           <span className="truncate">{year}{genres ? ` • ${genres}` : ''}</span>
         </div>
+        
+        {/* Platform */}
+        {platform && (
+          <div className="mt-2 flex items-center text-xs text-gray-300">
+            <Monitor className="h-3 w-3 mr-1 flex-shrink-0" />
+            <span className="whitespace-nowrap">Platform:</span> 
+            <span className="text-green-400 ml-1 truncate">{platform.name}</span>
+          </div>
+        )}
         
         {/* Watched date */}
         <div className="mt-2 flex items-center text-xs text-gray-300">
