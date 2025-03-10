@@ -1118,18 +1118,45 @@ export class DatabaseStorage implements IStorage {
 
   async deletePlatform(id: number): Promise<boolean> {
     try {
+      // First, we should reset any watchlist entries that use this platform
+      try {
+        await db.update(watchlistEntries)
+          .set({ platformId: null })
+          .where(eq(watchlistEntries.platformId, id));
+        console.log(`[STORAGE] Reset platformId to null for watchlist entries using platform ${id}`);
+      } catch (updateError) {
+        console.warn(`[STORAGE] Error resetting platformId for watchlist entries: ${updateError}`);
+        // Continue with deletion even if this fails
+      }
+      
+      // Now delete the platform
       const result = await db.delete(platforms).where(eq(platforms.id, id));
+      console.log(`[STORAGE] Successfully deleted platform ${id}`);
       return true;
     } catch (error) {
       console.error("Database error in deletePlatform:", error);
       
       if (this.shouldUseDirectSqlFallback(error)) {
         try {
+          // First reset platformId in watchlist entries
+          try {
+            await executeDirectSql(
+              'UPDATE "watchlist_entries" SET "platform_id" = NULL WHERE "platform_id" = $1',
+              [id],
+              'Failed to reset platform references'
+            );
+          } catch (resetError) {
+            console.warn(`[STORAGE] Direct SQL fallback failed for resetting platformId: ${resetError}`);
+            // Continue with deletion even if this fails
+          }
+          
+          // Now delete the platform
           await executeDirectSql(
             'DELETE FROM "platforms" WHERE "id" = $1',
             [id],
             'Failed to delete platform'
           );
+          console.log(`[STORAGE] Successfully deleted platform ${id} using direct SQL`);
           return true;
         } catch (fallbackError) {
           console.error("Direct SQL fallback failed for deletePlatform:", fallbackError);
