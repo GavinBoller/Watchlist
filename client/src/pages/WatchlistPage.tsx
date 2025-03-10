@@ -107,6 +107,13 @@ const WatchlistPage = () => {
     };
   }, []);
   
+  // Load platforms data when component mounts
+  useEffect(() => {
+    if (currentUser) {
+      fetchPlatforms(currentUser.id);
+    }
+  }, [currentUser]);
+
   useEffect(() => {
     if (isMobileSafari && currentUser && !hasAutoRefreshed) {
       // Brief delay to let page fully load before refresh
