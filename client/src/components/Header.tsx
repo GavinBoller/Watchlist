@@ -1,7 +1,11 @@
 import UserSelector from "./UserSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Search, List, Film, AlertTriangle } from "lucide-react";
+import { Search, List, Film, AlertTriangle, Monitor } from "lucide-react";
 import { useEffect, useState } from "react";
+import { PlatformManagementModal } from "./PlatformManagementModal";
+import { useUserContext } from "@/lib/user-context";
+import { useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
 
 interface HeaderProps {
   onTabChange: (tab: "search" | "watchlist") => void;
@@ -11,6 +15,19 @@ interface HeaderProps {
 const Header = ({ onTabChange, activeTab }: HeaderProps) => {
   const isMobile = useIsMobile();
   const [isEmergencyMode, setIsEmergencyMode] = useState(false);
+  const [isPlatformModalOpen, setIsPlatformModalOpen] = useState(false);
+  const { currentUser } = useUserContext();
+  const queryClient = useQueryClient();
+  
+  // Function to fetch platforms when needed
+  const fetchPlatforms = async (userId: number) => {
+    try {
+      // Invalidate the platforms query to ensure we have the latest data
+      queryClient.invalidateQueries({ queryKey: [`/api/platforms/${userId}`] });
+    } catch (error) {
+      console.error('Error fetching platforms:', error);
+    }
+  };
   
   // Check if we're using emergency authentication
   useEffect(() => {
@@ -55,8 +72,21 @@ const Header = ({ onTabChange, activeTab }: HeaderProps) => {
             )}
           </div>
           
-          {/* Mobile user selector */}
-          <UserSelector isMobile={true} />
+          {/* Mobile user selector and platform button */}
+          <div className="flex items-center gap-2">
+            {currentUser && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center p-2 h-8"
+                onClick={() => setIsPlatformModalOpen(true)}
+                aria-label="Manage Platforms"
+              >
+                <Monitor className="h-4 w-4" />
+              </Button>
+            )}
+            <UserSelector isMobile={true} />
+          </div>
         </div>
         
         <div className="flex flex-col md:flex-row md:items-center md:space-x-6 space-y-2 md:space-y-0">
@@ -127,8 +157,39 @@ const Header = ({ onTabChange, activeTab }: HeaderProps) => {
             )}
           </nav>
           
-          {/* Desktop user selector */}
-          {!isMobile && <UserSelector />}
+          {/* Platform management and user selector */}
+          {!isMobile && (
+            <div className="flex items-center gap-3">
+              {/* Platform Management Button */}
+              {currentUser && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-1"
+                  onClick={() => setIsPlatformModalOpen(true)}
+                  aria-label="Manage Platforms"
+                >
+                  <Monitor className="h-4 w-4" />
+                  <span className="hidden sm:inline">Platforms</span>
+                </Button>
+              )}
+              <UserSelector />
+            </div>
+          )}
+          
+          {/* Platform Management Modal */}
+          {currentUser && (
+            <PlatformManagementModal
+              isOpen={isPlatformModalOpen}
+              onClose={() => setIsPlatformModalOpen(false)}
+              onPlatformsUpdated={() => {
+                // Invalidate platforms query to refresh the data
+                if (currentUser?.id) {
+                  queryClient.invalidateQueries({ queryKey: [`/api/platforms/${currentUser.id}`] });
+                }
+              }}
+            />
+          )}
         </div>
       </div>
     </header>

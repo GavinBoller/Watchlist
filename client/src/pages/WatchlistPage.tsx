@@ -440,7 +440,7 @@ const WatchlistPage = () => {
       });
       
       const statusLabel = editStatus === 'to_watch' 
-        ? 'plan to watch list' 
+        ? 'to watch list' 
         : editStatus === 'watching' 
           ? 'currently watching list'
           : 'watched list';

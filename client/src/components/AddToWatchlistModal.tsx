@@ -576,7 +576,7 @@ export const AddToWatchlistModal = ({ item, isOpen, onClose }: AddToWatchlistMod
           <DialogDescription className="text-gray-400" id="dialog-description">
             Add this {mediaTypeLabel.toLowerCase()} to your {
               status === 'to_watch' 
-                ? 'plan to watch' 
+                ? 'to watch' 
                 : status === 'watching' 
                   ? 'currently watching'
                   : 'watched'
