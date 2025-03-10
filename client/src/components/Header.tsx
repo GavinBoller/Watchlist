@@ -57,8 +57,9 @@ const Header = ({ onTabChange, activeTab }: HeaderProps) => {
 
   return (
     <header className="bg-[#141414] border-b border-[#292929] sticky top-0 z-50 ios-safe-area-padding">
-      <div className="container mx-auto px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center justify-between mb-2 md:mb-0">
+      <div className="container mx-auto px-4 py-3 flex flex-col md:flex-row md:items-center">
+        {/* Logo area - left aligned in desktop */}
+        <div className="flex items-center justify-between mb-2 md:mb-0 md:w-1/4">
           <div className="flex items-center">
             <Film className="h-6 w-6 text-[#E50914] mr-2" />
             <h1 className="text-xl sm:text-2xl font-bold text-[#E50914] tracking-tight">MovieTracker</h1>
@@ -73,7 +74,7 @@ const Header = ({ onTabChange, activeTab }: HeaderProps) => {
           </div>
           
           {/* Mobile user selector and platform button */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 md:hidden">
             {currentUser && (
               <Button
                 variant="outline"
@@ -89,9 +90,9 @@ const Header = ({ onTabChange, activeTab }: HeaderProps) => {
           </div>
         </div>
         
-        <div className="flex flex-col md:flex-row md:items-center md:space-x-6 space-y-2 md:space-y-0">
-          {/* Navigation */}
-          <nav className="w-full">
+        <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:justify-between md:flex-1">
+          {/* Navigation - center aligned in desktop */}
+          <nav className="w-full md:w-auto md:mx-auto">
             {isMobile ? (
               // Mobile navigation - full width tab buttons with icons
               <ul className="grid grid-cols-2 gap-1 bg-[#1a1a1a] rounded-lg p-1">
@@ -125,31 +126,31 @@ const Header = ({ onTabChange, activeTab }: HeaderProps) => {
                 </li>
               </ul>
             ) : (
-              // Desktop navigation - underlined tabs
-              <ul className="flex space-x-4">
+              // Desktop navigation - centered with larger, more prominent tabs
+              <ul className="flex space-x-8">
                 <li>
                   <button 
-                    className={`px-1 py-2 font-medium border-b-2 flex items-center ${
+                    className={`px-3 py-2 font-medium border-b-2 flex items-center text-base ${
                       activeTab === "search" 
                         ? "border-[#E50914] text-white" 
                         : "border-transparent text-[#E5E5E5] hover:text-white transition"
                     }`}
                     onClick={() => onTabChange("search")}
                   >
-                    <Search className="h-4 w-4 mr-2" />
+                    <Search className="h-5 w-5 mr-2" />
                     Search
                   </button>
                 </li>
                 <li>
                   <button 
-                    className={`px-1 py-2 font-medium border-b-2 flex items-center ${
+                    className={`px-3 py-2 font-medium border-b-2 flex items-center text-base ${
                       activeTab === "watchlist" 
                         ? "border-[#E50914] text-white" 
                         : "border-transparent text-[#E5E5E5] hover:text-white transition"
                     }`}
                     onClick={() => onTabChange("watchlist")}
                   >
-                    <List className="h-4 w-4 mr-2" />
+                    <List className="h-5 w-5 mr-2" />
                     Watched
                   </button>
                 </li>
@@ -157,9 +158,9 @@ const Header = ({ onTabChange, activeTab }: HeaderProps) => {
             )}
           </nav>
           
-          {/* Platform management and user selector */}
+          {/* Platform management and user selector - right aligned in desktop */}
           {!isMobile && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 md:w-1/4 md:justify-end">
               {/* Platform Management Button */}
               {currentUser && (
                 <Button
