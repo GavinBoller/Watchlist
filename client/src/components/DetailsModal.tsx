@@ -9,9 +9,16 @@ interface DetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddToWatchlist: (item: TMDBMovie) => void;
+  showAddToWatchlistButton?: boolean;
 }
 
-export const DetailsModal = ({ item, isOpen, onClose, onAddToWatchlist }: DetailsModalProps) => {
+export const DetailsModal = ({ 
+  item, 
+  isOpen, 
+  onClose, 
+  onAddToWatchlist,
+  showAddToWatchlistButton = true 
+}: DetailsModalProps) => {
   const isMobile = useIsMobile();
   if (!item) return null;
 
@@ -92,13 +99,15 @@ export const DetailsModal = ({ item, isOpen, onClose, onAddToWatchlist }: Detail
               
               {/* Action buttons - stacked on mobile, row on desktop */}
               <div className={`flex ${isMobile ? 'flex-col gap-3 mt-4' : 'flex-row gap-2 mt-2'}`}>
-                <button 
-                  className={`bg-[#E50914] text-white ${isMobile ? 'py-3' : 'py-2'} px-4 rounded-lg hover:bg-red-700 transition w-full flex items-center justify-center font-medium`}
-                  onClick={handleAddToWatchlist}
-                >
-                  <Plus className="h-5 w-5 mr-2" />
-                  Add to Watchlist
-                </button>
+                {showAddToWatchlistButton && (
+                  <button 
+                    className={`bg-[#E50914] text-white ${isMobile ? 'py-3' : 'py-2'} px-4 rounded-lg hover:bg-red-700 transition w-full flex items-center justify-center font-medium`}
+                    onClick={handleAddToWatchlist}
+                  >
+                    <Plus className="h-5 w-5 mr-2" />
+                    Add to Watchlist
+                  </button>
+                )}
                 
                 <button
                   type="button"
