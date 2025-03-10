@@ -79,8 +79,8 @@ const SearchPage = () => {
   return (
     <div>
       {/* Introduction Text */}
-      <div className="max-w-2xl mx-auto text-center mb-4 px-3">
-        <h2 className="text-lg sm:text-xl font-bold mb-2">
+      <div className="max-w-2xl mx-auto text-center mt-6 mb-6 px-3">
+        <h2 className="text-lg sm:text-xl font-bold">
           Search for movies and TV shows to get started
         </h2>
       </div>
