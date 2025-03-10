@@ -48,10 +48,10 @@ const WatchlistPage = () => {
   const [editPlatformId, setEditPlatformId] = useState<number | null>(null);
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [loadingPlatforms, setLoadingPlatforms] = useState(false);
+  const [isPlatformModalOpen, setIsPlatformModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<WatchlistEntryWithMovie | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [isPlatformModalOpen, setIsPlatformModalOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
