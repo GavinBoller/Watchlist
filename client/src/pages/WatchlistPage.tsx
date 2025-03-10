@@ -949,6 +949,7 @@ const WatchlistPage = () => {
           item={createTMDBMovieFromEntry(selectedEntry)}
           isOpen={isDetailsModalOpen}
           onClose={() => setIsDetailsModalOpen(false)}
+          showAddToWatchlistButton={false}
           onAddToWatchlist={() => {
             toast({
               title: "Already in watched list",

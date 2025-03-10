@@ -258,6 +258,7 @@ const SearchPage = () => {
         item={selectedItem}
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
+        showAddToWatchlistButton={true}
         onAddToWatchlist={handleAddToWatchlist}
       />
     </div>
