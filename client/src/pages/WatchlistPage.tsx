@@ -599,23 +599,29 @@ const WatchlistPage = () => {
     <div>
       <div className="flex flex-col mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-3">
-          <h2 className="text-xl font-bold mb-2 md:mb-0 font-heading">
-            Watched
-            <span className="ml-2 text-sm font-normal text-gray-400">
-              ({stats.total} {stats.total === 1 ? 'item' : 'items'})
-            </span>
-          </h2>
+          <div className="flex flex-row items-center flex-wrap mb-2 md:mb-0">
+            <h2 className="text-xl font-bold font-heading flex items-center">
+              Watched
+              <span className="ml-2 text-sm font-normal text-gray-400">
+                ({stats.total} {stats.total === 1 ? 'item' : 'items'})
+              </span>
+            </h2>
+            
+            {/* Media Type Stats - Now moved next to the title on both mobile and desktop */}
+            <div className="flex space-x-2 items-center ml-3">
+              <Badge variant="outline" className="flex items-center">
+                <Film className="h-3 w-3 mr-1" />
+                {stats.movies} {stats.movies === 1 ? 'Movie' : 'Movies'}
+              </Badge>
+              <Badge variant="outline" className="flex items-center">
+                <Tv2 className="h-3 w-3 mr-1" />
+                {stats.tv} {stats.tv === 1 ? 'TV Show' : 'TV Shows'}
+              </Badge>
+            </div>
+          </div>
           
-          {/* Media Type Stats */}
-          <div className="flex space-x-2 items-center">
-            <Badge variant="outline" className="flex items-center">
-              <Film className="h-3 w-3 mr-1" />
-              {stats.movies} {stats.movies === 1 ? 'Movie' : 'Movies'}
-            </Badge>
-            <Badge variant="outline" className="flex items-center">
-              <Tv2 className="h-3 w-3 mr-1" />
-              {stats.tv} {stats.tv === 1 ? 'TV Show' : 'TV Shows'}
-            </Badge>
+          {/* Empty div to maintain layout with justify-between */}
+          <div>
 
             
             {/* Safari Mobile-specific refresh button */}
