@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useUserContext } from '@/lib/user-context';
 import WatchlistEntry from '@/components/WatchlistEntry';
 import { DetailsModal } from '@/components/DetailsModal';
-import { TMDBMovie, WatchlistEntryWithMovie } from '@shared/schema';
+import { TMDBMovie, WatchlistEntryWithMovie, Platform } from '@shared/schema';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiRequest } from '@/lib/queryClient';
@@ -326,7 +326,42 @@ const WatchlistPage = () => {
     setEditWatchedDate(entry.watchedDate ? format(new Date(entry.watchedDate), 'yyyy-MM-dd') : '');
     setEditNotes(entry.notes || '');
     setEditStatus(entry.status || 'watched'); // Set the current status
+    setEditPlatformId(entry.platformId || null);
+    
+    // Fetch platforms if we haven't loaded them yet
+    if (platforms.length === 0 && currentUser?.id) {
+      fetchPlatforms(currentUser.id);
+    }
+    
     setIsEditModalOpen(true);
+  };
+  
+  // Fetch platforms
+  const fetchPlatforms = async (userId: number) => {
+    if (loadingPlatforms) return;
+    
+    setLoadingPlatforms(true);
+    try {
+      const response = await apiRequest('GET', `/api/platforms/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setPlatforms(data);
+        
+        // If we have a default platform and no platform is selected, use default
+        if (editPlatformId === null) {
+          const defaultPlatform = data.find((p: Platform) => p.isDefault === true);
+          if (defaultPlatform) {
+            setEditPlatformId(defaultPlatform.id);
+          }
+        }
+      } else {
+        console.error('Failed to fetch platforms:', response.status);
+      }
+    } catch (error) {
+      console.error('Error fetching platforms:', error);
+    } finally {
+      setLoadingPlatforms(false);
+    }
   };
 
   // Handle showing details
@@ -346,6 +381,7 @@ const WatchlistPage = () => {
         watchedDate: editStatus === 'watched' ? editWatchedDate || null : null,
         notes: editNotes || null,
         status: editStatus,
+        platformId: editPlatformId,
       });
       
       const statusLabel = editStatus === 'to_watch' 
@@ -353,10 +389,19 @@ const WatchlistPage = () => {
         : editStatus === 'watching' 
           ? 'currently watching list'
           : 'watched list';
+      
+      // Find platform name if a platform is selected
+      const selectedPlatform = editPlatformId
+        ? platforms.find(p => p.id === editPlatformId)?.name
+        : null;
+      
+      const platformText = selectedPlatform 
+        ? ` on ${selectedPlatform}`
+        : '';
           
       toast({
         title: "Entry updated",
-        description: `${entryToEdit.movie.title} has been updated in your ${statusLabel}`,
+        description: `${entryToEdit.movie.title} has been updated in your ${statusLabel}${platformText}`,
       });
       
       // Invalidate the watchlist cache
@@ -900,13 +945,55 @@ const WatchlistPage = () => {
                 </div>
               )}
               
+              <div className="mb-4">
+                <Label htmlFor="edit-platform" className="text-sm font-medium mb-2 block">Platform (optional)</Label>
+                <Select 
+                  value={editPlatformId ? editPlatformId.toString() : ''} 
+                  onValueChange={(value) => setEditPlatformId(value ? parseInt(value) : null)}
+                >
+                  <SelectTrigger className="w-full bg-gray-700 text-white border-gray-600 focus:ring-[#E50914] h-12">
+                    <SelectValue placeholder="Where did you watch it?" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectItem value="">No platform</SelectItem>
+                    {platforms.map((platform) => (
+                      <SelectItem key={platform.id} value={platform.id.toString()}>
+                        <div className="flex items-center">
+                          {platform.name}
+                          {platform.isDefault && (
+                            <span className="ml-2 bg-green-700 text-white text-xs px-1.5 py-0.5 rounded-full">Default</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="mt-2 text-xs text-gray-400 flex items-center">
+                  <span>Want to add a new platform? </span>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      // Close the edit modal first to prevent UI conflicts
+                      setIsEditModalOpen(false);
+                      // Then open the platform management modal (assumed to be handled elsewhere)
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('openPlatformManagement'));
+                      }
+                    }} 
+                    className="ml-1 text-blue-400 hover:text-blue-300 underline"
+                  >
+                    Manage platforms
+                  </button>
+                </div>
+              </div>
+              
               <div className="mb-6">
                 <Label htmlFor="edit-watch-notes" className="text-sm font-medium mb-2 block">Notes (optional)</Label>
                 <Textarea 
                   id="edit-watch-notes" 
                   rows={4} 
                   className="w-full bg-gray-700 text-white rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#E50914] border-gray-600"
-                  placeholder={`Add your thoughts about the ${entryToEdit.movie.mediaType === 'tv' ? 'show' : 'movie'}...`}
+                  placeholder={`Add your thoughts about the ${entryToEdit?.movie?.mediaType === 'tv' ? 'show' : 'movie'}...`}
                   value={editNotes}
                   onChange={(e) => setEditNotes(e.target.value)}
                 />
