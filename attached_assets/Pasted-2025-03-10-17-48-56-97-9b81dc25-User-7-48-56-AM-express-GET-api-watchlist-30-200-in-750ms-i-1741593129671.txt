@@ -1,0 +1,197 @@
+2025-03-10 17:48:56.97
+9b81dc25
+User
+7:48:56 AM [express] GET /api/watchlist/30 200 in 750ms :: [{"id":102,"userId":30,"movieId":36,"plat…
+2025-03-10 17:48:57.24
+9b81dc25
+User
+[JWT AUTH] Request path: /api/movies/external-ids/11240, Authorization header present: false
+2025-03-10 17:48:57.24
+9b81dc25
+User
+[JWT AUTH] No token provided
+2025-03-10 17:48:57.24
+9b81dc25
+User
+[SESSION] Authentication lost in session 1741591917737-3k212tx2oja
+2025-03-10 17:48:57.31
+9b81dc25
+User
+7:48:57 AM [express] GET /api/movies/external-ids/11240 200 in 72ms :: {"id":11240,"imdb_id":"tt0091…
+2025-03-10 17:48:58.90
+9b81dc25
+User
+[JWT AUTH] Request path: /favicon.ico, Authorization header present: false
+2025-03-10 17:48:58.90
+9b81dc25
+User
+[JWT AUTH] No token provided
+2025-03-10 17:49:02.90
+9b81dc25
+User
+[JWT AUTH] Request path: /api/movies/search, Authorization header present: false
+2025-03-10 17:49:02.90
+9b81dc25
+User
+[JWT AUTH] No token provided
+2025-03-10 17:49:03.07
+9b81dc25
+User
+7:49:03 AM [express] GET /api/movies/search 200 in 167ms :: {"page":1,"results":[{"adult":false,"bac…
+2025-03-10 17:49:24.57
+9b81dc25
+User
+[DB] Database connection verified
+2025-03-10 17:50:04.64
+9b81dc25
+User
+[SESSION] New session initialized: 1741593004643-lij1e481qan
+2025-03-10 17:50:04.64
+9b81dc25
+User
+[JWT AUTH] Request path: /api/logout, Authorization header present: false
+2025-03-10 17:50:04.64
+9b81dc25
+User
+[JWT AUTH] No token provided
+2025-03-10 17:50:04.64
+9b81dc25
+User
+[SESSION] New session initialized: 1741593004643-lij1e481qan
+2025-03-10 17:50:04.64
+9b81dc25
+User
+Logout request. User authenticated: false, Emergency mode: false
+2025-03-10 17:50:04.64
+9b81dc25
+User
+Session ID: 1741593004643-lij1e481qan
+2025-03-10 17:50:04.64
+9b81dc25
+User
+Session cookie configuration: watchlist.sid, secure: true, sameSite: lax
+2025-03-10 17:50:04.64
+9b81dc25
+User
+[SESSION] New session initialized: 1741593004644-hj3n5duug77
+2025-03-10 17:50:04.64
+9b81dc25
+User
+7:50:04 AM [express] POST /api/logout 200 in 2ms :: {"message":"Logout successful","time":"2025-03-1…
+2025-03-10 17:50:04.64
+9b81dc25
+User
+Background session destruction completed successfully
+2025-03-10 17:50:05.48
+9b81dc25
+User
+[SESSION] New session initialized: 1741593005484-09sbonwdsw8t
+2025-03-10 17:50:05.48
+9b81dc25
+User
+[JWT AUTH] Request path: /api/logout, Authorization header present: false
+2025-03-10 17:50:05.48
+9b81dc25
+User
+[JWT AUTH] No token provided
+2025-03-10 17:50:05.48
+9b81dc25
+User
+[SESSION] New session initialized: 1741593005484-09sbonwdsw8t
+2025-03-10 17:50:05.48
+9b81dc25
+User
+Logout request. User authenticated: false, Emergency mode: false
+2025-03-10 17:50:05.48
+9b81dc25
+User
+Session ID: 1741593005484-09sbonwdsw8t
+2025-03-10 17:50:05.48
+9b81dc25
+User
+Session cookie configuration: watchlist.sid, secure: true, sameSite: lax
+2025-03-10 17:50:05.48
+9b81dc25
+User
+[SESSION] New session initialized: 1741593005485-nilhnyiax8
+2025-03-10 17:50:05.48
+9b81dc25
+User
+7:50:05 AM [express] POST /api/logout 200 in 2ms :: {"message":"Logout successful","time":"2025-03-1…
+2025-03-10 17:50:05.48
+9b81dc25
+User
+Background session destruction completed successfully
+2025-03-10 17:50:06.01
+9b81dc25
+User
+[SESSION] New session initialized: 1741593006013-251qr8kvlfl
+2025-03-10 17:50:06.01
+9b81dc25
+User
+[JWT AUTH] Request path: /api/logout, Authorization header present: false
+2025-03-10 17:50:06.01
+9b81dc25
+User
+[JWT AUTH] No token provided
+2025-03-10 17:50:06.01
+9b81dc25
+User
+[SESSION] New session initialized: 1741593006013-251qr8kvlfl
+2025-03-10 17:50:06.01
+9b81dc25
+User
+Logout request. User authenticated: false, Emergency mode: false
+2025-03-10 17:50:06.01
+9b81dc25
+User
+Session ID: 1741593006013-251qr8kvlfl
+2025-03-10 17:50:06.01
+9b81dc25
+User
+Session cookie configuration: watchlist.sid, secure: true, sameSite: lax
+2025-03-10 17:50:06.01
+9b81dc25
+User
+[SESSION] New session initialized: 1741593006014-njnj923cv2a
+2025-03-10 17:50:06.01
+9b81dc25
+User
+7:50:06 AM [express] POST /api/logout 200 in 1ms :: {"message":"Logout successful","time":"2025-03-1…
+2025-03-10 17:50:06.01
+9b81dc25
+User
+Background session destruction completed successfully
+2025-03-10 17:50:06.30
+9b81dc25
+User
+[SESSION] New session initialized: 1741593006302-h1r63tsppm9
+2025-03-10 17:50:06.30
+9b81dc25
+User
+[JWT AUTH] Request path: /api/logout, Authorization header present: false
+2025-03-10 17:50:06.30
+9b81dc25
+User
+[JWT AUTH] No token provided
+2025-03-10 17:50:06.30
+9b81dc25
+User
+[SESSION] New session initialized: 1741593006302-h1r63tsppm9
+2025-03-10 17:50:06.30
+9b81dc25
+User
+Logout request. User authenticated: false, Emergency mode: false
+2025-03-10 17:50:06.30
+9b81dc25
+User
+Session ID: 1741593006302-h1r63tsppm9
+2025-03-10 17:50:06.30
+9b81dc25
+User
+Session cookie configuration: watchlist.sid, secure: true, sameSite: lax
+2025-03-10 17:50:06.30
+9b81dc25
+User
+[SESSION] New session initialized: 1741593006303-i9uoh4zdyq
+2025-03-10 17:50:0
