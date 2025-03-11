@@ -135,14 +135,17 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
     
     // Get simple counts using direct SQL for reliability
     try {
-      // Count only active sessions (not expired)
+      // Count only active sessions (not expired and recently accessed)
       const query = `
         SELECT 
           (SELECT COUNT(*) FROM movies WHERE media_type = 'movie') as movie_count,
           (SELECT COUNT(*) FROM movies WHERE media_type = 'tv') as tv_count,
           (SELECT COUNT(*) FROM watchlist_entries) as watchlist_count,
           (SELECT COUNT(*) FROM platforms) as platform_count,
-          (SELECT COUNT(*) FROM session WHERE expire > NOW()) as session_count
+          (SELECT COUNT(*) FROM session 
+           WHERE expire > NOW() 
+           AND sess::json->>'lastChecked' IS NOT NULL 
+           AND (sess::json->>'lastChecked')::bigint > extract(epoch from now())::bigint - 86400) as session_count
       `;
       
       const countResult = await executeDirectSql(query);
@@ -262,7 +265,7 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       console.error('Error fetching recent registrations:', error);
     }
     
-    // Get recent watchlist activity
+    // Get recent watchlist activity - limit to last 30 days to keep data current
     try {
       const recentActivity = await executeDirectSql(`
         SELECT 
@@ -273,6 +276,7 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
         FROM watchlist_entries w
         JOIN users u ON w.user_id = u.id
         JOIN movies m ON w.movie_id = m.id
+        WHERE w.created_at > NOW() - INTERVAL '30 days'
         ORDER BY w.created_at DESC
         LIMIT 20
       `);

@@ -363,7 +363,7 @@ const AdminDashboardPage = () => {
             <CardContent>
               <div className="text-3xl font-bold">{stats.stats.content.watchlistEntries}</div>
               <div className="text-xs text-muted-foreground pt-2">
-                &nbsp;
+                Each entry is a user-movie relationship
               </div>
             </CardContent>
           </Card>
@@ -373,7 +373,7 @@ const AdminDashboardPage = () => {
         <Card>
           <CardHeader>
             <CardTitle>Media Type Breakdown</CardTitle>
-            <CardDescription>Distribution of movies vs TV shows in the catalog</CardDescription>
+            <CardDescription>Distribution of unique movies vs TV shows in the catalog</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
