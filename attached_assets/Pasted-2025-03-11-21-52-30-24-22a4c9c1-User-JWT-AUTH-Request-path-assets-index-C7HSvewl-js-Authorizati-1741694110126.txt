@@ -1,0 +1,138 @@
+2025-03-11 21:52:30.24
+22a4c9c1
+User
+[JWT AUTH] Request path: /assets/index-C7HSvewl.js, Authorization header present: false
+2025-03-11 21:52:30.24
+22a4c9c1
+User
+[JWT AUTH] No token provided
+2025-03-11 21:52:30.28
+22a4c9c1
+User
+[JWT AUTH] Request path: /assets/index-l-9pJ96E.css, Authorization header present: false
+2025-03-11 21:52:30.28
+22a4c9c1
+User
+[JWT AUTH] No token provided
+2025-03-11 21:52:30.71
+22a4c9c1
+User
+[SESSION] New session initialized: 1741693950712-vhv77e4w4n8
+2025-03-11 21:52:30.71
+22a4c9c1
+User
+[JWT AUTH] Request path: /manifest.json, Authorization header present: false
+2025-03-11 21:52:30.71
+22a4c9c1
+User
+[JWT AUTH] No token provided
+2025-03-11 21:52:30.71
+22a4c9c1
+User
+[SESSION] New session initialized: 1741693950712-vhv77e4w4n8
+2025-03-11 21:52:30.94
+22a4c9c1
+User
+[JWT AUTH] Request path: /apple-touch-icon.svg, Authorization header present: false
+2025-03-11 21:52:30.94
+22a4c9c1
+User
+[JWT AUTH] No token provided
+2025-03-11 21:52:45.17
+22a4c9c1
+User
+[JWT AUTH] Request path: /api/status-direct/ping, Authorization header present: false
+2025-03-11 21:52:45.17
+22a4c9c1
+User
+[JWT AUTH] No token provided
+2025-03-11 21:52:45.18
+22a4c9c1
+User
+11:52:45 AM [express] GET /api/status-direct/ping 200 in 3ms
+2025-03-11 21:52:45.41
+22a4c9c1
+User
+[JWT AUTH] Request path: /assets/index-l-9pJ96E.css, Authorization header present: false
+2025-03-11 21:52:45.41
+22a4c9c1
+User
+[JWT AUTH] No token provided
+2025-03-11 21:52:45.42
+22a4c9c1
+User
+[JWT AUTH] Request path: /assets/index-C7HSvewl.js, Authorization header present: false
+2025-03-11 21:52:45.42
+22a4c9c1
+User
+[JWT AUTH] No token provided
+2025-03-11 21:52:45.72
+22a4c9c1
+User
+[SESSION] New session initialized: 1741693965720-3vexz9mm95
+2025-03-11 21:52:45.72
+22a4c9c1
+User
+[JWT AUTH] Request path: /manifest.json, Authorization header present: false
+2025-03-11 21:52:45.72
+22a4c9c1
+User
+[JWT AUTH] No token provided
+2025-03-11 21:52:45.72
+22a4c9c1
+User
+[SESSION] New session initialized: 1741693965720-3vexz9mm95
+2025-03-11 21:52:45.94
+22a4c9c1
+User
+[JWT AUTH] Request path: /apple-touch-icon.svg, Authorization header present: false
+2025-03-11 21:52:45.94
+22a4c9c1
+User
+[JWT AUTH] No token provided
+2025-03-11 21:53:00.01
+22a4c9c1
+User
+[SESSION] New session initialized: 1741693980013-svv9t98ir6r
+2025-03-11 21:53:00.01
+22a4c9c1
+User
+[JWT AUTH] Request path: /api/status-direct/ping, Authorization header present: false
+2025-03-11 21:53:00.01
+22a4c9c1
+User
+[JWT AUTH] No token provided
+2025-03-11 21:53:00.01
+22a4c9c1
+User
+[SESSION] New session initialized: 1741693980013-svv9t98ir6r
+2025-03-11 21:53:00.01
+22a4c9c1
+User
+11:53:00 AM [express] GET /api/status-direct/ping 200 in 2ms
+2025-03-11 21:53:00.25
+22a4c9c1
+User
+[JWT AUTH] Request path: /assets/index-C7HSvewl.js, Authorization header present: false
+2025-03-11 21:53:00.25
+22a4c9c1
+User
+[JWT AUTH] No token provided
+2025-03-11 21:53:00.25
+22a4c9c1
+User
+[JWT AUTH] Request path: /assets/index-l-9pJ96E.css, Authorization header present: false
+2025-03-11 21:53:00.25
+22a4c9c1
+User
+[JWT AUTH] No token provided
+2025-03-11 21:53:00.73
+22a4c9c1
+User
+[JWT AUTH] Request path: /apple-touch-icon.svg, Authorization header present: false
+2025-03-11 21:53:00.73
+22a4c9c1
+User
+[JWT AUTH] No token provided
+2025-03-11 21:53:19.86
+22a4c

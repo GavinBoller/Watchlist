@@ -52,6 +52,14 @@ function AppInternal() {
             <ProtectedRoute path="/watched" component={WatchlistPage} />
             <ProtectedRoute path="/admin" component={AdminDashboardPage} />
             <Route path="/auth" component={AuthPage} />
+            {/* API paths should be ignored by the client-side router */}
+            <Route path="/api/:rest*">
+              {() => {
+                // This is just a placeholder that will never be rendered
+                // API requests will be handled by the server
+                return null;
+              }}
+            </Route>
             <Route component={NotFound} />
           </Switch>
         </main>

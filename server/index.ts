@@ -421,10 +421,18 @@ async function startServer() {
     
     // Add direct status endpoints to ensure they're accessible in all environments
     app.get('/api/status-direct/ping', (_req: Request, res: Response) => {
+      // Set explicit content type and disable caching to prevent browser interpretation
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
       res.json({ status: 'ok', time: new Date().toISOString() });
     });
     
     app.get('/api/status-direct/admin-check', async (_req: Request, res: Response) => {
+      // Set explicit content type and disable caching to prevent browser interpretation
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
       try {
         // Administrators are user ID 1 or any user marked as admin 
         // In the current system, only user ID 1 has admin privileges
