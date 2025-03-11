@@ -165,10 +165,9 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
     
     // Get basic user data (top 5 users and some activity) with environment filtering
     try {
-      // In development, only show users with ID greater than 50 (newer dev users)
-      // In production, show all users
-      const isDevelopment = process.env.NODE_ENV !== 'production';
-      const userFilter = isDevelopment ? 'WHERE u.id > 50' : '';
+      // We're already connected to the appropriate environment database,
+      // so we don't need to filter by username patterns
+      const userFilter = '';
       
       // Simplified query for top users
       const topUsersResult = await executeDirectSql(`
@@ -194,13 +193,14 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
           u.username, 
           u.display_name,
           COUNT(w.id)::text as watchlist_count,
-          MAX(w.created_at)::text as last_activity
+          MAX(w.created_at)::text as last_activity,
+          MAX(u.last_login)::text as last_login
         FROM users u
         LEFT JOIN watchlist_entries w ON u.id = w.user_id
         ${userFilter}
         GROUP BY u.id, u.username, u.display_name
         ORDER BY last_activity DESC NULLS LAST
-        LIMIT 20
+        LIMIT 100
       `);
       
       // Map the results with safer parsing
@@ -211,7 +211,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
         watchlist_count: parseInt(user.watchlist_count || '0', 10),
         last_activity: user.last_activity,
         last_seen: null,
-        last_login: null
+        last_login: user.last_login
       }));
     } catch (error) {
       console.error('Error getting user activity data:', error);
@@ -260,7 +260,7 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
   try {
     // Get recent registrations with environment-specific filtering
     try {
-      // In development, only show users with ID greater than 50 (newer dev users)
+      // In development, only show development users (Gavin*, Test*)
       // In production, show last 7 days registrations
       const isDevelopment = process.env.NODE_ENV !== 'production';
       
@@ -268,11 +268,11 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
         SELECT username, display_name, created_at
         FROM users
         ${isDevelopment 
-          ? 'WHERE id > 50' 
-          : 'WHERE created_at > NOW() - INTERVAL \'7 days\''
+          ? "WHERE (username LIKE 'Gavin%' OR username LIKE 'Test%' OR username = 'Gavinadmin' OR username = 'admin')" 
+          : "WHERE created_at > NOW() - INTERVAL '7 days'"
         }
         ORDER BY created_at DESC
-        LIMIT 20
+        LIMIT 40
       `);
       
       responseData.recentRegistrations = recentRegistrations.rows || [];
