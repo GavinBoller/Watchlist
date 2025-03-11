@@ -163,8 +163,13 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       console.error('Error getting count data:', error);
     }
     
-    // Get basic user data (top 5 users and some activity)
+    // Get basic user data (top 5 users and some activity) with environment filtering
     try {
+      // In development, only show users with ID greater than 50 (newer dev users)
+      // In production, show all users
+      const isDevelopment = process.env.NODE_ENV !== 'production';
+      const userFilter = isDevelopment ? 'WHERE u.id > 50' : '';
+      
       // Simplified query for top users
       const topUsersResult = await executeDirectSql(`
         SELECT 
@@ -174,6 +179,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
           COUNT(w.id)::text as entry_count
         FROM users u
         JOIN watchlist_entries w ON u.id = w.user_id
+        ${userFilter}
         GROUP BY u.id, u.username, u.display_name
         ORDER BY COUNT(w.id) DESC
         LIMIT 5
@@ -191,6 +197,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
           MAX(w.created_at)::text as last_activity
         FROM users u
         LEFT JOIN watchlist_entries w ON u.id = w.user_id
+        ${userFilter}
         GROUP BY u.id, u.username, u.display_name
         ORDER BY last_activity DESC NULLS LAST
         LIMIT 20
@@ -251,13 +258,21 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
   };
   
   try {
-    // Get recent registrations (last 7 days)
+    // Get recent registrations with environment-specific filtering
     try {
+      // In development, only show users with ID greater than 50 (newer dev users)
+      // In production, show last 7 days registrations
+      const isDevelopment = process.env.NODE_ENV !== 'production';
+      
       const recentRegistrations = await executeDirectSql(`
         SELECT username, display_name, created_at
         FROM users
-        WHERE created_at > NOW() - INTERVAL '7 days'
+        ${isDevelopment 
+          ? 'WHERE id > 50' 
+          : 'WHERE created_at > NOW() - INTERVAL \'7 days\''
+        }
         ORDER BY created_at DESC
+        LIMIT 20
       `);
       
       responseData.recentRegistrations = recentRegistrations.rows || [];
@@ -265,8 +280,12 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       console.error('Error fetching recent registrations:', error);
     }
     
-    // Get recent watchlist activity - limit to last 30 days to keep data current
+    // Get recent watchlist activity - use environment-specific filtering
     try {
+      // In development, only show activity from users with ID greater than 50 (newer dev users)
+      // In production, show all activity
+      const isDevelopment = process.env.NODE_ENV !== 'production';
+      
       const recentActivity = await executeDirectSql(`
         SELECT 
           u.username,
@@ -276,7 +295,7 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
         FROM watchlist_entries w
         JOIN users u ON w.user_id = u.id
         JOIN movies m ON w.movie_id = m.id
-        WHERE w.created_at > NOW() - INTERVAL '30 days'
+        ${isDevelopment ? 'WHERE u.id > 50' : ''}
         ORDER BY w.created_at DESC
         LIMIT 20
       `);
