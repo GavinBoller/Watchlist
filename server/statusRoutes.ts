@@ -46,25 +46,28 @@ function formatPostgresTimestamp(timestamp: string | null): string | null {
   
   // Remove microseconds and convert to ISO format
   try {
+    // Make sure timestamp is a string (handle any potential non-string values)
+    const timestampStr = String(timestamp);
+    
     // Handle PostgreSQL timestamp format with microseconds
-    if (timestamp.includes('.')) {
-      return timestamp.replace(/(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}).*/, '$1T$2.000Z');
+    if (timestampStr.includes('.')) {
+      return timestampStr.replace(/(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}).*/, '$1T$2.000Z');
     }
     
     // Handle timestamps without microseconds
-    if (timestamp.includes(' ') && !timestamp.includes('T')) {
-      return timestamp.replace(' ', 'T') + '.000Z';
+    if (timestampStr.includes(' ') && !timestampStr.includes('T')) {
+      return timestampStr.replace(' ', 'T') + '.000Z';
     }
     
     // If it's already in ISO format or close to it
-    if (!timestamp.endsWith('Z') && timestamp.includes('T')) {
-      return timestamp + '.000Z';
+    if (!timestampStr.endsWith('Z') && timestampStr.includes('T')) {
+      return timestampStr + '.000Z';
     }
     
-    return timestamp;
+    return timestampStr;
   } catch (e) {
     console.error('Error formatting timestamp:', timestamp, e);
-    return timestamp;
+    return String(timestamp);
   }
 }
 
