@@ -377,10 +377,19 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       // Show all registrations in dev mode, no filtering
       // In production, this would be filtered by time period
       console.log('Environment for recent registrations:', isDevelopment ? 'development' : 'production');
-      // Create filter based on current environment
+      // Get the appropriate environment marker from database
+      // In a proper implementation, this would use an 'environment' column in the database
+      // or retrieve a configuration setting rather than hardcoding patterns
+      // TODO: Implement proper environment tracking in the database
+      
+      // For now, get environment patterns from environment variables to make it configurable
+      const devUsernamePattern = process.env.DEV_USERNAME_PATTERN || "'%'";
+      const prodUsernamePattern = process.env.PROD_USERNAME_PATTERN || "'%'";
+      
+      // Create filter based on current environment - default to showing all users if not configured
       const registrationEnvFilter = isDevelopment
-        ? "username NOT LIKE 'Gaju%' AND username NOT LIKE 'Sophieb%'"
-        : "username LIKE 'Gaju%' OR username LIKE 'Sophieb%'";
+        ? `username LIKE ${devUsernamePattern}`
+        : `username LIKE ${prodUsernamePattern}`;
           
       const recentRegistrations = await executeDirectSql(`
         SELECT 
@@ -408,10 +417,14 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       // Get all activity, regardless of environment
       // In development, we want to see ALL types of activity
       console.log('Environment for recent activity:', isDevelopment ? 'development' : 'production');
-      // Create activity filter based on current environment 
+      // Get environment patterns from environment variables to make it configurable
+      const devUsernamePattern = process.env.DEV_USERNAME_PATTERN || "'%'";
+      const prodUsernamePattern = process.env.PROD_USERNAME_PATTERN || "'%'";
+      
+      // Create filter based on current environment - default to showing all users if not configured
       const activityEnvFilter = isDevelopment
-        ? "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'"
-        : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+        ? `u.username LIKE ${devUsernamePattern}`
+        : `u.username LIKE ${prodUsernamePattern}`;
           
       const recentActivity = await executeDirectSql(`
         SELECT 
