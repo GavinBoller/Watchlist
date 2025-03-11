@@ -331,16 +331,22 @@ const AdminDashboardPage = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {stats.stats.users.userActivity.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell>{user.id}</TableCell>
-                          <TableCell>{user.username}</TableCell>
-                          <TableCell>{user.display_name || '-'}</TableCell>
-                          <TableCell>{user.watchlist_count}</TableCell>
-                          <TableCell>{formatDate(user.last_activity)}</TableCell>
-                          <TableCell>{formatDate(user.last_seen)}</TableCell>
+                      {stats.stats.users.userActivity && stats.stats.users.userActivity.length > 0 ? 
+                        stats.stats.users.userActivity.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell>{user.id}</TableCell>
+                            <TableCell>{user.username}</TableCell>
+                            <TableCell>{user.display_name || '-'}</TableCell>
+                            <TableCell>{user.watchlist_count}</TableCell>
+                            <TableCell>{formatDate(user.last_activity)}</TableCell>
+                            <TableCell>{formatDate(user.last_seen)}</TableCell>
+                          </TableRow>
+                        ))
+                      : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-4">No user activity data available</TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </ScrollArea>
@@ -366,14 +372,20 @@ const AdminDashboardPage = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {stats.stats.users.topUsers.map((user, index) => (
-                      <TableRow key={user.id}>
-                        <TableCell>#{index + 1}</TableCell>
-                        <TableCell>{user.username}</TableCell>
-                        <TableCell>{user.display_name || '-'}</TableCell>
-                        <TableCell>{user.entry_count}</TableCell>
+                    {stats.stats.users.topUsers && stats.stats.users.topUsers.length > 0 ? 
+                      stats.stats.users.topUsers.map((user, index) => (
+                        <TableRow key={user.id}>
+                          <TableCell>#{index + 1}</TableCell>
+                          <TableCell>{user.username}</TableCell>
+                          <TableCell>{user.display_name || '-'}</TableCell>
+                          <TableCell>{user.entry_count}</TableCell>
+                        </TableRow>
+                      ))
+                    : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-4">No watchlist data available</TableCell>
                       </TableRow>
-                    ))}
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>

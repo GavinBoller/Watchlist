@@ -153,7 +153,7 @@ router.get('/stats', isJwtAuthenticated, async (_req: Request, res: Response) =>
           u.display_name,
           COUNT(w.id) as watchlist_count,
           (
-            SELECT MAX(created_at) 
+            SELECT MAX(s.created_at) 
             FROM session s 
             WHERE sess::jsonb->>'preservedUsername' = u.username
             OR sess::jsonb->>'username' = u.username
