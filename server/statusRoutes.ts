@@ -185,9 +185,14 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
   try {
     // Safely get user count - apply environment-specific filtering
     try {
+      // Get environment patterns from environment variables to make it configurable
+      const devUsernamePattern = process.env.DEV_USERNAME_PATTERN || "'%'";
+      const prodUsernamePattern = process.env.PROD_USERNAME_PATTERN || "'%'";
+      
+      // Create filter based on current environment - default to showing all users if not configured
       const userEnvironmentFilter = isDevelopment
-        ? "username NOT LIKE 'Gaju%' AND username NOT LIKE 'Sophieb%'"
-        : "username LIKE 'Gaju%' OR username LIKE 'Sophieb%'";
+        ? `username LIKE ${devUsernamePattern}`
+        : `username LIKE ${prodUsernamePattern}`;
       
       console.log(`Environment for user count: ${isDevelopment ? 'development' : 'production'}`);
       
@@ -206,9 +211,14 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
     // Get simple counts using direct SQL for reliability
     try {
       // Use the same environment detection from above
+      // Get environment patterns from environment variables to make it configurable
+      const devUsernamePattern = process.env.DEV_USERNAME_PATTERN || "'%'";
+      const prodUsernamePattern = process.env.PROD_USERNAME_PATTERN || "'%'";
+      
+      // Create filter based on current environment - default to showing all users if not configured
       const userEnvironmentFilter = isDevelopment
-        ? "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'"
-        : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+        ? `u.username LIKE ${devUsernamePattern}`
+        : `u.username LIKE ${prodUsernamePattern}`;
       
       console.log(`Environment for content stats: ${isDevelopment ? 'development' : 'production'}`);
       
@@ -267,10 +277,14 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       const userFilter = '';
       
       // Simplified query for top users - reuse the existing environment filter
-      // Create a new variable for user activity environment filtering
+      // Get environment patterns from environment variables to make it configurable
+      const devUsernamePattern = process.env.DEV_USERNAME_PATTERN || "'%'";
+      const prodUsernamePattern = process.env.PROD_USERNAME_PATTERN || "'%'";
+      
+      // Create new filter for user activity based on environment
       const userActivityEnvFilter = isDevelopment
-        ? "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'"
-        : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+        ? `u.username LIKE ${devUsernamePattern}`
+        : `u.username LIKE ${prodUsernamePattern}`;
       
       const topUsersResult = await executeDirectSql(`
         SELECT 
@@ -377,10 +391,11 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       // Show all registrations in dev mode, no filtering
       // In production, this would be filtered by time period
       console.log('Environment for recent registrations:', isDevelopment ? 'development' : 'production');
-      // Get the appropriate environment marker from database
-      // In a proper implementation, this would use an 'environment' column in the database
-      // or retrieve a configuration setting rather than hardcoding patterns
-      // TODO: Implement proper environment tracking in the database
+      // Use environment variables for configuration instead of hardcoded patterns
+      // To configure development vs. production data separation:
+      // - Set DEV_USERNAME_PATTERN to filter usernames in development (e.g., "'dev_%'" to show only dev_ prefixed users)
+      // - Set PROD_USERNAME_PATTERN to filter usernames in production (e.g., "'prod_%'" to show only prod_ prefixed users)
+      // By default, all users are shown in both environments if not configured
       
       // For now, get environment patterns from environment variables to make it configurable
       const devUsernamePattern = process.env.DEV_USERNAME_PATTERN || "'%'";
