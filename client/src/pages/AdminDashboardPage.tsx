@@ -518,7 +518,17 @@ const AdminDashboardPage = () => {
                       stats.stats.users.topUsers.map((user, index) => (
                         <TableRow key={user.id}>
                           <TableCell>#{index + 1}</TableCell>
-                          <TableCell>{user.username}</TableCell>
+                          <TableCell>
+                            {user.username}
+                            {user.database_environment && (
+                              <Badge 
+                                variant={user.database_environment === 'production' ? 'destructive' : 'default'} 
+                                className="ml-2 text-xs"
+                              >
+                                {user.database_environment}
+                              </Badge>
+                            )}
+                          </TableCell>
                           <TableCell>{user.display_name || '-'}</TableCell>
                           <TableCell>{user.entry_count}</TableCell>
                         </TableRow>
@@ -558,7 +568,17 @@ const AdminDashboardPage = () => {
                       <TableBody>
                         {activityData.recentActivity.map((activity, index) => (
                           <TableRow key={index}>
-                            <TableCell>{activity.username}</TableCell>
+                            <TableCell>
+                              {activity.username}
+                              {activity.database_environment && (
+                                <Badge 
+                                  variant={activity.database_environment === 'production' ? 'destructive' : 'default'} 
+                                  className="ml-2 text-xs"
+                                >
+                                  {activity.database_environment}
+                                </Badge>
+                              )}
+                            </TableCell>
                             <TableCell className="max-w-[200px] truncate">{activity.title}</TableCell>
                             <TableCell>{getStatusBadge(activity.status)}</TableCell>
                             <TableCell>{formatDate(activity.created_at)}</TableCell>
@@ -595,7 +615,17 @@ const AdminDashboardPage = () => {
                       {activityData.recentRegistrations.length > 0 ? (
                         activityData.recentRegistrations.map((registration, index) => (
                           <TableRow key={index}>
-                            <TableCell>{registration.username}</TableCell>
+                            <TableCell>
+                              {registration.username}
+                              {registration.database_environment && (
+                                <Badge 
+                                  variant={registration.database_environment === 'production' ? 'destructive' : 'default'} 
+                                  className="ml-2 text-xs"
+                                >
+                                  {registration.database_environment}
+                                </Badge>
+                              )}
+                            </TableCell>
                             <TableCell>{registration.display_name || '-'}</TableCell>
                             <TableCell>{formatDate(registration.created_at)}</TableCell>
                           </TableRow>
