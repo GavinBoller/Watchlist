@@ -20,6 +20,7 @@ interface TopUser {
   username: string;
   display_name: string | null;
   entry_count: string;
+  database_environment?: 'development' | 'production';
 }
 
 interface UserActivity {
@@ -30,12 +31,14 @@ interface UserActivity {
   last_login: string | null;
   last_activity: string | null;
   last_seen: string | null;
+  database_environment?: 'development' | 'production';
 }
 
 interface RecentRegistration {
   username: string;
   display_name: string | null;
   created_at: string;
+  database_environment?: 'development' | 'production';
 }
 
 interface RecentActivity {
@@ -43,6 +46,7 @@ interface RecentActivity {
   title: string;
   created_at: string;
   status: 'to_watch' | 'watching' | 'watched';
+  database_environment?: 'development' | 'production';
 }
 
 interface SystemStats {
@@ -463,7 +467,17 @@ const AdminDashboardPage = () => {
                         stats.stats.users.userActivity.map((user) => (
                           <TableRow key={user.id}>
                             <TableCell>{user.id}</TableCell>
-                            <TableCell>{user.username}</TableCell>
+                            <TableCell>
+                              {user.username}
+                              {user.database_environment && (
+                                <Badge 
+                                  variant={user.database_environment === 'production' ? 'destructive' : 'default'} 
+                                  className="ml-2 text-xs"
+                                >
+                                  {user.database_environment}
+                                </Badge>
+                              )}
+                            </TableCell>
                             <TableCell>{user.display_name || '-'}</TableCell>
                             <TableCell>{user.watchlist_count}</TableCell>
                             <TableCell>{formatDate(user.last_activity)}</TableCell>

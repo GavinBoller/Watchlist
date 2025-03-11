@@ -269,6 +269,7 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       // Show all registrations in dev mode, no filtering
       // In production, this would be filtered by time period
       const isDevelopment = process.env.NODE_ENV !== 'production';
+      console.log('Environment for recent registrations:', isDevelopment ? 'development' : 'production');
       const recentRegistrations = await executeDirectSql(`
         SELECT 
           username, 
@@ -289,13 +290,15 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
     try {
       // Get all activity, regardless of environment
       // In development, we want to see ALL types of activity
+      const isDevelopment = process.env.NODE_ENV !== 'production';
+      console.log('Environment for recent activity:', isDevelopment ? 'development' : 'production');
       const recentActivity = await executeDirectSql(`
         SELECT 
           u.username,
           m.title,
           w.created_at,
           w.status,
-          '${isDevelopment ? 'development' : 'production'}' as database_environment
+          '${process.env.NODE_ENV !== 'production' ? 'development' : 'production'}' as database_environment
         FROM watchlist_entries w
         JOIN users u ON w.user_id = u.id
         JOIN movies m ON w.movie_id = m.id
