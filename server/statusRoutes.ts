@@ -146,8 +146,15 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
     console.log(`[ADMIN] Stats accessed by user: ${req.user.username} (ID: ${req.user.id})`);
   }
   
-  // Determine environment
-  const isDevelopment = process.env.NODE_ENV !== 'production';
+  // Determine environment - explicitly check NODE_ENV for production
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  const isDevelopment = nodeEnv !== 'production';
+  console.log(`Current environment for stats endpoint: ${nodeEnv} (isDevelopment: ${isDevelopment})`);
+  
+  // If we're on Replit deployments, make sure we treat it as production
+  if (process.env.REPL_SLUG && process.env.REPLIT_RUN_COMMAND && !isDevelopment) {
+    console.log('Production environment detected from Replit deployment identifiers');
+  }
   
   // Create a basic stats structure with default values
   const responseData = {
@@ -176,27 +183,67 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
     }
   };
   try {
-    // Safely get user count
+    // Safely get user count - apply environment-specific filtering
     try {
-      const users = await storage.getAllUsers();
-      responseData.stats.users.total = users.length;
+      const userEnvironmentFilter = isDevelopment
+        ? "username NOT LIKE 'Gaju%' AND username NOT LIKE 'Sophieb%'"
+        : "username LIKE 'Gaju%' OR username LIKE 'Sophieb%'";
+      
+      console.log(`Environment for user count: ${isDevelopment ? 'development' : 'production'}`);
+      
+      const userCountQuery = `
+        SELECT COUNT(*) as user_count
+        FROM users
+        WHERE ${userEnvironmentFilter}
+      `;
+      
+      const userCountResult = await executeDirectSql(userCountQuery);
+      responseData.stats.users.total = parseInt(userCountResult.rows[0].user_count || '0', 10);
     } catch (error) {
       console.error('Error getting user count:', error);
     }
     
     // Get simple counts using direct SQL for reliability
     try {
+      // Apply environment-specific filtering based on usernames
+      const isDevelopment = process.env.NODE_ENV !== 'production';
+      const userEnvironmentFilter = isDevelopment
+        ? "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'"
+        : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+      
+      console.log(`Environment for content stats: ${isDevelopment ? 'development' : 'production'}`);
+      
       // Count only active sessions (not expired and recently accessed)
+      // Use JOIN with users table to filter watchlist entries and platforms by environment
       const query = `
         SELECT 
-          (SELECT COUNT(*) FROM movies WHERE media_type = 'movie') as movie_count,
-          (SELECT COUNT(*) FROM movies WHERE media_type = 'tv') as tv_count,
-          (SELECT COUNT(*) FROM watchlist_entries) as watchlist_count,
-          (SELECT COUNT(*) FROM platforms) as platform_count,
+          (SELECT COUNT(*) FROM movies m
+           JOIN watchlist_entries we ON m.id = we.movie_id
+           JOIN users u ON we.user_id = u.id
+           WHERE m.media_type = 'movie' AND (${userEnvironmentFilter})
+          ) as movie_count,
+          
+          (SELECT COUNT(*) FROM movies m
+           JOIN watchlist_entries we ON m.id = we.movie_id
+           JOIN users u ON we.user_id = u.id
+           WHERE m.media_type = 'tv' AND (${userEnvironmentFilter})
+          ) as tv_count,
+          
+          (SELECT COUNT(*) FROM watchlist_entries we
+           JOIN users u ON we.user_id = u.id
+           WHERE ${userEnvironmentFilter}
+          ) as watchlist_count,
+          
+          (SELECT COUNT(*) FROM platforms p
+           JOIN users u ON p.user_id = u.id
+           WHERE ${userEnvironmentFilter}
+          ) as platform_count,
+          
           (SELECT COUNT(*) FROM session 
            WHERE expire > NOW() 
            AND sess::json->>'lastChecked' IS NOT NULL 
-           AND (sess::json->>'lastChecked')::bigint > extract(epoch from now())::bigint - 86400) as session_count
+           AND (sess::json->>'lastChecked')::bigint > extract(epoch from now())::bigint - 86400
+          ) as session_count
       `;
       
       const countResult = await executeDirectSql(query);
@@ -305,10 +352,21 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
   // Log access attempt for debugging
   console.log(`[ADMIN] Dashboard access by user: ${user.username} (ID: ${user.id})`);
   
+  // Determine environment - explicitly check NODE_ENV for production
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  const isDevelopment = nodeEnv !== 'production';
+  console.log(`Current environment for user-activity endpoint: ${nodeEnv} (isDevelopment: ${isDevelopment})`);
+  
+  // If we're on Replit deployments, make sure we treat it as production
+  if (process.env.REPL_SLUG && process.env.REPLIT_RUN_COMMAND && !isDevelopment) {
+    console.log('Production environment detected from Replit deployment identifiers');
+  }
+  
   // Create a response with default values
   const responseData = {
     status: 'ok',
     timestamp: new Date().toISOString(),
+    environment: isDevelopment ? 'development' : 'production', // Add environment to the response
     recentRegistrations: [] as RecentRegistration[],
     recentActivity: [] as RecentActivity[]
   };
@@ -318,7 +376,6 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
     try {
       // Show all registrations in dev mode, no filtering
       // In production, this would be filtered by time period
-      const isDevelopment = process.env.NODE_ENV !== 'production';
       console.log('Environment for recent registrations:', isDevelopment ? 'development' : 'production');
       // Create filter based on current environment
       const registrationEnvFilter = isDevelopment
@@ -350,7 +407,6 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
     try {
       // Get all activity, regardless of environment
       // In development, we want to see ALL types of activity
-      const isDevelopment = process.env.NODE_ENV !== 'production';
       console.log('Environment for recent activity:', isDevelopment ? 'development' : 'production');
       // Create activity filter based on current environment 
       const activityEnvFilter = isDevelopment
