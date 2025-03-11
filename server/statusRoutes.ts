@@ -186,7 +186,8 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       
       responseData.stats.users.topUsers = topUsersResult.rows;
       
-      // Simplified user activity query
+      // Simplified user activity query - limiting to 10 most recent users in dev mode
+      const isDevelopment = process.env.NODE_ENV !== 'production';
       const userActivityResult = await executeDirectSql(`
         SELECT 
           u.id, 
@@ -200,6 +201,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
         ${userFilter}
         GROUP BY u.id, u.username, u.display_name, u.created_at
         ORDER BY last_activity DESC NULLS LAST, u.created_at DESC
+        ${isDevelopment ? 'LIMIT 10' : ''}
       `);
       
       // Map the results with safer parsing
