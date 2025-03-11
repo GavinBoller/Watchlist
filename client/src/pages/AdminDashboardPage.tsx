@@ -123,17 +123,73 @@ const AdminDashboardPage = () => {
           throw new Error(`Failed to fetch stats: ${statsResponse.statusText}`);
         }
         
-        const statsData = await statsResponse.json();
+        let statsData;
+        try {
+          statsData = await statsResponse.json();
+        } catch (error) {
+          console.error("Error parsing stats JSON:", error);
+          throw new Error("Invalid data received from server");
+        }
+        
+        // Ensure we have the expected data structure to prevent rendering errors
+        if (!statsData.stats) {
+          statsData.stats = {
+            users: {
+              total: 0,
+              topUsers: [],
+              userActivity: []
+            },
+            content: {
+              movies: 0,
+              watchlistEntries: 0,
+              platforms: 0
+            },
+            system: {
+              database: {
+                connected: false,
+                lastChecked: new Date().toISOString()
+              },
+              sessions: 0
+            }
+          };
+        } else {
+          // Ensure sub-objects exist
+          if (!statsData.stats.users) {
+            statsData.stats.users = { total: 0, topUsers: [], userActivity: [] };
+          }
+          if (!statsData.stats.content) {
+            statsData.stats.content = { movies: 0, watchlistEntries: 0, platforms: 0 };
+          }
+          if (!statsData.stats.system) {
+            statsData.stats.system = { 
+              database: { connected: false, lastChecked: new Date().toISOString() },
+              sessions: 0
+            };
+          }
+          
+          // Ensure arrays exist
+          if (!statsData.stats.users.topUsers) statsData.stats.users.topUsers = [];
+          if (!statsData.stats.users.userActivity) statsData.stats.users.userActivity = [];
+        }
+        
         setStats(statsData);
         
         // Fetch detailed user activity
-        const activityResponse = await fetch("/api/status/user-activity", {
-          headers: setAuthHeader(),
-        });
-        
-        if (activityResponse.ok) {
-          const activityData = await activityResponse.json();
-          setActivityData(activityData);
+        try {
+          const activityResponse = await fetch("/api/status/user-activity", {
+            headers: setAuthHeader(),
+          });
+          
+          if (activityResponse.ok) {
+            const activityData = await activityResponse.json();
+            // Ensure expected properties exist
+            if (!activityData.recentRegistrations) activityData.recentRegistrations = [];
+            if (!activityData.recentActivity) activityData.recentActivity = [];
+            setActivityData(activityData);
+          }
+        } catch (activityError) {
+          console.error("Error fetching activity data:", activityError);
+          // Continue without activity data - it's not critical
         }
         
       } catch (err) {

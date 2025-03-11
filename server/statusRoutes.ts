@@ -155,15 +155,15 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
           u.id, 
           u.username, 
           u.display_name,
-          COUNT(w.id) as watchlist_count,
+          COUNT(w.id)::text as watchlist_count,
           (
-            SELECT MAX(s.expire) 
+            SELECT MAX(s.expire)::text
             FROM session s 
             WHERE sess::jsonb->>'preservedUsername' = u.username
             OR sess::jsonb->>'username' = u.username
           ) as last_login,
           (
-            SELECT MAX(w2.created_at) 
+            SELECT MAX(w2.created_at)::text
             FROM watchlist_entries w2 
             WHERE w2.user_id = u.id
           ) as last_activity

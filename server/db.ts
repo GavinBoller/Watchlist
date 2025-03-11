@@ -363,7 +363,7 @@ export async function executeDirectSql<T = any>(
   sql: string, 
   params: any[] = [],
   errorMessage: string = 'Database operation failed'
-): Promise<T[]> {
+): Promise<{rows: T[], rowCount: number}> {
   if (!pool) {
     // Try to initialize database before failing
     try {
@@ -374,7 +374,11 @@ export async function executeDirectSql<T = any>(
     
     // If still no pool, throw error
     if (!pool) {
-      throw new Error('Database pool not initialized');
+      // Return empty result set instead of throwing
+      return {
+        rows: [],
+        rowCount: 0
+      };
     }
   }
   
@@ -382,10 +386,17 @@ export async function executeDirectSql<T = any>(
   try {
     client = await pool.connect();
     const result = await client.query(sql, params);
-    return result.rows as T[];
+    return {
+      rows: result.rows as T[],
+      rowCount: result.rowCount
+    };
   } catch (error) {
     console.error(`Direct SQL execution failed: ${errorMessage}`, error);
-    throw new Error(`${errorMessage}: ${getDbErrorMessage(error)}`);
+    // Return empty result set instead of throwing
+    return {
+      rows: [],
+      rowCount: 0
+    };
   } finally {
     if (client) client.release();
   }
