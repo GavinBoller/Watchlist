@@ -111,6 +111,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       },
       content: {
         movies: 0,
+        tvShows: 0, // Add TV shows count
         watchlistEntries: 0,
         platforms: 0
       },
@@ -134,19 +135,23 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
     
     // Get simple counts using direct SQL for reliability
     try {
+      // Count only active sessions (not expired)
       const query = `
         SELECT 
-          (SELECT COUNT(*) FROM movies) as movie_count,
+          (SELECT COUNT(*) FROM movies WHERE media_type = 'movie') as movie_count,
+          (SELECT COUNT(*) FROM movies WHERE media_type = 'tv') as tv_count,
           (SELECT COUNT(*) FROM watchlist_entries) as watchlist_count,
           (SELECT COUNT(*) FROM platforms) as platform_count,
-          (SELECT COUNT(*) FROM session) as session_count
+          (SELECT COUNT(*) FROM session WHERE expire > NOW()) as session_count
       `;
       
       const countResult = await executeDirectSql(query);
       
       if (countResult.rows.length > 0) {
         const counts = countResult.rows[0];
+        // Add a movies field that includes both movies and TV shows
         responseData.stats.content.movies = parseInt(counts.movie_count || '0', 10);
+        responseData.stats.content.tvShows = parseInt(counts.tv_count || '0', 10);
         responseData.stats.content.watchlistEntries = parseInt(counts.watchlist_count || '0', 10);
         responseData.stats.content.platforms = parseInt(counts.platform_count || '0', 10);
         responseData.stats.system.sessions = parseInt(counts.session_count || '0', 10);

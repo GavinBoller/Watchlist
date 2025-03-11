@@ -55,6 +55,7 @@ interface SystemStats {
     };
     content: {
       movies: number;
+      tvShows: number; // Added TV shows count
       watchlistEntries: number;
       platforms: number;
     };
@@ -141,6 +142,7 @@ const AdminDashboardPage = () => {
             },
             content: {
               movies: 0,
+              tvShows: 0,
               watchlistEntries: 0,
               platforms: 0
             },
@@ -158,7 +160,7 @@ const AdminDashboardPage = () => {
             statsData.stats.users = { total: 0, topUsers: [], userActivity: [] };
           }
           if (!statsData.stats.content) {
-            statsData.stats.content = { movies: 0, watchlistEntries: 0, platforms: 0 };
+            statsData.stats.content = { movies: 0, tvShows: 0, watchlistEntries: 0, platforms: 0 };
           }
           if (!statsData.stats.system) {
             statsData.stats.system = { 
@@ -324,7 +326,7 @@ const AdminDashboardPage = () => {
         </Card>
 
         {/* Key Metrics */}
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle>Users</CardTitle>
@@ -345,10 +347,22 @@ const AdminDashboardPage = () => {
           
           <Card>
             <CardHeader className="pb-2">
+              <CardTitle>TV Shows</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{stats.stats.content.tvShows || 0}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
               <CardTitle>Watchlist Entries</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{stats.stats.content.watchlistEntries}</div>
+              <div className="text-xs text-muted-foreground pt-2">
+                {import.meta.env.DEV && <span className="text-orange-500">⚠️ Showing production data</span>}
+              </div>
             </CardContent>
           </Card>
         </div>
