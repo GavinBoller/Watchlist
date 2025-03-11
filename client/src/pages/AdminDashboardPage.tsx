@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { isAuthenticated, setAuthHeader } from "@/lib/jwtUtils";
+import { isProductionEnvironment } from "@/lib/environment-utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistance } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -446,7 +447,7 @@ const AdminDashboardPage = () => {
                         <TableHead>Display Name</TableHead>
                         <TableHead>Watchlist Count</TableHead>
                         <TableHead>Last Activity</TableHead>
-                        <TableHead>Last Login</TableHead>
+                        <TableHead>Registration Date</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -458,7 +459,7 @@ const AdminDashboardPage = () => {
                             <TableCell>{user.display_name || '-'}</TableCell>
                             <TableCell>{user.watchlist_count}</TableCell>
                             <TableCell>{formatDate(user.last_activity)}</TableCell>
-                            <TableCell>{formatDate(user.last_seen)}</TableCell>
+                            <TableCell>{formatDate(user.last_login)}</TableCell>
                           </TableRow>
                         ))
                       : (
@@ -556,7 +557,7 @@ const AdminDashboardPage = () => {
                 <CardHeader>
                   <CardTitle>Recent Registrations</CardTitle>
                   <CardDescription>
-                    Users who joined in the last 7 days
+                    {isProductionEnvironment() ? 'Users who joined in the last 7 days' : 'All users in development environment'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -580,7 +581,7 @@ const AdminDashboardPage = () => {
                       ) : (
                         <TableRow>
                           <TableCell colSpan={3} className="text-center py-6">
-                            No new registrations in the last 7 days
+                            {isProduction ? 'No new registrations in the last 7 days' : 'No user registrations available'}
                           </TableCell>
                         </TableRow>
                       )}
