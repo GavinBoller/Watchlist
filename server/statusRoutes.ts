@@ -267,7 +267,10 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       const userFilter = '';
       
       // Simplified query for top users - reuse the existing environment filter
-      // Re-using the same filter to ensure consistency across all queries
+      // Create a new variable for user activity environment filtering
+      const userActivityEnvFilter = isDevelopment
+        ? "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'"
+        : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
       
       const topUsersResult = await executeDirectSql(`
         SELECT 
@@ -278,7 +281,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
           '${isDevelopment ? 'development' : 'production'}' as database_environment
         FROM users u
         JOIN watchlist_entries w ON u.id = w.user_id
-        WHERE ${userEnvironmentFilter}
+        WHERE ${userActivityEnvFilter}
         GROUP BY u.id, u.username, u.display_name
         ORDER BY COUNT(w.id) DESC
         LIMIT 5
@@ -296,7 +299,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
           (SELECT MAX(w.created_at)::text FROM watchlist_entries w WHERE w.user_id = u.id) as last_activity,
           '${isDevelopment ? 'development' : 'production'}' as database_environment
         FROM users u
-        WHERE ${userEnvironmentFilter}
+        WHERE ${userActivityEnvFilter}
         ORDER BY last_activity DESC NULLS LAST, registration_date DESC
       `;
       
