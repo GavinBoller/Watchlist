@@ -211,21 +211,38 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       
       responseData.stats.users.topUsers = topUsersResult.rows;
       
-      // Simplified user activity query - filter by environment
+      // Improved user activity query to reflect recent activity more accurately
+      // First, get the latest activity timestamps from all activities for each user
       const userActivityResult = await executeDirectSql(`
+        WITH latest_activities AS (
+          SELECT 
+            u.id, 
+            u.username, 
+            u.display_name,
+            COUNT(w.id)::text as watchlist_count,
+            MAX(w.created_at)::text as last_activity,
+            MAX(w.updated_at)::text as last_updated,
+            u.created_at::text as registration_date,
+            '${isDevelopment ? 'development' : 'production'}' as database_environment
+          FROM users u
+          LEFT JOIN watchlist_entries w ON u.id = w.user_id
+          WHERE ${userEnvironmentFilter}
+          GROUP BY u.id, u.username, u.display_name, u.created_at
+        )
         SELECT 
-          u.id, 
-          u.username, 
-          u.display_name,
-          COUNT(w.id)::text as watchlist_count,
-          MAX(w.created_at)::text as last_activity,
-          u.created_at::text as registration_date,
-          '${isDevelopment ? 'development' : 'production'}' as database_environment
-        FROM users u
-        LEFT JOIN watchlist_entries w ON u.id = w.user_id
-        WHERE ${userEnvironmentFilter}
-        GROUP BY u.id, u.username, u.display_name, u.created_at
-        ORDER BY last_activity DESC NULLS LAST, u.created_at DESC
+          id, 
+          username, 
+          display_name,
+          watchlist_count,
+          CASE 
+            WHEN last_activity IS NULL THEN registration_date
+            WHEN last_updated IS NULL OR last_activity > last_updated THEN last_activity
+            ELSE last_updated
+          END as last_activity,
+          registration_date,
+          database_environment
+        FROM latest_activities
+        ORDER BY last_activity DESC NULLS LAST, registration_date DESC
       `);
       
       // Map the results with safer parsing
