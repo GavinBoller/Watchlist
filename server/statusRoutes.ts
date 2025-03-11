@@ -22,6 +22,22 @@ interface UserActivityData {
   last_login: string | null;
   last_activity: string | null;
   last_seen: string | null;
+  database_environment: 'development' | 'production';
+}
+
+interface RecentRegistration {
+  username: string;
+  display_name: string | null;
+  created_at: string;
+  database_environment: 'development' | 'production';
+}
+
+interface RecentActivity {
+  username: string;
+  title: string;
+  created_at: string;
+  status: 'to_watch' | 'watching' | 'watched';
+  database_environment: 'development' | 'production';
 }
 
 const router = Router();
@@ -173,7 +189,11 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       // so we don't need to filter by username patterns
       const userFilter = '';
       
-      // Simplified query for top users
+      // Simplified query for top users - filter by environment
+      const userEnvironmentFilter = isDevelopment
+        ? "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'"
+        : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+      
       const topUsersResult = await executeDirectSql(`
         SELECT 
           u.id, 
@@ -183,7 +203,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
           '${isDevelopment ? 'development' : 'production'}' as database_environment
         FROM users u
         JOIN watchlist_entries w ON u.id = w.user_id
-        ${userFilter}
+        WHERE ${userEnvironmentFilter}
         GROUP BY u.id, u.username, u.display_name
         ORDER BY COUNT(w.id) DESC
         LIMIT 5
@@ -191,7 +211,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       
       responseData.stats.users.topUsers = topUsersResult.rows;
       
-      // Simplified user activity query - showing ALL users in dev mode
+      // Simplified user activity query - filter by environment
       const userActivityResult = await executeDirectSql(`
         SELECT 
           u.id, 
@@ -203,7 +223,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
           '${isDevelopment ? 'development' : 'production'}' as database_environment
         FROM users u
         LEFT JOIN watchlist_entries w ON u.id = w.user_id
-        ${userFilter}
+        WHERE ${userEnvironmentFilter}
         GROUP BY u.id, u.username, u.display_name, u.created_at
         ORDER BY last_activity DESC NULLS LAST, u.created_at DESC
       `);
@@ -259,8 +279,8 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
   const responseData = {
     status: 'ok',
     timestamp: new Date().toISOString(),
-    recentRegistrations: [],
-    recentActivity: []
+    recentRegistrations: [] as RecentRegistration[],
+    recentActivity: [] as RecentActivity[]
   };
   
   try {
@@ -275,7 +295,10 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
           username, 
           display_name, 
           created_at,
-          '${isDevelopment ? 'development' : 'production'}' as database_environment
+          CASE 
+            WHEN username LIKE 'Gaju%' OR username LIKE 'Sophieb%' THEN 'production'
+            ELSE '${isDevelopment ? 'development' : 'production'}'
+          END as database_environment
         FROM users
         ORDER BY created_at DESC
         LIMIT 100
@@ -298,7 +321,10 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
           m.title,
           w.created_at,
           w.status,
-          '${process.env.NODE_ENV !== 'production' ? 'development' : 'production'}' as database_environment
+          CASE 
+            WHEN u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%' THEN 'production'
+            ELSE '${process.env.NODE_ENV !== 'production' ? 'development' : 'production'}'
+          END as database_environment
         FROM watchlist_entries w
         JOIN users u ON w.user_id = u.id
         JOIN movies m ON w.movie_id = m.id
