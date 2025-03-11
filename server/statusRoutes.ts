@@ -211,23 +211,34 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       
       responseData.stats.users.topUsers = topUsersResult.rows;
       
-      // Updated user activity query with a direct join to get the most recent activity
+      // Using a much simpler approach to retrieve latest activity data
+      // Add explicit debugging to verify the recent entries
+      console.log('[DEBUG] Getting most recent activity for Gavin500 (ID: 53)');
+      const entryCheck = await executeDirectSql(`
+        SELECT w.id, w.created_at, w.user_id, u.username FROM watchlist_entries w
+        JOIN users u ON w.user_id = u.id
+        WHERE u.username = 'Gavin500'
+        ORDER BY w.created_at DESC LIMIT 5
+      `);
+      
+      if (entryCheck.rows && entryCheck.rows.length > 0) {
+        console.log('[DEBUG] Most recent entries for Gavin500:', JSON.stringify(entryCheck.rows));
+      } else {
+        console.log('[DEBUG] No recent entries found for Gavin500');
+      }
+      
+      // Extremely simplified query that directly gets the most recent activity
       const userActivityResult = await executeDirectSql(`
-        WITH user_latest_activity AS (
-          SELECT DISTINCT ON (u.id)
-            u.id,
-            u.username,
-            u.display_name,
-            u.created_at as registration_date,
-            (SELECT COUNT(*) FROM watchlist_entries w WHERE w.user_id = u.id)::text as watchlist_count,
-            (SELECT MAX(created_at)::text FROM watchlist_entries w WHERE w.user_id = u.id) as last_activity,
-            '${isDevelopment ? 'development' : 'production'}' as database_environment
-          FROM users u
-          WHERE ${userEnvironmentFilter}
-          ORDER BY u.id, last_activity DESC NULLS LAST
-        )
-        SELECT *
-        FROM user_latest_activity
+        SELECT 
+          u.id,
+          u.username,
+          u.display_name,
+          u.created_at as registration_date,
+          (SELECT COUNT(*) FROM watchlist_entries w WHERE w.user_id = u.id)::text as watchlist_count,
+          (SELECT MAX(w.created_at)::text FROM watchlist_entries w WHERE w.user_id = u.id) as last_activity,
+          '${isDevelopment ? 'development' : 'production'}' as database_environment
+        FROM users u
+        WHERE ${userEnvironmentFilter}
         ORDER BY last_activity DESC NULLS LAST, registration_date DESC
       `);
       
