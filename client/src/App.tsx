@@ -8,6 +8,7 @@ import Header from "@/components/Header";
 import SearchPage from "@/pages/SearchPage";
 import WatchlistPage from "@/pages/WatchlistPage";
 import AuthPage from "@/pages/auth-page";
+import AdminDashboardPage from "@/pages/AdminDashboardPage";
 import { UserContext } from "@/lib/user-context";
 import { Switch, Route } from "wouter";
 import { JwtAuthProvider, useJwtAuth } from "@/hooks/use-jwt-auth";
@@ -49,6 +50,7 @@ function AppInternal() {
           <Switch>
             <ProtectedRoute path="/" component={SearchPage} />
             <ProtectedRoute path="/watched" component={WatchlistPage} />
+            <ProtectedRoute path="/admin" component={AdminDashboardPage} />
             <Route path="/auth" component={AuthPage} />
             <Route component={NotFound} />
           </Switch>
