@@ -20,7 +20,7 @@ import passport from "passport";
 import { configurePassport, isAuthenticated, hasWatchlistAccess } from "./auth";
 import authRoutes from "./authRoutes";
 import MemoryStore from "memorystore";
-import { pool, db } from "./db";
+import { pool, db, executeDirectSql } from "./db";
 import { exec } from "child_process";
 import util from "util";
 import fs from "fs";
@@ -418,6 +418,63 @@ async function startServer() {
     // Register status routes for monitoring and admin endpoints
     console.log('[SERVER] Adding status routes for monitoring');
     app.use('/api/status', statusRouter);
+    
+    // Add direct status endpoints to ensure they're accessible in all environments
+    app.get('/api/status-direct/ping', (_req: Request, res: Response) => {
+      res.json({ status: 'ok', time: new Date().toISOString() });
+    });
+    
+    app.get('/api/status-direct/admin-check', async (_req: Request, res: Response) => {
+      try {
+        // Administrators are user ID 1 or any user marked as admin 
+        // In the current system, only user ID 1 has admin privileges
+        let adminUsers = [];
+        
+        try {
+          // Skip DB query if database is not available, just use default admin
+          if (pool) {
+            const client = await pool.connect();
+            try {
+              const result = await client.query('SELECT id, username, display_name FROM users WHERE id = 1 ORDER BY id');
+              if (result.rows && result.rows.length > 0) {
+                adminUsers = result.rows.map(user => ({
+                  id: user.id,
+                  username: user.username,
+                  displayName: user.display_name || user.username
+                }));
+              }
+            } finally {
+              client.release();
+            }
+          }
+        } catch (dbError) {
+          console.log('Could not query database for admin users:', dbError);
+        }
+        
+        // If no admin users were found, use the default
+        if (adminUsers.length === 0) {
+          console.log('No admin users found in database, using default');
+          adminUsers = [{
+            id: 1,
+            username: 'admin',
+            displayName: 'Default Admin'
+          }];
+        }
+        
+        res.json({
+          status: 'ok',
+          adminUsers: adminUsers,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Error in admin-check endpoint:', error);
+        res.status(500).json({
+          status: 'error',
+          message: 'Could not determine admin users',
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    });
     
     // Emergency recovery endpoints have been removed to simplify authentication
     
