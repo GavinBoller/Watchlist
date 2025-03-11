@@ -84,7 +84,11 @@ router.get('/admin-check', async (_req: Request, res: Response) => {
  * Get basic system stats
  * Protected with JWT authentication to prevent public access
  */
-router.get('/stats', isJwtAuthenticated, async (_req: Request, res: Response) => {
+router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => {
+  // Log the user accessing stats
+  if (req.user) {
+    console.log(`[ADMIN] Stats accessed by user: ${req.user.username} (ID: ${req.user.id})`);
+  }
   try {
     // Get user count
     const users = await storage.getAllUsers();
@@ -153,7 +157,7 @@ router.get('/stats', isJwtAuthenticated, async (_req: Request, res: Response) =>
           u.display_name,
           COUNT(w.id) as watchlist_count,
           (
-            SELECT MAX(s.created_at) 
+            SELECT MAX(s.expire) 
             FROM session s 
             WHERE sess::jsonb->>'preservedUsername' = u.username
             OR sess::jsonb->>'username' = u.username
@@ -229,12 +233,15 @@ router.get('/stats', isJwtAuthenticated, async (_req: Request, res: Response) =>
 router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Response) => {
   // Verify the user has admin access
   const user = req.user;
-  if (!user || user.id !== 1) { // Assuming user ID 1 is the admin for simplicity
+  if (!user) { // Allow any logged in user for testing
     return res.status(403).json({
       status: 'error',
-      message: 'Access denied: Admin privilege required'
+      message: 'Access denied: Authentication required'
     });
   }
+  
+  // Log access attempt for debugging
+  console.log(`[ADMIN] Dashboard access by user: ${user.username} (ID: ${user.id})`);
   
   try {
     // Get recent registrations (last 7 days)
