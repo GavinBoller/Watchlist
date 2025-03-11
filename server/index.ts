@@ -419,12 +419,26 @@ async function startServer() {
     console.log('[SERVER] Adding status routes for monitoring');
     app.use('/api/status', statusRouter);
     
+    // Add special route to test ping endpoint from browser
+    app.get('/status-ping-test', (_req: Request, res: Response) => {
+      res.sendFile(path.join(__dirname, '../public/status-direct-ping.html'));
+    });
+    
+    // Add special route to test admin check endpoint from browser
+    app.get('/status-admin-test', (_req: Request, res: Response) => {
+      res.sendFile(path.join(__dirname, '../public/status-direct-admin.html'));
+    });
+    
     // Add direct status endpoints to ensure they're accessible in all environments
     app.get('/api/status-direct/ping', (_req: Request, res: Response) => {
       // Set explicit content type and disable caching to prevent browser interpretation
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
       res.setHeader('X-Content-Type-Options', 'nosniff');
+      // Add CORS headers to ensure direct API access
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       res.json({ status: 'ok', time: new Date().toISOString() });
     });
     
@@ -433,6 +447,10 @@ async function startServer() {
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
       res.setHeader('X-Content-Type-Options', 'nosniff');
+      // Add CORS headers to ensure direct API access
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       try {
         // Administrators are user ID 1 or any user marked as admin 
         // In the current system, only user ID 1 has admin privileges
