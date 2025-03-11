@@ -159,18 +159,30 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
   
   // Check DATABASE_URL for production indicators
   const dbUrl = process.env.DATABASE_URL || '';
-  const hasProdDatabase = dbUrl.includes('prod') || 
-                           dbUrl.includes('neon.tech') || 
-                           dbUrl.includes('amazonaws.com') ||
-                           dbUrl.includes('render.com');
   
-  // If any production indicator is present, consider it production
-  const isProduction = 
-    nodeEnv === 'production' || 
-    hasReplitDeploymentIndicators ||
-    hasProdDatabase;
-    
-  const isDevelopment = !isProduction;
+  // Only consider it a production database if:
+  // 1. It explicitly has 'prod' in the URL
+  // 2. It's a deployed cloud instance AND NODE_ENV is production
+  // This prevents development databases on cloud providers being seen as production
+  const hasProdDatabase = 
+    dbUrl.includes('prod') || 
+    (nodeEnv === 'production' && (
+      dbUrl.includes('amazonaws.com') ||
+      dbUrl.includes('render.com')
+    ));
+  
+  // For dashboard purposes, we'll force development mode unless:
+  // 1. We're explicitly in production mode (NODE_ENV=production)
+  // 2. We have an environment variable to override
+  
+  // Default to development environment for dashboard
+  let isDevelopment = true;
+  
+  // Only consider production if NODE_ENV is explicitly set to production
+  const isProduction = nodeEnv === 'production';
+  
+  // Use that to set the development flag
+  isDevelopment = !isProduction;
   
   console.log(`Environment detection for stats endpoint:`);
   console.log(`- NODE_ENV: ${nodeEnv}`);
@@ -428,12 +440,12 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
                           dbUrl.includes('amazonaws.com') ||
                           dbUrl.includes('render.com');
   
-  // If any production indicator is present, consider it production
-  const isProduction = 
-    nodeEnv === 'production' || 
-    hasReplitDeploymentIndicators ||
-    hasProdDatabase;
-    
+  // For dashboard purposes in development, we'll only be in production mode
+  // if NODE_ENV is explicitly set to production
+  
+  // Always default to development mode for dashboard 
+  // unless explicitly set to production mode
+  const isProduction = nodeEnv === 'production';
   let isDevelopment = !isProduction;
   
   console.log(`Environment detection for user-activity endpoint:`);
