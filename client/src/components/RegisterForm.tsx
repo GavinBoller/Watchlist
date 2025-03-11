@@ -175,6 +175,7 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
               onChange={(e) => setUsername(e.target.value)}
               disabled={isLoading}
               required
+              autoComplete="off"
             />
           </div>
           <div className="space-y-2">
@@ -185,6 +186,7 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               disabled={isLoading}
+              autoComplete="off"
             />
             <p className="text-xs text-muted-foreground">
               This will be displayed in your profile. If left empty, your username will be used.
@@ -216,6 +218,7 @@ export const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }: RegisterFor
               onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={isLoading}
               required
+              autoComplete="off"
             />
           </div>
           <Button type="submit" className="w-full" disabled={isLoading}>
