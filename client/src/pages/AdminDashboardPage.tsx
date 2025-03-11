@@ -290,11 +290,6 @@ const AdminDashboardPage = () => {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          {import.meta.env.DEV && (
-            <div className="text-orange-500 font-medium text-sm mt-1">
-              ⚠️ Development mode - Connected to production database
-            </div>
-          )}
         </div>
         <Button onClick={() => window.location.reload()}>Refresh Data</Button>
       </div>
@@ -368,7 +363,7 @@ const AdminDashboardPage = () => {
             <CardContent>
               <div className="text-3xl font-bold">{stats.stats.content.watchlistEntries}</div>
               <div className="text-xs text-muted-foreground pt-2">
-                {import.meta.env.DEV && <span className="text-orange-500">⚠️ Showing production data</span>}
+                &nbsp;
               </div>
             </CardContent>
           </Card>
@@ -524,11 +519,6 @@ const AdminDashboardPage = () => {
                   <CardTitle>Recent Watchlist Activity</CardTitle>
                   <CardDescription>
                     Latest watchlist updates
-                    {import.meta.env.DEV && (
-                      <span className="text-orange-500 block mt-1 text-xs">
-                        ⚠️ Showing production data
-                      </span>
-                    )}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -567,11 +557,6 @@ const AdminDashboardPage = () => {
                   <CardTitle>Recent Registrations</CardTitle>
                   <CardDescription>
                     Users who joined in the last 7 days
-                    {import.meta.env.DEV && (
-                      <span className="text-orange-500 block mt-1 text-xs">
-                        ⚠️ Showing production data
-                      </span>
-                    )}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
