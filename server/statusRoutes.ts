@@ -146,14 +146,43 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
     console.log(`[ADMIN] Stats accessed by user: ${req.user.username} (ID: ${req.user.id})`);
   }
   
-  // Determine environment - explicitly check NODE_ENV for production
+  // Determine environment through multiple environment indicators
   const nodeEnv = process.env.NODE_ENV || 'development';
-  const isDevelopment = nodeEnv !== 'production';
-  console.log(`Current environment for stats endpoint: ${nodeEnv} (isDevelopment: ${isDevelopment})`);
   
-  // If we're on Replit deployments, make sure we treat it as production
-  if (process.env.REPL_SLUG && process.env.REPLIT_RUN_COMMAND && !isDevelopment) {
-    console.log('Production environment detected from Replit deployment identifiers');
+  // Check multiple indicators to determine the environment:
+  // 1. NODE_ENV explicit setting
+  // 2. Replit deployment indicators
+  // 3. Database connection URL
+  
+  // Check if we're in a Replit deployment environment
+  const hasReplitDeploymentIndicators = !!(process.env.REPL_SLUG && process.env.REPLIT_RUN_COMMAND);
+  
+  // Check DATABASE_URL for production indicators
+  const dbUrl = process.env.DATABASE_URL || '';
+  const hasProdDatabase = dbUrl.includes('prod') || 
+                           dbUrl.includes('neon.tech') || 
+                           dbUrl.includes('amazonaws.com') ||
+                           dbUrl.includes('render.com');
+  
+  // If any production indicator is present, consider it production
+  const isProduction = 
+    nodeEnv === 'production' || 
+    hasReplitDeploymentIndicators ||
+    hasProdDatabase;
+    
+  const isDevelopment = !isProduction;
+  
+  console.log(`Environment detection for stats endpoint:`);
+  console.log(`- NODE_ENV: ${nodeEnv}`);
+  console.log(`- Replit deployment indicators: ${hasReplitDeploymentIndicators}`);
+  console.log(`- Production database indicators: ${hasProdDatabase}`);
+  console.log(`- Final environment: ${isDevelopment ? 'development' : 'production'}`);
+  
+  // Use environment variable to override if explicitly set
+  const envOverride = process.env.FORCE_ENVIRONMENT;
+  if (envOverride === 'development' || envOverride === 'production') {
+    console.log(`Environment override applied: ${envOverride}`);
+    isDevelopment = envOverride === 'development';
   }
   
   // Create a basic stats structure with default values
@@ -381,14 +410,43 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
   // Log access attempt for debugging
   console.log(`[ADMIN] Dashboard access by user: ${user.username} (ID: ${user.id})`);
   
-  // Determine environment - explicitly check NODE_ENV for production
+  // Determine environment through multiple environment indicators
   const nodeEnv = process.env.NODE_ENV || 'development';
-  const isDevelopment = nodeEnv !== 'production';
-  console.log(`Current environment for user-activity endpoint: ${nodeEnv} (isDevelopment: ${isDevelopment})`);
   
-  // If we're on Replit deployments, make sure we treat it as production
-  if (process.env.REPL_SLUG && process.env.REPLIT_RUN_COMMAND && !isDevelopment) {
-    console.log('Production environment detected from Replit deployment identifiers');
+  // Check multiple indicators to determine the environment:
+  // 1. NODE_ENV explicit setting
+  // 2. Replit deployment indicators
+  // 3. Database connection URL
+  
+  // Check if we're in a Replit deployment environment
+  const hasReplitDeploymentIndicators = !!(process.env.REPL_SLUG && process.env.REPLIT_RUN_COMMAND);
+  
+  // Check DATABASE_URL for production indicators
+  const dbUrl = process.env.DATABASE_URL || '';
+  const hasProdDatabase = dbUrl.includes('prod') || 
+                          dbUrl.includes('neon.tech') || 
+                          dbUrl.includes('amazonaws.com') ||
+                          dbUrl.includes('render.com');
+  
+  // If any production indicator is present, consider it production
+  const isProduction = 
+    nodeEnv === 'production' || 
+    hasReplitDeploymentIndicators ||
+    hasProdDatabase;
+    
+  let isDevelopment = !isProduction;
+  
+  console.log(`Environment detection for user-activity endpoint:`);
+  console.log(`- NODE_ENV: ${nodeEnv}`);
+  console.log(`- Replit deployment indicators: ${hasReplitDeploymentIndicators}`);
+  console.log(`- Production database indicators: ${hasProdDatabase}`);
+  console.log(`- Final environment: ${isDevelopment ? 'development' : 'production'}`);
+  
+  // Use environment variable to override if explicitly set
+  const envOverride = process.env.FORCE_ENVIRONMENT;
+  if (envOverride === 'development' || envOverride === 'production') {
+    console.log(`Environment override applied: ${envOverride}`);
+    isDevelopment = envOverride === 'development';
   }
   
   // Create a response with default values
