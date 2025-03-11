@@ -82,6 +82,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   console.log("[SERVER] Registering simplified registration endpoint");
   app.use("/api", simpleRegisterRouter);
   
+  // Add direct handlers for status endpoints to make them available in production environment
+  app.get("/api/status/ping", (_req: Request, res: Response) => {
+    res.json({ status: 'ok', time: new Date().toISOString() });
+  });
+  
+  app.get("/api/status/admin-check", async (_req: Request, res: Response) => {
+    try {
+      // Administrators are user ID 1 or any user marked as admin 
+      // In the current system, only user ID 1 has admin privileges
+      const admins = await executeDirectSql<{id: number, username: string, display_name: string | null}>(
+        'SELECT id, username, display_name FROM users WHERE id = 1 ORDER BY id'
+      );
+      
+      // Make sure rows exists before mapping
+      if (admins && admins.rows && admins.rows.length > 0) {
+        res.json({
+          status: 'ok',
+          adminUsers: admins.rows.map(user => ({
+            id: user.id,
+            username: user.username,
+            displayName: user.display_name || user.username
+          }))
+        });
+      } else {
+        // Fallback for when no admins are found
+        console.log('No admin users found in database');
+        res.json({
+          status: 'ok',
+          adminUsers: [{
+            id: 1,
+            username: 'admin',
+            displayName: 'Default Admin'
+          }],
+          note: 'No admin users found in database, showing default admin user'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching admin users:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Could not determine admin users',
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+  
   // Auth routes are already registered in index.ts - don't register them twice
   
   // Add a session diagnostics endpoint to help debug session issues
