@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -89,6 +89,7 @@ const AdminDashboardPage = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -304,7 +305,24 @@ const AdminDashboardPage = () => {
             </div>
           )}
         </div>
-        <Button onClick={() => window.location.reload()}>Refresh Data</Button>
+        <div className="flex space-x-2">
+          <Button 
+            onClick={() => window.location.reload()} 
+            variant="outline"
+          >
+            Refresh Data
+          </Button>
+          <Button 
+            onClick={() => {
+              // Force a complete cache bypass by appending a timestamp
+              const cacheBuster = `?cache=${Date.now()}`;
+              window.location.href = window.location.pathname + cacheBuster;
+            }}
+            variant="default"
+          >
+            Force Refresh (Clear Cache)
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6">
