@@ -205,8 +205,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
     
     // Get simple counts using direct SQL for reliability
     try {
-      // Apply environment-specific filtering based on usernames
-      const isDevelopment = process.env.NODE_ENV !== 'production';
+      // Use the same environment detection from above
       const userEnvironmentFilter = isDevelopment
         ? "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'"
         : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
@@ -267,10 +266,8 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       // so we don't need to filter by username patterns
       const userFilter = '';
       
-      // Simplified query for top users - filter by environment
-      const userEnvironmentFilter = isDevelopment
-        ? "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'"
-        : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+      // Simplified query for top users - reuse the existing environment filter
+      // Re-using the same filter to ensure consistency across all queries
       
       const topUsersResult = await executeDirectSql(`
         SELECT 
