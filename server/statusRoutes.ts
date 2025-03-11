@@ -211,21 +211,24 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       
       responseData.stats.users.topUsers = topUsersResult.rows;
       
-      // Fixed user activity query - we don't have updated_at column
+      // Updated user activity query with a direct join to get the most recent activity
       const userActivityResult = await executeDirectSql(`
-        SELECT 
-          u.id, 
-          u.username, 
-          u.display_name,
-          COUNT(w.id)::text as watchlist_count,
-          MAX(w.created_at)::text as last_activity,
-          u.created_at::text as registration_date,
-          '${isDevelopment ? 'development' : 'production'}' as database_environment
-        FROM users u
-        LEFT JOIN watchlist_entries w ON u.id = w.user_id
-        WHERE ${userEnvironmentFilter}
-        GROUP BY u.id, u.username, u.display_name, u.created_at
-        ORDER BY last_activity DESC NULLS LAST, u.created_at DESC
+        WITH user_latest_activity AS (
+          SELECT DISTINCT ON (u.id)
+            u.id,
+            u.username,
+            u.display_name,
+            u.created_at as registration_date,
+            (SELECT COUNT(*) FROM watchlist_entries w WHERE w.user_id = u.id)::text as watchlist_count,
+            (SELECT MAX(created_at)::text FROM watchlist_entries w WHERE w.user_id = u.id) as last_activity,
+            '${isDevelopment ? 'development' : 'production'}' as database_environment
+          FROM users u
+          WHERE ${userEnvironmentFilter}
+          ORDER BY u.id, last_activity DESC NULLS LAST
+        )
+        SELECT *
+        FROM user_latest_activity
+        ORDER BY last_activity DESC NULLS LAST, registration_date DESC
       `);
       
       // Map the results with safer parsing
