@@ -110,7 +110,7 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword
         <CardTitle className="text-2xl text-center">Log In to Your Account</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
             <Input
@@ -119,6 +119,7 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               disabled={isLoading}
+              autoComplete="off"
             />
           </div>
           <div className="space-y-2">
@@ -130,6 +131,7 @@ export const LoginForm = ({ onLoginSuccess, onSwitchToRegister, onForgotPassword
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
+              autoComplete="off"
             />
           </div>
           <Button type="submit" className="w-full" disabled={isLoading}>
