@@ -288,7 +288,14 @@ const AdminDashboardPage = () => {
   return (
     <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <div>
+          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          {import.meta.env.DEV && (
+            <div className="text-orange-500 font-medium text-sm mt-1">
+              ⚠️ Development mode - Connected to production database
+            </div>
+          )}
+        </div>
         <Button onClick={() => window.location.reload()}>Refresh Data</Button>
       </div>
 
@@ -366,6 +373,53 @@ const AdminDashboardPage = () => {
             </CardContent>
           </Card>
         </div>
+        
+        {/* Media Type Breakdown */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Media Type Breakdown</CardTitle>
+            <CardDescription>Distribution of movies vs TV shows in the catalog</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Movies</span>
+                  <span className="font-bold">{stats.stats.content.movies}</span>
+                </div>
+                <div className="h-2.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-600 rounded-full" 
+                    style={{ 
+                      width: `${Math.round((stats.stats.content.movies / (stats.stats.content.movies + (stats.stats.content.tvShows || 0))) * 100)}%` 
+                    }}
+                  ></div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {Math.round((stats.stats.content.movies / (stats.stats.content.movies + (stats.stats.content.tvShows || 0))) * 100)}% of catalog
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">TV Shows</span>
+                  <span className="font-bold">{stats.stats.content.tvShows || 0}</span>
+                </div>
+                <div className="h-2.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-purple-600 rounded-full" 
+                    style={{ 
+                      width: `${Math.round(((stats.stats.content.tvShows || 0) / (stats.stats.content.movies + (stats.stats.content.tvShows || 0))) * 100)}%` 
+                    }}
+                  ></div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {Math.round(((stats.stats.content.tvShows || 0) / (stats.stats.content.movies + (stats.stats.content.tvShows || 0))) * 100)}% of catalog
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Tabs for different data views */}
         <Tabs defaultValue="users">
@@ -468,7 +522,14 @@ const AdminDashboardPage = () => {
               <Card>
                 <CardHeader>
                   <CardTitle>Recent Watchlist Activity</CardTitle>
-                  <CardDescription>Latest watchlist updates</CardDescription>
+                  <CardDescription>
+                    Latest watchlist updates
+                    {import.meta.env.DEV && (
+                      <span className="text-orange-500 block mt-1 text-xs">
+                        ⚠️ Showing production data
+                      </span>
+                    )}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[400px]">
@@ -504,7 +565,14 @@ const AdminDashboardPage = () => {
               <Card>
                 <CardHeader>
                   <CardTitle>Recent Registrations</CardTitle>
-                  <CardDescription>Users who joined in the last 7 days</CardDescription>
+                  <CardDescription>
+                    Users who joined in the last 7 days
+                    {import.meta.env.DEV && (
+                      <span className="text-orange-500 block mt-1 text-xs">
+                        ⚠️ Showing production data
+                      </span>
+                    )}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Table>
