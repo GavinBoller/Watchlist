@@ -217,32 +217,51 @@ const AdminDashboardPage = () => {
     fetchStats();
   }, [toast, setLocation]);
 
-  // Format date for display - using robust parsing approach
+  // Ultra-simple date formatter that handles multiple formats
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Never";
+    if (dateString === "Invalid date") return "Unknown";
+    
     try {
-      // Standard ISO format or simplified date format handling
-      const date = new Date(dateString);
-      if (!isNaN(date.getTime())) {
-        return formatDistance(date, new Date(), { addSuffix: true });
+      // For debugging - show the raw format in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Date string format:', dateString);
       }
       
-      // If the date looks like a raw timestamp string, clean it up
-      if (typeof dateString === 'string') {
-        // Handle PostgreSQL timestamp format more explicitly
-        if (dateString.includes(' ') && dateString.includes('-') && dateString.includes(':')) {
-          // Format: "2025-03-11 13:34:16.831175" -> "2025-03-11T13:34:16"
-          const cleanDate = dateString.replace(/(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}).*/, '$1T$2');
-          const parsedDate = new Date(cleanDate);
-          if (!isNaN(parsedDate.getTime())) {
-            return formatDistance(parsedDate, new Date(), { addSuffix: true });
+      let dateObj: Date;
+      
+      // Handle PostgreSQL format: 2025-03-11 13:34:16.831175
+      if (dateString.includes(' ') && !dateString.includes('T')) {
+        const [datePart, timePart] = dateString.split(' ');
+        const [year, month, day] = datePart.split('-').map(Number);
+        let [hours, minutes, seconds] = [0, 0, 0];
+        
+        if (timePart) {
+          const timeComponents = timePart.split(':');
+          hours = parseInt(timeComponents[0] || '0');
+          minutes = parseInt(timeComponents[1] || '0');
+          // Handle seconds with possible decimal
+          if (timeComponents[2]) {
+            seconds = parseInt(timeComponents[2].split('.')[0]);
           }
         }
+        
+        // Create date using UTC to avoid timezone issues
+        dateObj = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
+      } else {
+        // Standard handling for ISO format or already formatted dates
+        dateObj = new Date(dateString);
       }
       
-      // Fallback to showing the raw string if we can't parse it
-      return String(dateString);
+      // Verify the date is valid
+      if (isNaN(dateObj.getTime())) {
+        return String(dateString);
+      }
+      
+      // Format relative to now
+      return formatDistance(dateObj, new Date(), { addSuffix: true });
     } catch (err) {
+      // If all else fails, just show the string
       return String(dateString);
     }
   };
