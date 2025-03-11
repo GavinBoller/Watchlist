@@ -48,6 +48,7 @@ interface RecentActivity {
 interface SystemStats {
   status: string;
   timestamp: string;
+  environment: 'development' | 'production';
   stats: {
     users: {
       total: number;
@@ -291,6 +292,13 @@ const AdminDashboardPage = () => {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          {stats.environment && (
+            <div className="mt-1">
+              <Badge variant={stats.environment === 'production' ? 'destructive' : 'default'} className="text-sm">
+                {stats.environment === 'production' ? 'PRODUCTION' : 'DEVELOPMENT'} ENVIRONMENT
+              </Badge>
+            </div>
+          )}
         </div>
         <Button onClick={() => window.location.reload()}>Refresh Data</Button>
       </div>

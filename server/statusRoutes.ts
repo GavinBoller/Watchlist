@@ -179,7 +179,8 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
           u.id, 
           u.username, 
           u.display_name, 
-          COUNT(w.id)::text as entry_count
+          COUNT(w.id)::text as entry_count,
+          '${isDevelopment ? 'development' : 'production'}' as database_environment
         FROM users u
         JOIN watchlist_entries w ON u.id = w.user_id
         ${userFilter}
@@ -198,7 +199,8 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
           u.display_name,
           COUNT(w.id)::text as watchlist_count,
           MAX(w.created_at)::text as last_activity,
-          u.created_at::text as registration_date
+          u.created_at::text as registration_date,
+          '${isDevelopment ? 'development' : 'production'}' as database_environment
         FROM users u
         LEFT JOIN watchlist_entries w ON u.id = w.user_id
         ${userFilter}
@@ -214,7 +216,8 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
         watchlist_count: parseInt(user.watchlist_count || '0', 10),
         last_activity: user.last_activity,
         last_seen: null,
-        last_login: user.registration_date // We're using registration date instead of last login
+        last_login: user.registration_date, // We're using registration date instead of last login
+        database_environment: user.database_environment // Include the database environment
       }));
     } catch (error) {
       console.error('Error getting user activity data:', error);
@@ -265,8 +268,13 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
     try {
       // Show all registrations in dev mode, no filtering
       // In production, this would be filtered by time period
+      const isDevelopment = process.env.NODE_ENV !== 'production';
       const recentRegistrations = await executeDirectSql(`
-        SELECT username, display_name, created_at
+        SELECT 
+          username, 
+          display_name, 
+          created_at,
+          '${isDevelopment ? 'development' : 'production'}' as database_environment
         FROM users
         ORDER BY created_at DESC
         LIMIT 100
@@ -286,7 +294,8 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
           u.username,
           m.title,
           w.created_at,
-          w.status
+          w.status,
+          '${isDevelopment ? 'development' : 'production'}' as database_environment
         FROM watchlist_entries w
         JOIN users u ON w.user_id = u.id
         JOIN movies m ON w.movie_id = m.id
