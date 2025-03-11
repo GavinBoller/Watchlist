@@ -217,13 +217,32 @@ const AdminDashboardPage = () => {
     fetchStats();
   }, [toast, setLocation]);
 
-  // Format date for display
+  // Format date for display with special handling for Gavin500
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Never";
     try {
-      const date = new Date(dateString);
+      // Parse the date with special handling for different formats
+      let date;
+      
+      // Try to handle PostgreSQL timestamp format which might include microseconds
+      if (dateString.includes('.')) {
+        // PostgreSQL timestamp format: 2025-03-11 13:34:16.831175
+        const [datePart, timePart] = dateString.split(' ');
+        const [timePortion] = timePart.split('.');
+        date = new Date(`${datePart}T${timePortion}`);
+      } else {
+        date = new Date(dateString);
+      }
+      
+      // Ensure the date is valid
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date encountered:', dateString);
+        return dateString;
+      }
+      
       return formatDistance(date, new Date(), { addSuffix: true });
     } catch (err) {
+      console.error('Error formatting date:', dateString, err);
       return dateString;
     }
   };
