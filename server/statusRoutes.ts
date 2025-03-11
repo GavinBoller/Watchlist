@@ -40,6 +40,34 @@ interface RecentActivity {
   database_environment: 'development' | 'production';
 }
 
+// Helper function to format PostgreSQL timestamps to ISO format
+function formatPostgresTimestamp(timestamp: string | null): string | null {
+  if (!timestamp) return null;
+  
+  // Remove microseconds and convert to ISO format
+  try {
+    // Handle PostgreSQL timestamp format with microseconds
+    if (timestamp.includes('.')) {
+      return timestamp.replace(/(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}).*/, '$1T$2.000Z');
+    }
+    
+    // Handle timestamps without microseconds
+    if (timestamp.includes(' ') && !timestamp.includes('T')) {
+      return timestamp.replace(' ', 'T') + '.000Z';
+    }
+    
+    // If it's already in ISO format or close to it
+    if (!timestamp.endsWith('Z') && timestamp.includes('T')) {
+      return timestamp + '.000Z';
+    }
+    
+    return timestamp;
+  } catch (e) {
+    console.error('Error formatting timestamp:', timestamp, e);
+    return timestamp;
+  }
+}
+
 const router = Router();
 
 /**
@@ -210,8 +238,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       `);
       
       responseData.stats.users.topUsers = topUsersResult.rows;
-      
-      // Get all users with normal query
+
       const userActivityQuery = `
         SELECT 
           u.id,
@@ -228,15 +255,15 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       
       const userActivityResult = await executeDirectSql(userActivityQuery);
       
-      // Map the results with safer parsing
+      // Map the results with safer parsing and consistent date formatting
       responseData.stats.users.userActivity = userActivityResult.rows.map(user => ({
         id: user.id,
         username: user.username,
         display_name: user.display_name,
         watchlist_count: parseInt(user.watchlist_count || '0', 10),
-        last_activity: user.last_activity,
+        last_activity: formatPostgresTimestamp(user.last_activity),
         last_seen: null,
-        last_login: user.registration_date, // We're using registration date instead of last login
+        last_login: formatPostgresTimestamp(user.registration_date), // We're using registration date instead of last login
         database_environment: user.database_environment // Include the database environment
       }));
     } catch (error) {
@@ -307,7 +334,11 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
         LIMIT 100
       `);
       
-      responseData.recentRegistrations = recentRegistrations.rows || [];
+      // Format registration timestamps
+      responseData.recentRegistrations = (recentRegistrations.rows || []).map(registration => ({
+        ...registration,
+        created_at: formatPostgresTimestamp(registration.created_at)
+      }));
     } catch (error) {
       console.error('Error fetching recent registrations:', error);
     }
@@ -338,7 +369,11 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
         LIMIT 100
       `);
       
-      responseData.recentActivity = recentActivity.rows || [];
+      // Format timestamps consistently
+      responseData.recentActivity = (recentActivity.rows || []).map(activity => ({
+        ...activity,
+        created_at: formatPostgresTimestamp(activity.created_at)
+      }));
     } catch (error) {
       console.error('Error fetching recent activity:', error);
     }

@@ -217,33 +217,33 @@ const AdminDashboardPage = () => {
     fetchStats();
   }, [toast, setLocation]);
 
-  // Format date for display with special handling for Gavin500
+  // Format date for display - using robust parsing approach
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Never";
     try {
-      // Parse the date with special handling for different formats
-      let date;
-      
-      // Try to handle PostgreSQL timestamp format which might include microseconds
-      if (dateString.includes('.')) {
-        // PostgreSQL timestamp format: 2025-03-11 13:34:16.831175
-        const [datePart, timePart] = dateString.split(' ');
-        const [timePortion] = timePart.split('.');
-        date = new Date(`${datePart}T${timePortion}`);
-      } else {
-        date = new Date(dateString);
+      // Standard ISO format or simplified date format handling
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        return formatDistance(date, new Date(), { addSuffix: true });
       }
       
-      // Ensure the date is valid
-      if (isNaN(date.getTime())) {
-        console.warn('Invalid date encountered:', dateString);
-        return dateString;
+      // If the date looks like a raw timestamp string, clean it up
+      if (typeof dateString === 'string') {
+        // Handle PostgreSQL timestamp format more explicitly
+        if (dateString.includes(' ') && dateString.includes('-') && dateString.includes(':')) {
+          // Format: "2025-03-11 13:34:16.831175" -> "2025-03-11T13:34:16"
+          const cleanDate = dateString.replace(/(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}).*/, '$1T$2');
+          const parsedDate = new Date(cleanDate);
+          if (!isNaN(parsedDate.getTime())) {
+            return formatDistance(parsedDate, new Date(), { addSuffix: true });
+          }
+        }
       }
       
-      return formatDistance(date, new Date(), { addSuffix: true });
+      // Fallback to showing the raw string if we can't parse it
+      return String(dateString);
     } catch (err) {
-      console.error('Error formatting date:', dateString, err);
-      return dateString;
+      return String(dateString);
     }
   };
 
