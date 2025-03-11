@@ -581,7 +581,7 @@ const AdminDashboardPage = () => {
                       ) : (
                         <TableRow>
                           <TableCell colSpan={3} className="text-center py-6">
-                            {isProduction ? 'No new registrations in the last 7 days' : 'No user registrations available'}
+                            {isProductionEnvironment() ? 'No new registrations in the last 7 days' : 'No user registrations available'}
                           </TableCell>
                         </TableRow>
                       )}
