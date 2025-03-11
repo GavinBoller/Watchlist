@@ -576,8 +576,8 @@ async function startServer() {
       res.setHeader('Access-Control-Allow-Methods', 'GET');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       try {
-        // Administrators are user ID 1 or any user marked as admin 
-        // In the current system, only user ID 1 has admin privileges
+        // Administrators are user ID 1 or any user marked as admin or with specific usernames
+        // Include Gavinadmin as an admin user
         let adminUsers = [];
         
         try {
@@ -585,7 +585,13 @@ async function startServer() {
           if (pool) {
             const client = await pool.connect();
             try {
-              const result = await client.query('SELECT id, username, display_name FROM users WHERE id = 1 ORDER BY id');
+              // Query both user ID 1 and username 'Gavinadmin'
+              const result = await client.query(`
+                SELECT id, username, display_name 
+                FROM users 
+                WHERE id = 1 OR username = 'Gavinadmin' 
+                ORDER BY id
+              `);
               if (result.rows && result.rows.length > 0) {
                 adminUsers = result.rows.map(user => ({
                   id: user.id,

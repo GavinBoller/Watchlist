@@ -39,10 +39,12 @@ router.get('/ping', (_req: Request, res: Response) => {
  */
 router.get('/admin-check', async (_req: Request, res: Response) => {
   try {
-    // Administrators are user ID 1 or any user marked as admin 
-    // In the current system, only user ID 1 has admin privileges
+    // Administrators are user ID 1 or specified users like Gavinadmin
     const admins = await executeDirectSql<{id: number, username: string, display_name: string | null}>(
-      'SELECT id, username, display_name FROM users WHERE id = 1 ORDER BY id'
+      `SELECT id, username, display_name 
+       FROM users 
+       WHERE id = 1 OR username = 'Gavinadmin' 
+       ORDER BY id`
     );
     
     // Make sure rows exists before mapping
