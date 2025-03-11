@@ -34,6 +34,36 @@ router.get('/ping', (_req: Request, res: Response) => {
 });
 
 /**
+ * Public route to check admin users
+ * This helps identify who has admin access without requiring database access
+ */
+router.get('/admin-check', async (_req: Request, res: Response) => {
+  try {
+    // Administrators are user ID 1 or any user marked as admin 
+    // In the current system, only user ID 1 has admin privileges
+    const admins = await executeDirectSql<{id: number, username: string, display_name: string | null}>(
+      'SELECT id, username, display_name FROM users WHERE id = 1 ORDER BY id'
+    );
+    
+    res.json({
+      status: 'ok',
+      adminUsers: admins.rows.map(user => ({
+        id: user.id,
+        username: user.username,
+        displayName: user.display_name || user.username
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching admin users:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Could not determine admin users',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+/**
  * Get basic system stats
  * Protected with JWT authentication to prevent public access
  */

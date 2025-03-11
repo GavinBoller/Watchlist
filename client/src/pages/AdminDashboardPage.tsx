@@ -92,7 +92,7 @@ const AdminDashboardPage = () => {
           description: "You must be logged in to view this page.",
           variant: "destructive",
         });
-        navigate("/");
+        setLocation("/");
         return false;
       }
       return true;
@@ -117,7 +117,7 @@ const AdminDashboardPage = () => {
               description: "You don't have permission to access the admin dashboard.",
               variant: "destructive",
             });
-            navigate("/");
+            setLocation("/");
             return;
           }
           throw new Error(`Failed to fetch stats: ${statsResponse.statusText}`);
@@ -150,7 +150,7 @@ const AdminDashboardPage = () => {
     };
 
     fetchStats();
-  }, [toast, navigate]);
+  }, [toast, setLocation]);
 
   // Format date for display
   const formatDate = (dateString: string | null) => {
