@@ -163,7 +163,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
             OR sess::jsonb->>'username' = u.username
           ) as last_login,
           (
-            SELECT MAX(w2.updated_at) 
+            SELECT MAX(w2.created_at) 
             FROM watchlist_entries w2 
             WHERE w2.user_id = u.id
           ) as last_activity
@@ -192,9 +192,11 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
     let sessionCount = 0;
     try {
       const sessionResult = await executeDirectSql('SELECT COUNT(*) as count FROM session');
-      sessionCount = sessionResult.rows[0]?.count || 0;
+      sessionCount = parseInt(sessionResult.rows[0]?.count || '0', 10);
     } catch (error) {
       console.error('Error fetching session count:', error);
+      // In case of error, provide a fallback value
+      sessionCount = 0;
     }
     
     res.json({
