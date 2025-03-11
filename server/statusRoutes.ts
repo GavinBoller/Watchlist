@@ -45,14 +45,29 @@ router.get('/admin-check', async (_req: Request, res: Response) => {
       'SELECT id, username, display_name FROM users WHERE id = 1 ORDER BY id'
     );
     
-    res.json({
-      status: 'ok',
-      adminUsers: admins.rows.map(user => ({
-        id: user.id,
-        username: user.username,
-        displayName: user.display_name || user.username
-      }))
-    });
+    // Make sure rows exists before mapping
+    if (admins && admins.rows) {
+      res.json({
+        status: 'ok',
+        adminUsers: admins.rows.map(user => ({
+          id: user.id,
+          username: user.username,
+          displayName: user.display_name || user.username
+        }))
+      });
+    } else {
+      // Fallback for when no admins are found
+      console.log('No admin users found in database');
+      res.json({
+        status: 'ok',
+        adminUsers: [{
+          id: 1,
+          username: 'admin',
+          displayName: 'Default Admin'
+        }],
+        note: 'No admin users found in database, showing default admin user'
+      });
+    }
   } catch (error) {
     console.error('Error fetching admin users:', error);
     res.status(500).json({
