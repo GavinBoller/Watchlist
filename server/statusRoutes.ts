@@ -290,16 +290,19 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       // In production, this would be filtered by time period
       const isDevelopment = process.env.NODE_ENV !== 'production';
       console.log('Environment for recent registrations:', isDevelopment ? 'development' : 'production');
+      // Create filter based on current environment
+      const registrationEnvFilter = isDevelopment
+        ? "username NOT LIKE 'Gaju%' AND username NOT LIKE 'Sophieb%'"
+        : "username LIKE 'Gaju%' OR username LIKE 'Sophieb%'";
+          
       const recentRegistrations = await executeDirectSql(`
         SELECT 
           username, 
           display_name, 
           created_at,
-          CASE 
-            WHEN username LIKE 'Gaju%' OR username LIKE 'Sophieb%' THEN 'production'
-            ELSE '${isDevelopment ? 'development' : 'production'}'
-          END as database_environment
+          '${isDevelopment ? 'development' : 'production'}' as database_environment
         FROM users
+        WHERE ${registrationEnvFilter}
         ORDER BY created_at DESC
         LIMIT 100
       `);
@@ -315,19 +318,22 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       // In development, we want to see ALL types of activity
       const isDevelopment = process.env.NODE_ENV !== 'production';
       console.log('Environment for recent activity:', isDevelopment ? 'development' : 'production');
+      // Create activity filter based on current environment 
+      const activityEnvFilter = isDevelopment
+        ? "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'"
+        : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+          
       const recentActivity = await executeDirectSql(`
         SELECT 
           u.username,
           m.title,
           w.created_at,
           w.status,
-          CASE 
-            WHEN u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%' THEN 'production'
-            ELSE '${process.env.NODE_ENV !== 'production' ? 'development' : 'production'}'
-          END as database_environment
+          '${isDevelopment ? 'development' : 'production'}' as database_environment
         FROM watchlist_entries w
         JOIN users u ON w.user_id = u.id
         JOIN movies m ON w.movie_id = m.id
+        WHERE ${activityEnvFilter}
         ORDER BY w.created_at DESC
         LIMIT 100
       `);
