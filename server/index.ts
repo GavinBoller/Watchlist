@@ -419,14 +419,138 @@ async function startServer() {
     console.log('[SERVER] Adding status routes for monitoring');
     app.use('/api/status', statusRouter);
     
-    // Add special route to test ping endpoint from browser
+    // Instead of HTML files, use direct text responses for testing
     app.get('/status-ping-test', (_req: Request, res: Response) => {
-      res.sendFile(path.join(__dirname, '../public/status-direct-ping.html'));
+      res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>API Ping Test</title>
+        <style>
+          body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          #result {
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+          }
+          button {
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+          }
+        </style>
+      </head>
+      <body>
+        <h1>API Ping Test</h1>
+        <p>This page tests the direct API ping endpoint.</p>
+        
+        <button onclick="testPing()">Test API</button>
+        
+        <div id="result">Results will appear here...</div>
+        
+        <script>
+          async function testPing() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = 'Loading...';
+            
+            try {
+              const response = await fetch('/api/status-direct/ping');
+              const contentType = response.headers.get('content-type');
+              
+              if (response.ok) {
+                const data = await response.json();
+                resultDiv.textContent = 'SUCCESS!\\n\\nContent-Type: ' + contentType + 
+                                       '\\n\\nResponse: ' + JSON.stringify(data, null, 2);
+              } else {
+                resultDiv.textContent = 'ERROR: ' + response.status + ' ' + response.statusText;
+              }
+            } catch (error) {
+              resultDiv.textContent = 'FETCH ERROR: ' + error.message;
+            }
+          }
+        </script>
+      </body>
+      </html>
+      `);
     });
     
-    // Add special route to test admin check endpoint from browser
+    // Test page for admin-check API
     app.get('/status-admin-test', (_req: Request, res: Response) => {
-      res.sendFile(path.join(__dirname, '../public/status-direct-admin.html'));
+      res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Admin Check Test</title>
+        <style>
+          body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          #result {
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+          }
+          button {
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+          }
+        </style>
+      </head>
+      <body>
+        <h1>Admin Check Test</h1>
+        <p>This page tests the direct API admin-check endpoint.</p>
+        
+        <button onclick="testAdminCheck()">Test Admin Check</button>
+        
+        <div id="result">Results will appear here...</div>
+        
+        <script>
+          async function testAdminCheck() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = 'Loading...';
+            
+            try {
+              const response = await fetch('/api/status-direct/admin-check');
+              const contentType = response.headers.get('content-type');
+              
+              if (response.ok) {
+                const data = await response.json();
+                resultDiv.textContent = 'SUCCESS!\\n\\nContent-Type: ' + contentType + 
+                                       '\\n\\nResponse: ' + JSON.stringify(data, null, 2);
+              } else {
+                resultDiv.textContent = 'ERROR: ' + response.status + ' ' + response.statusText;
+              }
+            } catch (error) {
+              resultDiv.textContent = 'FETCH ERROR: ' + error.message;
+            }
+          }
+        </script>
+      </body>
+      </html>
+      `);
     });
     
     // Add direct status endpoints to ensure they're accessible in all environments
