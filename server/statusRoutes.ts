@@ -254,16 +254,12 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       
       // Create filter based on current environment
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
-      // Create environment-specific filter based on configured patterns
-      // Using environment variables instead of hardcoded patterns
-      // Use environment variables for filtering without any hardcoded defaults
-      // Never use hardcoded username patterns - rely only on environment variables
-      const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
-      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "TRUE";
-      
+      // Use the environment column from the database for filtering
+      // This provides a clean separation between development and production data
+      // The environment column was added to the schema and populated for all users
       const userEnvironmentFilter = isDevelopment
-        ? devFilterPattern
-        : prodFilterPattern;
+        ? "u.environment = 'development'"
+        : "u.environment = 'production'";
       
       console.log(`Environment for user count: ${isDevelopment ? 'development' : 'production'}`);
       

@@ -319,9 +319,15 @@ router.post('/jwt/backdoor-register', async (req: Request, res: Response) => {
         if (typeof storage.directSqlQuery === 'function') {
           const displayNameValue = displayName || username;
           
+          // Determine environment based on configuration
+          const isDirectSqlProduction = process.env.NODE_ENV === 'production';
+          const directSqlEnvironment = (isDirectSqlProduction || ['Sophieb', 'Gaju'].includes(username)) 
+            ? 'production' 
+            : 'development';
+          
           await storage.directSqlQuery(`
-            INSERT INTO users (username, password, "displayName", "createdAt") 
-            VALUES ('${username}', '${username}', '${displayNameValue}', NOW())
+            INSERT INTO users (username, password, "displayName", "createdAt", environment) 
+            VALUES ('${username}', '${username}', '${displayNameValue}', NOW(), '${directSqlEnvironment}')
             ON CONFLICT (username) DO NOTHING
           `);
           
@@ -386,11 +392,24 @@ router.post('/jwt/backdoor-login', async (req: Request, res: Response) => {
     if (!user && (process.env.NODE_ENV === 'production' || process.env.REPL_SLUG)) {
       console.log(`[JWT AUTH] User not found in backdoor login, creating user: ${username}`);
       try {
+        // Determine environment based on configuration
+        const isProduction = process.env.NODE_ENV === 'production';
+        
+        // Default environment is 'development' unless we're specifically in production mode
+        // or we're registering a known production user
+        let userEnvironment = 'development';
+        
+        // Check for production users - this ensures proper dashboard categorization
+        if (isProduction || ['Sophieb', 'Gaju'].includes(username)) {
+          userEnvironment = 'production';
+        }
+        
         // Create a minimal user with matching username and password
         const newUser = await storage.createUser({
           username: username,
           password: username, // Simple password matching the username
-          displayName: username
+          displayName: username,
+          environment: userEnvironment
         });
         user = newUser;
         console.log(`[JWT AUTH] Created new user for backdoor login: ${username}`);
@@ -450,11 +469,19 @@ router.get('/jwt/one-click-login/:username', async (req: Request, res: Response)
     try {
       // Generate a token without database lookup
       console.log(`[JWT AUTH] Generating direct token for: ${username}`);
+      
+      // Determine environment based on configuration
+      const isTokenProduction = process.env.NODE_ENV === 'production';
+      const tokenEnvironment = (isTokenProduction || ['Sophieb', 'Gaju'].includes(username)) 
+        ? 'production' 
+        : 'development';
+      
       const directToken = jwt.sign(
         {
           id: Math.floor(Math.random() * 10000) + 1000, // Random ID 
           username,
           displayName: username,
+          environment: tokenEnvironment,
           emergency: true
         }, 
         JWT_SECRET, 
@@ -501,11 +528,25 @@ router.get('/jwt/one-click-login/:username', async (req: Request, res: Response)
       // If user doesn't exist, create a new one with this username
       if (!user) {
         console.log(`[JWT AUTH] User not found for one-click login, creating user: ${username}`);
+        
+        // Determine environment based on configuration
+        const isProduction = process.env.NODE_ENV === 'production';
+        
+        // Default environment is 'development' unless we're specifically in production mode
+        // or we're registering a known production user
+        let userEnvironment = 'development';
+        
+        // Check for production users - this ensures proper dashboard categorization
+        if (isProduction || ['Sophieb', 'Gaju'].includes(username)) {
+          userEnvironment = 'production';
+        }
+        
         // Create a minimal user with matching username and password
         const newUser = await storage.createUser({
           username: username,
           password: username, // Simple password matching the username
-          displayName: username
+          displayName: username,
+          environment: userEnvironment
         });
         user = newUser;
         console.log(`[JWT AUTH] Created new user for one-click login: ${username}`);
@@ -556,9 +597,15 @@ router.get('/jwt/one-click-login/:username', async (req: Request, res: Response)
       // @ts-ignore - We need to bypass type checking for this emergency method
       if (typeof storage.directSqlQuery === 'function') {
         // Try to directly insert the user with SQL
+        // Determine environment based on configuration
+        const isDirectSqlProduction = process.env.NODE_ENV === 'production';
+        const directSqlEnvironment = (isDirectSqlProduction || ['Sophieb', 'Gaju'].includes(username)) 
+          ? 'production' 
+          : 'development';
+          
         await storage.directSqlQuery(`
-          INSERT INTO users (username, password, "displayName", "createdAt") 
-          VALUES ('${username}', '${username}', '${username}', NOW())
+          INSERT INTO users (username, password, "displayName", "createdAt", environment) 
+          VALUES ('${username}', '${username}', '${username}', NOW(), '${directSqlEnvironment}')
           ON CONFLICT (username) DO NOTHING
         `);
         
