@@ -257,8 +257,9 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       // Create environment-specific filter based on configured patterns
       // Using environment variables instead of hardcoded patterns
       // Use environment variables for filtering without any hardcoded defaults
+      // Never use hardcoded username patterns - rely only on environment variables
       const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
-      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "username LIKE 'Gaju%' OR username LIKE 'Sophieb%'";
+      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "TRUE";
       
       const userEnvironmentFilter = isDevelopment
         ? devFilterPattern
@@ -290,8 +291,9 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       // Create environment-specific filter for content stats based on configured patterns
       // Using environment variables instead of hardcoded patterns
       // Use environment variables for filtering without any hardcoded defaults
+      // Never use hardcoded username patterns - rely only on environment variables
       const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
-      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "TRUE";
       
       const userEnvironmentFilter = isDevelopment
         ? devFilterPattern
@@ -363,8 +365,9 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       // Create environment-specific filter for user activity based on configured patterns
       // Using environment variables instead of hardcoded patterns
       // Use environment variables for filtering without any hardcoded defaults
+      // Never use hardcoded username patterns - rely only on environment variables
       const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
-      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "TRUE";
       
       const userActivityEnvFilter = isDevelopment
         ? devFilterPattern
