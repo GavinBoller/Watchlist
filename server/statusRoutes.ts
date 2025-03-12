@@ -146,8 +146,16 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
     });
   }
   
-  // Strict admin access control - only user ID 1, 30, or username Gavinadmin or Gaju
-  if (user.id !== 1 && user.id !== 30 && user.username !== 'Gavinadmin' && user.username !== 'Gaju') {
+  // Strict admin access control based on environment variables
+  const adminIds = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(id => parseInt(id.trim(), 10)) : [1, 30];
+  const adminUsernames = process.env.ADMIN_USERNAMES ? 
+    process.env.ADMIN_USERNAMES.split(',').map(name => name.trim()) : 
+    ['Gavinadmin', 'Gaju'];
+    
+  // Check if current user is in the admin list
+  const isAdmin = adminIds.includes(user.id) || adminUsernames.includes(user.username);
+    
+  if (!isAdmin) {
     console.log(`[ADMIN] Access DENIED to stats for non-admin user: ${user.username} (ID: ${user.id})`);
     return res.status(403).json({
       status: 'error',
@@ -439,8 +447,16 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
     });
   }
   
-  // Strict admin access control - only user ID 1, 30, or username Gavinadmin or Gaju
-  if (user.id !== 1 && user.id !== 30 && user.username !== 'Gavinadmin' && user.username !== 'Gaju') {
+  // Strict admin access control based on environment variables
+  const adminIds = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(id => parseInt(id.trim(), 10)) : [1, 30];
+  const adminUsernames = process.env.ADMIN_USERNAMES ? 
+    process.env.ADMIN_USERNAMES.split(',').map(name => name.trim()) : 
+    ['Gavinadmin', 'Gaju'];
+    
+  // Check if current user is in the admin list
+  const isAdmin = adminIds.includes(user.id) || adminUsernames.includes(user.username);
+    
+  if (!isAdmin) {
     console.log(`[ADMIN] Access DENIED to user-activity for non-admin user: ${user.username} (ID: ${user.id})`);
     return res.status(403).json({
       status: 'error',
