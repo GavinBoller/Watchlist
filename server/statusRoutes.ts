@@ -539,8 +539,9 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       // Create environment-specific filter for user registrations based on configured patterns
       // Using environment variables instead of hardcoded patterns
       // Use environment variables for filtering without any hardcoded defaults
+      // Never use hardcoded username patterns - rely only on environment variables
       const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
-      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "username LIKE 'Gaju%' OR username LIKE 'Sophieb%'";
+      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "TRUE";
       
       const registrationEnvFilter = isDevelopment
         ? devFilterPattern
@@ -581,8 +582,9 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       // Create environment-specific filter for recent activity based on configured patterns
       // Using environment variables instead of hardcoded patterns
       // Use environment variables for filtering without any hardcoded defaults
+      // Never use hardcoded username patterns - rely only on environment variables
       const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
-      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "TRUE";
       
       const activityEnvFilter = isDevelopment
         ? devFilterPattern

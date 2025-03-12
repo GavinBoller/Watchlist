@@ -33,19 +33,19 @@ By default, user IDs 1 and 30, and usernames 'Gavinadmin' and 'Gaju' have admin 
 
 ## Environment-Specific Data Filtering
 
-The dashboard can be configured to show different data in development vs. production environments.
+The dashboard can be configured to show different data in development vs. production environments. This ensures proper data isolation between environments.
 
 ### SQL Filter Patterns
 
 Define SQL filter conditions to determine which data is shown in each environment:
 
 ```
-# .env file example - New recommended approach
-DEV_FILTER_PATTERN=TRUE                                   # Show all users in development
-PROD_FILTER_PATTERN="username LIKE 'Gaju%' OR username LIKE 'Sophieb%'"  # Only show specific users in production
+# .env file example - Bidirectional Data Isolation 
+DEV_FILTER_PATTERN=username NOT LIKE 'Sophieb%' AND username NOT LIKE 'Gaju%'  # Exclude production users from development
+PROD_FILTER_PATTERN=username LIKE 'Sophieb%' OR username LIKE 'Gaju%'  # Only show production users in production
 ```
 
-These filters are applied directly to SQL WHERE clauses for all dashboard queries.
+These filters are applied directly to SQL WHERE clauses for all dashboard queries. It's critical to configure both environment filters correctly to ensure proper data separation.
 
 ### Legacy Username Pattern Filtering
 
@@ -57,9 +57,11 @@ DEV_USERNAME_PATTERN='dev_%'    # Only show users with names like 'dev_user1'
 PROD_USERNAME_PATTERN='prod_%'  # Only show users with names like 'prod_user1'
 ```
 
-By default:
-- In development: all users are shown (DEV_FILTER_PATTERN=TRUE)
-- In production: only includes users with names like 'Gaju%' or 'Sophieb%'
+The current configuration ensures complete data isolation by:
+- In development: excluding users with names like 'Sophieb%' or 'Gaju%'
+- In production: only showing users with names like 'Sophieb%' or 'Gaju%'
+
+This bidirectional filtering ensures production users never appear in development dashboards and vice versa.
 
 ## Dashboard Features
 
@@ -84,7 +86,7 @@ All dashboard data is correctly labeled with its source environment (`developmen
 | FORCE_ENVIRONMENT       | Override environment for dashboard           | None               |
 | ADMIN_IDS               | User IDs with admin access                   | [1, 30]            |
 | ADMIN_USERNAMES         | Usernames with admin access                  | ['Gavinadmin', 'Gaju'] |
-| DEV_FILTER_PATTERN      | SQL filter for dev dashboard queries         | 'TRUE' (show all)  |
-| PROD_FILTER_PATTERN     | SQL filter for production dashboard queries  | 'username LIKE 'Gaju%' OR username LIKE 'Sophieb%'' |
+| DEV_FILTER_PATTERN      | SQL filter for dev dashboard queries         | username NOT LIKE 'Sophieb%' AND username NOT LIKE 'Gaju%'  |
+| PROD_FILTER_PATTERN     | SQL filter for production dashboard queries  | username LIKE 'Sophieb%' OR username LIKE 'Gaju%' |
 | DEV_USERNAME_PATTERN    | Legacy: SQL pattern for dev filtering        | None (deprecated)  |
 | PROD_USERNAME_PATTERN   | Legacy: SQL pattern for prod filtering       | None (deprecated)  |
