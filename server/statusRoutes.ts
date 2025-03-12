@@ -241,13 +241,12 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       
       // Create filter based on current environment
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
+      // Create proper environment-specific filter
+      // In development we want to see dev data, in production we want to see prod data
+      // But still allow Gavinadmin in both environments
       const userEnvironmentFilter = isDevelopment
-        ? (process.env.DEV_USERNAME_PATTERN 
-           ? `username LIKE ${devUsernamePattern}` 
-           : "username NOT LIKE 'Gaju%' AND username NOT LIKE 'Sophieb%'")
-        : (process.env.PROD_USERNAME_PATTERN 
-           ? `username LIKE ${prodUsernamePattern}`
-           : "username LIKE 'Gaju%' OR username LIKE 'Sophieb%'");
+        ? "(username != 'Gavinadmin' AND username NOT LIKE 'Gaju%' AND username NOT LIKE 'Sophieb%') OR username = 'Gavinadmin'"
+        : "username LIKE 'Gaju%' OR username LIKE 'Sophieb%' OR username = 'Gavinadmin'";
       
       console.log(`Environment for user count: ${isDevelopment ? 'development' : 'production'}`);
       
@@ -272,13 +271,12 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       
       // Create filter based on current environment
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
+      // Create proper environment-specific filter for content stats
+      // In development we want to see dev data, in production we want to see prod data
+      // But still allow Gavinadmin to see their content in both environments
       const userEnvironmentFilter = isDevelopment
-        ? (process.env.DEV_USERNAME_PATTERN 
-           ? `u.username LIKE ${devUsernamePattern}` 
-           : "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'")
-        : (process.env.PROD_USERNAME_PATTERN 
-           ? `u.username LIKE ${prodUsernamePattern}`
-           : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'");
+        ? "(u.username != 'Gavinadmin' AND u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%') OR u.username = 'Gavinadmin'"
+        : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%' OR u.username = 'Gavinadmin'";
       
       console.log(`Environment for content stats: ${isDevelopment ? 'development' : 'production'}`);
       
@@ -343,13 +341,12 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       
       // Create new filter for user activity based on environment
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
+      // Create proper environment-specific filter for user activity list
+      // In development we want to see dev data, in production we want to see prod data
+      // But still allow Gavinadmin in both environments
       const userActivityEnvFilter = isDevelopment
-        ? (process.env.DEV_USERNAME_PATTERN 
-           ? `u.username LIKE ${devUsernamePattern}` 
-           : "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'")
-        : (process.env.PROD_USERNAME_PATTERN 
-           ? `u.username LIKE ${prodUsernamePattern}`
-           : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'");
+        ? "(u.username != 'Gavinadmin' AND u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%') OR u.username = 'Gavinadmin'"
+        : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%' OR u.username = 'Gavinadmin'";
       
       const topUsersResult = await executeDirectSql(`
         SELECT 
@@ -506,9 +503,12 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       
       // Create filter based on current environment
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
-      // For admin dashboard, we always include all registrations regardless of environment
-      // This gives administrators complete visibility
-      const registrationEnvFilter = "TRUE";
+      // Create proper environment-specific filter for user registrations
+      // In development we want to see dev registrations, in production we want to see prod registrations
+      // But still allow Gavinadmin in both environments
+      const registrationEnvFilter = isDevelopment
+        ? "(username != 'Gavinadmin' AND username NOT LIKE 'Gaju%' AND username NOT LIKE 'Sophieb%') OR username = 'Gavinadmin'"
+        : "username LIKE 'Gaju%' OR username LIKE 'Sophieb%' OR username = 'Gavinadmin'";
           
       const recentRegistrations = await executeDirectSql(`
         SELECT 
@@ -542,9 +542,12 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       
       // Create filter based on current environment
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
-      // For admin dashboard, we always include all user data regardless of environment
-      // This ensures admins can see all activity and make informed decisions
-      const activityEnvFilter = "TRUE";
+      // Create proper environment-specific filter for recent activity
+      // In development we want to see dev activity, in production we want to see prod activity
+      // But still allow Gavinadmin's activities in both environments
+      const activityEnvFilter = isDevelopment
+        ? "(u.username != 'Gavinadmin' AND u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%') OR u.username = 'Gavinadmin'"
+        : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%' OR u.username = 'Gavinadmin'";
           
       const recentActivity = await executeDirectSql(`
         SELECT 
