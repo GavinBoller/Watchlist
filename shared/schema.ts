@@ -19,6 +19,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   displayName: text("display_name"),
   createdAt: timestamp("created_at").defaultNow(),
+  environment: text("environment").default("development"),
 });
 
 // For app use (includes password)
