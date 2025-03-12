@@ -259,7 +259,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       const userEnvironmentFilter = isDevelopment
         ? process.env.DEV_USERNAME_PATTERN 
            ? `username LIKE ${devUsernamePattern}` 
-           : "username NOT LIKE 'Gaju%' AND username NOT LIKE 'Sophieb%'"
+           : "TRUE" // In development mode, show all users by default
         : process.env.PROD_USERNAME_PATTERN 
            ? `username LIKE ${prodUsernamePattern}`
            : "username LIKE 'Gaju%' OR username LIKE 'Sophieb%'";
@@ -292,7 +292,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       const userEnvironmentFilter = isDevelopment
         ? process.env.DEV_USERNAME_PATTERN 
            ? `u.username LIKE ${devUsernamePattern}` 
-           : "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'"
+           : "TRUE" // In development mode, show all users by default
         : process.env.PROD_USERNAME_PATTERN 
            ? `u.username LIKE ${prodUsernamePattern}`
            : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
@@ -365,7 +365,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       const userActivityEnvFilter = isDevelopment
         ? process.env.DEV_USERNAME_PATTERN 
            ? `u.username LIKE ${devUsernamePattern}` 
-           : "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'"
+           : "TRUE" // In development mode, show all users by default
         : process.env.PROD_USERNAME_PATTERN 
            ? `u.username LIKE ${prodUsernamePattern}`
            : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
@@ -538,7 +538,7 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       const registrationEnvFilter = isDevelopment
         ? process.env.DEV_USERNAME_PATTERN 
            ? `username LIKE ${devUsernamePattern}` 
-           : "username NOT LIKE 'Gaju%' AND username NOT LIKE 'Sophieb%'"
+           : "TRUE" // In development mode, show all users by default
         : process.env.PROD_USERNAME_PATTERN 
            ? `username LIKE ${prodUsernamePattern}`
            : "username LIKE 'Gaju%' OR username LIKE 'Sophieb%'";
@@ -580,7 +580,7 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       const activityEnvFilter = isDevelopment
         ? process.env.DEV_USERNAME_PATTERN 
            ? `u.username LIKE ${devUsernamePattern}` 
-           : "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'"
+           : "TRUE" // In development mode, show all activity by default
         : process.env.PROD_USERNAME_PATTERN 
            ? `u.username LIKE ${prodUsernamePattern}`
            : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
