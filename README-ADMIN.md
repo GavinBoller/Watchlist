@@ -35,18 +35,30 @@ By default, user IDs 1 and 30, and usernames 'Gavinadmin' and 'Gaju' have admin 
 
 The dashboard can be configured to show different data in development vs. production environments.
 
-### Username Pattern Filtering
+### SQL Filter Patterns
 
-Define SQL patterns to filter which users are shown in each environment:
+Define SQL filter conditions to determine which data is shown in each environment:
 
 ```
-# .env file example
+# .env file example - New recommended approach
+DEV_FILTER_PATTERN=TRUE                                   # Show all users in development
+PROD_FILTER_PATTERN="username LIKE 'Gaju%' OR username LIKE 'Sophieb%'"  # Only show specific users in production
+```
+
+These filters are applied directly to SQL WHERE clauses for all dashboard queries.
+
+### Legacy Username Pattern Filtering
+
+For backward compatibility, the older pattern-based filtering is still supported:
+
+```
+# .env file example - Legacy approach
 DEV_USERNAME_PATTERN='dev_%'    # Only show users with names like 'dev_user1'
 PROD_USERNAME_PATTERN='prod_%'  # Only show users with names like 'prod_user1'
 ```
 
 By default:
-- In development: excludes users with names like 'Gaju%' or 'Sophieb%'
+- In development: all users are shown (DEV_FILTER_PATTERN=TRUE)
 - In production: only includes users with names like 'Gaju%' or 'Sophieb%'
 
 ## Dashboard Features
@@ -72,5 +84,7 @@ All dashboard data is correctly labeled with its source environment (`developmen
 | FORCE_ENVIRONMENT       | Override environment for dashboard           | None               |
 | ADMIN_IDS               | User IDs with admin access                   | [1, 30]            |
 | ADMIN_USERNAMES         | Usernames with admin access                  | ['Gavinadmin', 'Gaju'] |
-| DEV_USERNAME_PATTERN    | SQL pattern for dev user filtering           | None (uses exclusion) |
-| PROD_USERNAME_PATTERN   | SQL pattern for production user filtering    | None (uses inclusion) |
+| DEV_FILTER_PATTERN      | SQL filter for dev dashboard queries         | 'TRUE' (show all)  |
+| PROD_FILTER_PATTERN     | SQL filter for production dashboard queries  | 'username LIKE 'Gaju%' OR username LIKE 'Sophieb%'' |
+| DEV_USERNAME_PATTERN    | Legacy: SQL pattern for dev filtering        | None (deprecated)  |
+| PROD_USERNAME_PATTERN   | Legacy: SQL pattern for prod filtering       | None (deprecated)  |

@@ -256,13 +256,13 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
       // Create environment-specific filter based on configured patterns
       // Using environment variables instead of hardcoded patterns
+      // Use environment variables for filtering without any hardcoded defaults
+      const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
+      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "username LIKE 'Gaju%' OR username LIKE 'Sophieb%'";
+      
       const userEnvironmentFilter = isDevelopment
-        ? process.env.DEV_USERNAME_PATTERN 
-           ? `username LIKE ${devUsernamePattern}` 
-           : "TRUE" // In development mode, show all users by default
-        : process.env.PROD_USERNAME_PATTERN 
-           ? `username LIKE ${prodUsernamePattern}`
-           : "username LIKE 'Gaju%' OR username LIKE 'Sophieb%'";
+        ? devFilterPattern
+        : prodFilterPattern;
       
       console.log(`Environment for user count: ${isDevelopment ? 'development' : 'production'}`);
       
@@ -289,13 +289,13 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
       // Create environment-specific filter for content stats based on configured patterns
       // Using environment variables instead of hardcoded patterns
+      // Use environment variables for filtering without any hardcoded defaults
+      const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
+      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+      
       const userEnvironmentFilter = isDevelopment
-        ? process.env.DEV_USERNAME_PATTERN 
-           ? `u.username LIKE ${devUsernamePattern}` 
-           : "TRUE" // In development mode, show all users by default
-        : process.env.PROD_USERNAME_PATTERN 
-           ? `u.username LIKE ${prodUsernamePattern}`
-           : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+        ? devFilterPattern
+        : prodFilterPattern;
       
       console.log(`Environment for content stats: ${isDevelopment ? 'development' : 'production'}`);
       
@@ -362,13 +362,13 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
       // Create environment-specific filter for user activity based on configured patterns
       // Using environment variables instead of hardcoded patterns
+      // Use environment variables for filtering without any hardcoded defaults
+      const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
+      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+      
       const userActivityEnvFilter = isDevelopment
-        ? process.env.DEV_USERNAME_PATTERN 
-           ? `u.username LIKE ${devUsernamePattern}` 
-           : "TRUE" // In development mode, show all users by default
-        : process.env.PROD_USERNAME_PATTERN 
-           ? `u.username LIKE ${prodUsernamePattern}`
-           : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+        ? devFilterPattern
+        : prodFilterPattern;
       
       const topUsersResult = await executeDirectSql(`
         SELECT 
@@ -535,13 +535,13 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
       // Create environment-specific filter for user registrations based on configured patterns
       // Using environment variables instead of hardcoded patterns
+      // Use environment variables for filtering without any hardcoded defaults
+      const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
+      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "username LIKE 'Gaju%' OR username LIKE 'Sophieb%'";
+      
       const registrationEnvFilter = isDevelopment
-        ? process.env.DEV_USERNAME_PATTERN 
-           ? `username LIKE ${devUsernamePattern}` 
-           : "TRUE" // In development mode, show all users by default
-        : process.env.PROD_USERNAME_PATTERN 
-           ? `username LIKE ${prodUsernamePattern}`
-           : "username LIKE 'Gaju%' OR username LIKE 'Sophieb%'";
+        ? devFilterPattern
+        : prodFilterPattern;
           
       const recentRegistrations = await executeDirectSql(`
         SELECT 
@@ -577,13 +577,13 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
       // Create environment-specific filter for recent activity based on configured patterns
       // Using environment variables instead of hardcoded patterns
+      // Use environment variables for filtering without any hardcoded defaults
+      const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
+      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+      
       const activityEnvFilter = isDevelopment
-        ? process.env.DEV_USERNAME_PATTERN 
-           ? `u.username LIKE ${devUsernamePattern}` 
-           : "TRUE" // In development mode, show all activity by default
-        : process.env.PROD_USERNAME_PATTERN 
-           ? `u.username LIKE ${prodUsernamePattern}`
-           : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'";
+        ? devFilterPattern
+        : prodFilterPattern;
           
       const recentActivity = await executeDirectSql(`
         SELECT 
