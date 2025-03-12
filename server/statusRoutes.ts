@@ -132,12 +132,21 @@ router.get('/admin-check', async (_req: Request, res: Response) => {
  * Protected with JWT authentication to prevent public access
  */
 router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => {
-  // Verify the user has admin access
+  // Verify the user is authenticated
   const user = req.user;
-  if (!user) { // Allow any authenticated user during development
+  if (!user) {
     return res.status(403).json({
       status: 'error',
       message: 'Access denied: Authentication required'
+    });
+  }
+  
+  // Strict admin access control - only user ID 1 or username Gavinadmin 
+  if (user.id !== 1 && user.username !== 'Gavinadmin') {
+    console.log(`[ADMIN] Access DENIED to stats for non-admin user: ${user.username} (ID: ${user.id})`);
+    return res.status(403).json({
+      status: 'error',
+      message: 'Access denied: Administrator privileges required'
     });
   }
   
@@ -410,12 +419,21 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
  * Get detailed user statistics (admin only)
  */
 router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Response) => {
-  // Verify the user has admin access
+  // Verify the user is authenticated
   const user = req.user;
-  if (!user) { // Allow any logged in user for testing
+  if (!user) {
     return res.status(403).json({
       status: 'error',
       message: 'Access denied: Authentication required'
+    });
+  }
+  
+  // Strict admin access control - only user ID 1 or username Gavinadmin 
+  if (user.id !== 1 && user.username !== 'Gavinadmin') {
+    console.log(`[ADMIN] Access DENIED to user-activity for non-admin user: ${user.username} (ID: ${user.id})`);
+    return res.status(403).json({
+      status: 'error',
+      message: 'Access denied: Administrator privileges required'
     });
   }
   
