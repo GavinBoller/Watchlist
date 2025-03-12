@@ -76,11 +76,24 @@ export async function simpleRegisterHandler(req: Request, res: Response) {
       // Use a try-catch with transaction management for better reliability
       let user;
       try {
-        // Attempt to create user directly - simplified approach for reliability
-        user = await storage.createUser({
+        // Determine environment based on configuration
+      const isProduction = process.env.NODE_ENV === 'production';
+      
+      // Default environment is 'development' unless we're specifically in production mode
+      // or we're registering a known production user
+      let userEnvironment = 'development';
+      
+      // Check for production users - this ensures proper dashboard categorization
+      if (isProduction || ['Sophieb', 'Gaju'].includes(username)) {
+        userEnvironment = 'production';
+      }
+      
+      // Attempt to create user directly with environment field
+      user = await storage.createUser({
           username,
           password: hashedPassword,
           displayName: displayName || username,
+          environment: userEnvironment,
         });
         console.log(`[SIMPLE REGISTER] User creation successful: ${username}`);
       } catch (innerError) {

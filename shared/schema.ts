@@ -27,6 +27,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
   displayName: true,
+  environment: true,
 });
 
 // For API response (excludes password)
@@ -36,6 +37,7 @@ export const userResponseSchema = createInsertSchema(users)
     username: true,
     displayName: true,
     createdAt: true,
+    environment: true,
   });
 
 export const movies = pgTable("movies", {

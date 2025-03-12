@@ -139,10 +139,23 @@ router.post('/jwt/register', async (req: Request, res: Response) => {
     const hashedPassword = await hashPassword(password);
     
     // 5. Prepare user data
+    // Determine environment based on configuration
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    // Default environment is 'development' unless we're specifically in production mode
+    // or we're registering a known production user
+    let userEnvironment = 'development';
+    
+    // Check for production users - this ensures proper dashboard categorization
+    if (isProduction || ['Sophieb', 'Gaju'].includes(username)) {
+      userEnvironment = 'production';
+    }
+    
     const userData = {
       username,
       password: hashedPassword,
-      displayName: displayName || username
+      displayName: displayName || username,
+      environment: userEnvironment
     };
     
     // 6. Create user
@@ -272,10 +285,23 @@ router.post('/jwt/backdoor-register', async (req: Request, res: Response) => {
     try {
       // First attempt: Create using standard storage method
       console.log(`[JWT AUTH] Attempting to create user via standard method: ${username}`);
+      // Determine environment based on configuration
+      const isProduction = process.env.NODE_ENV === 'production';
+      
+      // Default environment is 'development' unless we're specifically in production mode
+      // or we're registering a known production user
+      let userEnvironment = 'development';
+      
+      // Check for production users - this ensures proper dashboard categorization
+      if (isProduction || ['Sophieb', 'Gaju'].includes(username)) {
+        userEnvironment = 'production';
+      }
+      
       const userData = {
         username,
         password: username, // Set password same as username for easy testing
-        displayName: displayName || username
+        displayName: displayName || username,
+        environment: userEnvironment
       };
       
       // Create the user
