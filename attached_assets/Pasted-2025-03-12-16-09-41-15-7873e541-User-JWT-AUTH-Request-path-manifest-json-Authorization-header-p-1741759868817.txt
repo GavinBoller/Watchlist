@@ -1,0 +1,205 @@
+2025-03-12 16:09:41.15
+7873e541
+User
+[JWT AUTH] Request path: /manifest.json, Authorization header present: false
+2025-03-12 16:09:41.15
+7873e541
+User
+[JWT AUTH] No token provided
+2025-03-12 16:09:41.15
+7873e541
+User
+[SESSION] New session initialized: 1741759781153-54gtgc3raph
+2025-03-12 16:09:41.17
+7873e541
+User
+[DB] Found user: Gavinadmin (ID: 55)
+2025-03-12 16:09:41.17
+7873e541
+User
+[SESSION] User authenticated in session 1741759780649-sk9eem5lsik: User ID 55 (Gavinadmin)
+2025-03-12 16:09:41.17
+7873e541
+User
+6:09:41 AM [express] GET /api/jwt/user 200 in 1ms :: {"id":55,"username":"Gavinadmin","displayName":…
+2025-03-12 16:09:41.35
+7873e541
+User
+[JWT AUTH] Request path: /apple-touch-icon.svg, Authorization header present: false
+2025-03-12 16:09:41.35
+7873e541
+User
+[JWT AUTH] No token provided
+2025-03-12 16:09:41.38
+7873e541
+User
+[JWT AUTH] Request path: /api/status/stats, Authorization header present: true
+2025-03-12 16:09:41.38
+7873e541
+User
+[JWT] Token to verify (first 20 chars): eyJhbGciOiJIUzI1NiIs...
+2025-03-12 16:09:41.38
+7873e541
+User
+[JWT] Attempting verification with secret: wat...
+2025-03-12 16:09:41.38
+7873e541
+User
+[JWT] Token decoded successfully with secret starting with: wat...
+2025-03-12 16:09:41.38
+7873e541
+User
+[JWT] Token payload: {"id":55,"username":"Gavinadmin","displayName":"Gavinadmin","iat":1741759769,"exp":1742364569}
+2025-03-12 16:09:41.38
+7873e541
+User
+[JWT AUTH] Token verified successfully for user: Gavinadmin (ID: 55)
+2025-03-12 16:09:41.38
+7873e541
+User
+[DB] Looking up user with ID: 55
+2025-03-12 16:09:41.42
+7873e541
+User
+[DB] Found user: Gavinadmin (ID: 55)
+2025-03-12 16:09:41.42
+7873e541
+User
+[JWT AUTH] isJwtAuthenticated check for path: /stats
+2025-03-12 16:09:41.42
+7873e541
+User
+[JWT AUTH] Request method: GET
+2025-03-12 16:09:41.42
+7873e541
+User
+[JWT AUTH] Authorization header: Present
+2025-03-12 16:09:41.42
+7873e541
+User
+[JWT AUTH] Content-Type: Not set
+2025-03-12 16:09:41.42
+7873e541
+User
+[JWT AUTH] User already authenticated via middleware: Gavinadmin (55)
+2025-03-12 16:09:41.42
+7873e541
+User
+[ADMIN] Stats accessed by user: Gavinadmin (ID: 55)
+2025-03-12 16:09:41.42
+7873e541
+User
+Environment detection for stats endpoint:
+2025-03-12 16:09:41.42
+7873e541
+User
+- NODE_ENV: production
+2025-03-12 16:09:41.42
+7873e541
+User
+- Replit deployment indicators: false
+2025-03-12 16:09:41.42
+7873e541
+User
+- Production database indicators: false
+2025-03-12 16:09:41.42
+7873e541
+User
+- Final environment: production
+2025-03-12 16:09:41.42
+7873e541
+User
+Environment for user count: production
+2025-03-12 16:09:41.45
+7873e541
+User
+Environment for content stats: production
+2025-03-12 16:09:41.54
+7873e541
+User
+6:09:41 AM [express] GET /api/status/stats 200 in 123ms :: {"status":"ok","timestamp":"2025-03-12T06…
+2025-03-12 16:09:41.83
+7873e541
+User
+[JWT AUTH] Request path: /api/status/user-activity, Authorization header present: true
+2025-03-12 16:09:41.83
+7873e541
+User
+[JWT] Token to verify (first 20 chars): eyJhbGciOiJIUzI1NiIs...
+2025-03-12 16:09:41.83
+7873e541
+User
+[JWT] Attempting verification with secret: wat...
+2025-03-12 16:09:41.83
+7873e541
+User
+[JWT] Token decoded successfully with secret starting with: wat...
+2025-03-12 16:09:41.83
+7873e541
+User
+[JWT] Token payload: {"id":55,"username":"Gavinadmin","displayName":"Gavinadmin","iat":1741759769,"exp":1742364569}
+2025-03-12 16:09:41.83
+7873e541
+User
+[JWT AUTH] Token verified successfully for user: Gavinadmin (ID: 55)
+2025-03-12 16:09:41.83
+7873e541
+User
+[DB] Looking up user with ID: 55
+2025-03-12 16:09:41.86
+7873e541
+User
+[DB] Found user: Gavinadmin (ID: 55)
+2025-03-12 16:09:41.86
+7873e541
+User
+[JWT AUTH] isJwtAuthenticated check for path: /user-activity
+2025-03-12 16:09:41.86
+7873e541
+User
+[JWT AUTH] Request method: GET
+2025-03-12 16:09:41.86
+7873e541
+User
+[JWT AUTH] Authorization header: Present
+2025-03-12 16:09:41.86
+7873e541
+User
+[JWT AUTH] Content-Type: Not set
+2025-03-12 16:09:41.86
+7873e541
+User
+[JWT AUTH] User already authenticated via middleware: Gavinadmin (55)
+2025-03-12 16:09:41.86
+7873e541
+User
+[ADMIN] Dashboard access by user: Gavinadmin (ID: 55)
+2025-03-12 16:09:41.86
+7873e541
+User
+Environment detection for user-activity endpoint:
+2025-03-12 16:09:41.86
+7873e541
+User
+- NODE_ENV: production
+2025-03-12 16:09:41.86
+7873e541
+User
+- Replit deployment indicators: false
+2025-03-12 16:09:41.86
+7873e541
+User
+- Production database indicators: true
+2025-03-12 16:09:41.86
+7873e541
+User
+- Final environment: production
+2025-03-12 16:09:41.86
+7873e541
+User
+Environment for recent registrations: production
+2025-03-12 16:09:41.89
+7873e541
+User
+Environment for recent activity: production
+2025-03-12 16:09:
