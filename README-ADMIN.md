@@ -86,7 +86,7 @@ All dashboard data is correctly labeled with its source environment (`developmen
 | FORCE_ENVIRONMENT       | Override environment for dashboard           | None               |
 | ADMIN_IDS               | User IDs with admin access                   | [1, 30]            |
 | ADMIN_USERNAMES         | Usernames with admin access                  | ['Gavinadmin', 'Gaju'] |
-| DEV_FILTER_PATTERN      | SQL filter for dev dashboard queries         | username NOT LIKE 'Sophieb%' AND username NOT LIKE 'Gaju%'  |
-| PROD_FILTER_PATTERN     | SQL filter for production dashboard queries  | username LIKE 'Sophieb%' OR username LIKE 'Gaju%' |
+| DEV_FILTER_PATTERN      | SQL filter for dev dashboard queries         | username <> 'Sophieb' AND username <> 'Gaju'  |
+| PROD_FILTER_PATTERN     | SQL filter for production dashboard queries  | username = 'Sophieb' OR username = 'Gaju' |
 | DEV_USERNAME_PATTERN    | Legacy: SQL pattern for dev filtering        | None (deprecated)  |
 | PROD_USERNAME_PATTERN   | Legacy: SQL pattern for prod filtering       | None (deprecated)  |
