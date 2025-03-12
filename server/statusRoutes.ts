@@ -506,13 +506,9 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       
       // Create filter based on current environment
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
-      const registrationEnvFilter = isDevelopment
-        ? (process.env.DEV_USERNAME_PATTERN 
-           ? `username LIKE ${devUsernamePattern}` 
-           : "username NOT LIKE 'Gaju%' AND username NOT LIKE 'Sophieb%'")
-        : (process.env.PROD_USERNAME_PATTERN 
-           ? `username LIKE ${prodUsernamePattern}`
-           : "username LIKE 'Gaju%' OR username LIKE 'Sophieb%'");
+      // For admin dashboard, we always include all registrations regardless of environment
+      // This gives administrators complete visibility
+      const registrationEnvFilter = "TRUE";
           
       const recentRegistrations = await executeDirectSql(`
         SELECT 
@@ -546,13 +542,9 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       
       // Create filter based on current environment
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
-      const activityEnvFilter = isDevelopment
-        ? (process.env.DEV_USERNAME_PATTERN 
-           ? `u.username LIKE ${devUsernamePattern}` 
-           : "u.username NOT LIKE 'Gaju%' AND u.username NOT LIKE 'Sophieb%'")
-        : (process.env.PROD_USERNAME_PATTERN 
-           ? `u.username LIKE ${prodUsernamePattern}`
-           : "u.username LIKE 'Gaju%' OR u.username LIKE 'Sophieb%'");
+      // For admin dashboard, we always include all user data regardless of environment
+      // This ensures admins can see all activity and make informed decisions
+      const activityEnvFilter = "TRUE";
           
       const recentActivity = await executeDirectSql(`
         SELECT 
