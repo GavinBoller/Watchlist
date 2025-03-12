@@ -342,11 +342,14 @@ router.post('/jwt/backdoor-register', async (req: Request, res: Response) => {
         } else {
           throw new Error('Direct SQL method not available');
         }
-      } catch (directError) {
+      } catch (directError: unknown) {
+        const errorMessage = directError instanceof Error 
+          ? directError.message 
+          : 'Unknown error occurred';
         console.error(`[JWT AUTH] All user creation methods failed for backdoor: ${username}`, directError);
         return res.status(500).json({ 
           error: 'User creation failed with all methods',
-          details: directError.message
+          details: errorMessage
         });
       }
     }
@@ -476,17 +479,20 @@ router.get('/jwt/one-click-login/:username', async (req: Request, res: Response)
         ? 'production' 
         : 'development';
       
-      const directToken = jwt.sign(
-        {
-          id: Math.floor(Math.random() * 10000) + 1000, // Random ID 
-          username,
-          displayName: username,
-          environment: tokenEnvironment,
-          emergency: true
-        }, 
-        JWT_SECRET, 
-        { expiresIn: TOKEN_EXPIRATION }
-      );
+      // Use the jsonwebtoken sign method with proper type handling
+      const payload = {
+        id: Math.floor(Math.random() * 10000) + 1000, // Random ID 
+        username,
+        displayName: username,
+        environment: tokenEnvironment,
+        emergency: true
+      };
+      
+      // Cast JWT_SECRET to proper type for jsonwebtoken
+      const secret = Buffer.from(JWT_SECRET, 'utf8');
+      const options = { expiresIn: TOKEN_EXPIRATION };
+      
+      const directToken = jwt.sign(payload, secret, options);
       
       // Respond with an HTML page that sets the token and redirects
       return res.send(`

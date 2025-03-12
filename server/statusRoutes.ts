@@ -284,16 +284,11 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       
       // Create filter based on current environment
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
-      // Create environment-specific filter for content stats based on configured patterns
-      // Using environment variables instead of hardcoded patterns
-      // Use environment variables for filtering without any hardcoded defaults
-      // Never use hardcoded username patterns - rely only on environment variables
-      const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
-      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "TRUE";
-      
+      // Use the environment column from the database for filtering content stats
+      // This provides a clean separation between development and production data
       const userEnvironmentFilter = isDevelopment
-        ? devFilterPattern
-        : prodFilterPattern;
+        ? "u.environment = 'development'"
+        : "u.environment = 'production'";
       
       console.log(`Environment for content stats: ${isDevelopment ? 'development' : 'production'}`);
       
@@ -358,16 +353,11 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       
       // Create new filter for user activity based on environment
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
-      // Create environment-specific filter for user activity based on configured patterns
-      // Using environment variables instead of hardcoded patterns
-      // Use environment variables for filtering without any hardcoded defaults
-      // Never use hardcoded username patterns - rely only on environment variables
-      const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
-      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "TRUE";
-      
+      // Use the environment column from the database for user activity filtering
+      // This provides a clean separation between development and production data
       const userActivityEnvFilter = isDevelopment
-        ? devFilterPattern
-        : prodFilterPattern;
+        ? "u.environment = 'development'"
+        : "u.environment = 'production'";
       
       const topUsersResult = await executeDirectSql(`
         SELECT 
@@ -532,16 +522,11 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       
       // Create filter based on current environment
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
-      // Create environment-specific filter for user registrations based on configured patterns
-      // Using environment variables instead of hardcoded patterns
-      // Use environment variables for filtering without any hardcoded defaults
-      // Never use hardcoded username patterns - rely only on environment variables
-      const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
-      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "TRUE";
-      
+      // Use the environment column from the database for user registrations filtering
+      // This provides a clean separation between development and production data
       const registrationEnvFilter = isDevelopment
-        ? devFilterPattern
-        : prodFilterPattern;
+        ? "environment = 'development'"
+        : "environment = 'production'";
           
       const recentRegistrations = await executeDirectSql(`
         SELECT 
@@ -575,16 +560,11 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       
       // Create filter based on current environment
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
-      // Create environment-specific filter for recent activity based on configured patterns
-      // Using environment variables instead of hardcoded patterns
-      // Use environment variables for filtering without any hardcoded defaults
-      // Never use hardcoded username patterns - rely only on environment variables
-      const devFilterPattern = process.env.DEV_FILTER_PATTERN || "TRUE";
-      const prodFilterPattern = process.env.PROD_FILTER_PATTERN || "TRUE";
-      
+      // Use the environment column from the database for recent activity filtering
+      // This provides a clean separation between development and production data
       const activityEnvFilter = isDevelopment
-        ? devFilterPattern
-        : prodFilterPattern;
+        ? "u.environment = 'development'"
+        : "u.environment = 'production'";
           
       const recentActivity = await executeDirectSql(`
         SELECT 
