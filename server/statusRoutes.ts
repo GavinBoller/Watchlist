@@ -141,8 +141,8 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
     });
   }
   
-  // Strict admin access control - only user ID 1 or username Gavinadmin 
-  if (user.id !== 1 && user.username !== 'Gavinadmin') {
+  // Strict admin access control - only user ID 1, 30, or username Gavinadmin or Gaju
+  if (user.id !== 1 && user.id !== 30 && user.username !== 'Gavinadmin' && user.username !== 'Gaju') {
     console.log(`[ADMIN] Access DENIED to stats for non-admin user: ${user.username} (ID: ${user.id})`);
     return res.status(403).json({
       status: 'error',
@@ -428,8 +428,8 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
     });
   }
   
-  // Strict admin access control - only user ID 1 or username Gavinadmin 
-  if (user.id !== 1 && user.username !== 'Gavinadmin') {
+  // Strict admin access control - only user ID 1, 30, or username Gavinadmin or Gaju
+  if (user.id !== 1 && user.id !== 30 && user.username !== 'Gavinadmin' && user.username !== 'Gaju') {
     console.log(`[ADMIN] Access DENIED to user-activity for non-admin user: ${user.username} (ID: ${user.id})`);
     return res.status(403).json({
       status: 'error',
