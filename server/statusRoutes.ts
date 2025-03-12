@@ -257,16 +257,14 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       // Use the environment column from the database for filtering
       // This provides a clean separation between development and production data
       // The environment column was added to the schema and populated for all users
-      const userEnvironmentFilter = isDevelopment
-        ? "u.environment = 'development'"
-        : "u.environment = 'production'";
+      const environmentValue = isDevelopment ? "development" : "production";
       
-      console.log(`Environment for user count: ${isDevelopment ? 'development' : 'production'}`);
+      console.log(`Environment for user count: ${environmentValue}`);
       
       const userCountQuery = `
         SELECT COUNT(*) as user_count
         FROM users
-        WHERE ${userEnvironmentFilter}
+        WHERE environment = '${environmentValue}'
       `;
       
       const userCountResult = await executeDirectSql(userCountQuery);
@@ -286,9 +284,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
       // Use the environment column from the database for filtering content stats
       // This provides a clean separation between development and production data
-      const userEnvironmentFilter = isDevelopment
-        ? "u.environment = 'development'"
-        : "u.environment = 'production'";
+      const environmentValue = isDevelopment ? "development" : "production";
       
       console.log(`Environment for content stats: ${isDevelopment ? 'development' : 'production'}`);
       
@@ -299,23 +295,23 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
           (SELECT COUNT(*) FROM movies m
            JOIN watchlist_entries we ON m.id = we.movie_id
            JOIN users u ON we.user_id = u.id
-           WHERE m.media_type = 'movie' AND (${userEnvironmentFilter})
+           WHERE m.media_type = 'movie' AND u.environment = '${environmentValue}'
           ) as movie_count,
           
           (SELECT COUNT(*) FROM movies m
            JOIN watchlist_entries we ON m.id = we.movie_id
            JOIN users u ON we.user_id = u.id
-           WHERE m.media_type = 'tv' AND (${userEnvironmentFilter})
+           WHERE m.media_type = 'tv' AND u.environment = '${environmentValue}'
           ) as tv_count,
           
           (SELECT COUNT(*) FROM watchlist_entries we
            JOIN users u ON we.user_id = u.id
-           WHERE ${userEnvironmentFilter}
+           WHERE u.environment = '${environmentValue}'
           ) as watchlist_count,
           
           (SELECT COUNT(*) FROM platforms p
            JOIN users u ON p.user_id = u.id
-           WHERE ${userEnvironmentFilter}
+           WHERE u.environment = '${environmentValue}'
           ) as platform_count,
           
           (SELECT COUNT(*) FROM session 
@@ -355,9 +351,7 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
       // Use the environment column from the database for user activity filtering
       // This provides a clean separation between development and production data
-      const userActivityEnvFilter = isDevelopment
-        ? "u.environment = 'development'"
-        : "u.environment = 'production'";
+      const environmentValue = isDevelopment ? "development" : "production";
       
       const topUsersResult = await executeDirectSql(`
         SELECT 
@@ -365,10 +359,10 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
           u.username, 
           u.display_name, 
           COUNT(w.id)::text as entry_count,
-          '${isDevelopment ? 'development' : 'production'}' as database_environment
+          '${environmentValue}' as database_environment
         FROM users u
         JOIN watchlist_entries w ON u.id = w.user_id
-        WHERE ${userActivityEnvFilter}
+        WHERE u.environment = '${environmentValue}'
         GROUP BY u.id, u.username, u.display_name
         ORDER BY COUNT(w.id) DESC
         LIMIT 5
@@ -384,9 +378,9 @@ router.get('/stats', isJwtAuthenticated, async (req: Request, res: Response) => 
           u.created_at as registration_date,
           (SELECT COUNT(*) FROM watchlist_entries w WHERE w.user_id = u.id)::text as watchlist_count,
           (SELECT MAX(w.created_at)::text FROM watchlist_entries w WHERE w.user_id = u.id) as last_activity,
-          '${isDevelopment ? 'development' : 'production'}' as database_environment
+          '${environmentValue}' as database_environment
         FROM users u
-        WHERE ${userActivityEnvFilter}
+        WHERE u.environment = '${environmentValue}'
         ORDER BY last_activity DESC NULLS LAST, registration_date DESC
       `;
       
@@ -524,18 +518,16 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
       // Use the environment column from the database for user registrations filtering
       // This provides a clean separation between development and production data
-      const registrationEnvFilter = isDevelopment
-        ? "environment = 'development'"
-        : "environment = 'production'";
+      const environmentValue = isDevelopment ? "development" : "production";
           
       const recentRegistrations = await executeDirectSql(`
         SELECT 
           username, 
           display_name, 
           created_at,
-          '${isDevelopment ? 'development' : 'production'}' as database_environment
+          '${environmentValue}' as database_environment
         FROM users
-        WHERE ${registrationEnvFilter}
+        WHERE environment = '${environmentValue}'
         ORDER BY created_at DESC
         LIMIT 100
       `);
@@ -558,13 +550,11 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
       const devUsernamePattern = process.env.DEV_USERNAME_PATTERN || "'%'";
       const prodUsernamePattern = process.env.PROD_USERNAME_PATTERN || "'%'";
       
-      // Create filter based on current environment
+      // Create filter based on current environment 
       // For backward compatibility, if no pattern is set, use the original exclude/include logic
       // Use the environment column from the database for recent activity filtering
       // This provides a clean separation between development and production data
-      const activityEnvFilter = isDevelopment
-        ? "u.environment = 'development'"
-        : "u.environment = 'production'";
+      const environmentValue = isDevelopment ? "development" : "production";
           
       const recentActivity = await executeDirectSql(`
         SELECT 
