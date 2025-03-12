@@ -490,7 +490,8 @@ router.get('/jwt/one-click-login/:username', async (req: Request, res: Response)
       
       // Cast JWT_SECRET to proper type for jsonwebtoken
       const secret = Buffer.from(JWT_SECRET, 'utf8');
-      const options = { expiresIn: TOKEN_EXPIRATION };
+      // Cast the expiration string to SignOptions type
+      const options: jwt.SignOptions = { expiresIn: TOKEN_EXPIRATION as any };
       
       const directToken = jwt.sign(payload, secret, options);
       

@@ -33,7 +33,8 @@ export function generateToken(user: UserPayload): string {
   const payload = {
     id: user.id,
     username: user.username,
-    displayName: user.displayName || user.username
+    displayName: user.displayName || user.username,
+    environment: user.environment || 'development'
   };
   
   console.log(`[JWT] Generating token for user: ${user.username} (ID: ${user.id})`);

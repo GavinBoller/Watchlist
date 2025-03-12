@@ -562,11 +562,11 @@ router.get('/user-activity', isJwtAuthenticated, async (req: Request, res: Respo
           m.title,
           w.created_at,
           w.status,
-          '${isDevelopment ? 'development' : 'production'}' as database_environment
+          '${environmentValue}' as database_environment
         FROM watchlist_entries w
         JOIN users u ON w.user_id = u.id
         JOIN movies m ON w.movie_id = m.id
-        WHERE ${activityEnvFilter}
+        WHERE u.environment = '${environmentValue}'
         ORDER BY w.created_at DESC
         LIMIT 100
       `);
