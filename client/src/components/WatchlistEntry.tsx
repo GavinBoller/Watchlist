@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { WatchlistEntryWithMovie } from '@shared/schema';
-import { getImageUrl, getGenreNames, getIMDbUrl } from '@/api/tmdb';
-import { Star, Trash2, Edit, Info, Calendar, Tv2, Film, ExternalLink, Monitor } from 'lucide-react';
+import { getImageUrl, getGenreNames, getIMDbUrl, getMovieDetails, formatRuntime } from '@/api/tmdb';
+import { Star, Trash2, Edit, Info, Calendar, Tv2, Film, ExternalLink, Monitor, Clock } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useState, useEffect } from 'react';
 
@@ -17,6 +17,7 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
   const isMobile = useIsMobile();
   const [imdbUrl, setImdbUrl] = useState<string>('');
   const [isLoadingUrl, setIsLoadingUrl] = useState<boolean>(false);
+  const [runtime, setRuntime] = useState<string>('');
   
   const posterUrl = getImageUrl(movie.posterPath, 'w200');
   const year = movie.releaseDate ? new Date(movie.releaseDate).getFullYear().toString() : '';
@@ -56,6 +57,32 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
     
     fetchImdbUrl();
   }, [movie.tmdbId, mediaType, movie.title]);
+  
+  // Fetch runtime when component mounts (for movies only)
+  useEffect(() => {
+    // Only fetch runtime for movies, not TV shows
+    if (mediaType === 'movie') {
+      const fetchRuntime = async () => {
+        try {
+          // Check if we already have runtime data in the movie object
+          if (movie.runtime) {
+            setRuntime(formatRuntime(movie.runtime));
+            return;
+          }
+          
+          // Otherwise fetch from the API
+          const details = await getMovieDetails(movie.tmdbId, 'movie');
+          if (details && details.runtime) {
+            setRuntime(formatRuntime(details.runtime));
+          }
+        } catch (error) {
+          console.error('Error fetching movie runtime:', error);
+        }
+      };
+      
+      fetchRuntime();
+    }
+  }, [movie.tmdbId, mediaType, movie.runtime]);
 
   return (
     <div className={`bg-[#292929] rounded-lg overflow-hidden ${isMobile ? 'flex flex-col' : 'flex'}`}>
@@ -96,10 +123,14 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
           </div>
         </div>
         
-        {/* Year and genres */}
+        {/* Year, runtime (for movies only), and genres */}
         <div className="flex items-center text-xs text-gray-300 mt-1">
           <MediaTypeIcon className="h-3 w-3 mr-1 flex-shrink-0" />
-          <span className="truncate">{year}{genres ? ` • ${genres}` : ''}</span>
+          <span className="truncate">
+            {year}
+            {mediaType === 'movie' && runtime && ` • ${runtime}`}
+            {genres ? ` • ${genres}` : ''}
+          </span>
         </div>
         
         {/* Platform */}

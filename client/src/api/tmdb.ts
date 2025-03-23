@@ -210,3 +210,46 @@ export const searchMovies = async (query: string, mediaType: string = 'all'): Pr
     throw error;
   }
 };
+
+// Cache for movie details to avoid repeated API calls
+const movieDetailsCache: Record<string, any> = {};
+
+// Get movie or TV show details including runtime
+export const getMovieDetails = async (tmdbId: number, mediaType: string = 'movie'): Promise<any> => {
+  try {
+    const cacheKey = `${mediaType}_${tmdbId}`;
+    
+    // First check the cache
+    if (movieDetailsCache[cacheKey]) {
+      return movieDetailsCache[cacheKey];
+    }
+    
+    const response = await fetch(`/api/movies/details/${tmdbId}?mediaType=${mediaType}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch movie details');
+    }
+    
+    const data = await response.json();
+    
+    // Save to cache
+    movieDetailsCache[cacheKey] = data;
+    
+    return data;
+  } catch (error) {
+    console.error('Error fetching movie details:', error);
+    return {};
+  }
+};
+
+// Format runtime from minutes to hours and minutes
+export const formatRuntime = (runtime?: number | null): string => {
+  if (!runtime) return '';
+  
+  const hours = Math.floor(runtime / 60);
+  const minutes = runtime % 60;
+  
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  
+  return `${hours}h ${minutes}m`;
+};
