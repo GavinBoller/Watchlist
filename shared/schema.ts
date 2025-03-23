@@ -131,6 +131,7 @@ export interface TMDBMovie {
   vote_average: number;
   genre_ids: number[];
   media_type?: string;  // 'movie' or 'tv'
+  runtime?: number;     // Runtime in minutes (for movies only)
 }
 
 export interface TMDBSearchResponse {

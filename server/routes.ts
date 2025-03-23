@@ -343,6 +343,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch external IDs" });
     }
   });
+  
+  // Get detailed information for a movie or TV show including runtime
+  app.get("/api/movies/details/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { mediaType } = req.query;
+      
+      if (!id) {
+        return res.status(400).json({ message: "ID parameter is required" });
+      }
+      
+      const type = typeof mediaType === "string" ? mediaType : "movie";
+      
+      const response = await axios.get(`${TMDB_API_BASE_URL}/${type}/${id}`, {
+        params: {
+          api_key: TMDB_API_KEY,
+        },
+      });
+      
+      res.json(response.data);
+    } catch (error) {
+      console.error("Error fetching movie/TV details:", error);
+      res.status(500).json({ message: "Failed to fetch movie/TV details" });
+    }
+  });
 
   // Movie and TV show search route (TMDB API)
   app.get("/api/movies/search", async (req: Request, res: Response) => {
