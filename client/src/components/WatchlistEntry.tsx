@@ -18,6 +18,7 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
   const [imdbUrl, setImdbUrl] = useState<string>('');
   const [isLoadingUrl, setIsLoadingUrl] = useState<boolean>(false);
   const [runtime, setRuntime] = useState<string>('');
+  const [tvInfo, setTvInfo] = useState<string>('');
   
   const posterUrl = getImageUrl(movie.posterPath, 'w200');
   const year = movie.releaseDate ? new Date(movie.releaseDate).getFullYear().toString() : '';

@@ -858,6 +858,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               backdropPath: tmdbData.backdrop_path || '',
               releaseDate: releaseDate || null,
               voteAverage: tmdbData.vote_average || 0,
+              runtime: tmdbData.runtime || null,
+              numberOfSeasons: mediaType === 'tv' ? tmdbData.number_of_seasons || null : null,
+              numberOfEpisodes: mediaType === 'tv' ? tmdbData.number_of_episodes || null : null,
               mediaType
             });
             
@@ -874,8 +877,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 // Try to insert the movie using direct SQL
                 const result = await executeDirectSql(
-                  `INSERT INTO movies (tmdb_id, title, overview, poster_path, backdrop_path, release_date, vote_average, media_type) 
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+                  `INSERT INTO movies (tmdb_id, title, overview, poster_path, backdrop_path, release_date, vote_average, runtime, number_of_seasons, number_of_episodes, media_type) 
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
                    RETURNING *`, 
                   [
                     tmdbId, 
@@ -884,7 +887,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     tmdbData.poster_path || '', 
                     tmdbData.backdrop_path || '', 
                     releaseDate || null, 
-                    tmdbData.vote_average || 0, 
+                    tmdbData.vote_average || 0,
+                    tmdbData.runtime || null,
+                    mediaType === 'tv' ? tmdbData.number_of_seasons || null : null,
+                    mediaType === 'tv' ? tmdbData.number_of_episodes || null : null, 
                     mediaType
                   ]
                 );
@@ -901,6 +907,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     backdropPath: row.backdrop_path,
                     releaseDate: row.release_date,
                     voteAverage: row.vote_average,
+                    genres: row.genres,
+                    runtime: row.runtime,
+                    numberOfSeasons: row.number_of_seasons,
+                    numberOfEpisodes: row.number_of_episodes,
                     mediaType: row.media_type,
                     createdAt: row.created_at
                   };
@@ -925,6 +935,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     backdropPath: tmdbData.backdrop_path || '',
                     releaseDate: releaseDate || null,
                     voteAverage: tmdbData.vote_average || 0,
+                    genres: null,
+                    runtime: tmdbData.runtime || null,
+                    numberOfSeasons: mediaType === 'tv' ? tmdbData.number_of_seasons || null : null,
+                    numberOfEpisodes: mediaType === 'tv' ? tmdbData.number_of_episodes || null : null,
                     mediaType,
                     createdAt: new Date().toISOString()
                   };
