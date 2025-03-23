@@ -59,12 +59,11 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
     fetchImdbUrl();
   }, [movie.tmdbId, mediaType, movie.title]);
   
-  // Fetch runtime when component mounts (for movies only)
+  // Fetch runtime for movies or TV show info when component mounts
   useEffect(() => {
-    // Only fetch runtime for movies, not TV shows
-    if (mediaType === 'movie') {
-      const fetchRuntime = async () => {
-        try {
+    const fetchMediaDetails = async () => {
+      try {
+        if (mediaType === 'movie') {
           // Check if we already have runtime data in the movie object
           if (movie.runtime) {
             setRuntime(formatRuntime(movie.runtime));
@@ -76,14 +75,32 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
           if (details && details.runtime) {
             setRuntime(formatRuntime(details.runtime));
           }
-        } catch (error) {
-          console.error('Error fetching movie runtime:', error);
+        } else if (mediaType === 'tv') {
+          // Check if we already have TV show data in the movie object
+          if (movie.numberOfSeasons && movie.numberOfEpisodes) {
+            const seasonText = movie.numberOfSeasons === 1 ? 'season' : 'seasons';
+            const episodeText = movie.numberOfEpisodes === 1 ? 'episode' : 'episodes';
+            setTvInfo(`${movie.numberOfSeasons} ${seasonText}, ${movie.numberOfEpisodes} ${episodeText}`);
+            return;
+          }
+          
+          // Otherwise fetch from the API
+          const details = await getMovieDetails(movie.tmdbId, 'tv');
+          if (details) {
+            const seasons = details.number_of_seasons || 0;
+            const episodes = details.number_of_episodes || 0;
+            const seasonText = seasons === 1 ? 'season' : 'seasons';
+            const episodeText = episodes === 1 ? 'episode' : 'episodes';
+            setTvInfo(`${seasons} ${seasonText}, ${episodes} ${episodeText}`);
+          }
         }
-      };
-      
-      fetchRuntime();
-    }
-  }, [movie.tmdbId, mediaType, movie.runtime]);
+      } catch (error) {
+        console.error(`Error fetching ${mediaType} details:`, error);
+      }
+    };
+    
+    fetchMediaDetails();
+  }, [movie.tmdbId, mediaType, movie.runtime, movie.numberOfSeasons, movie.numberOfEpisodes]);
 
   return (
     <div className={`bg-[#292929] rounded-lg overflow-hidden ${isMobile ? 'flex flex-col' : 'flex'}`}>
@@ -130,6 +147,7 @@ const WatchlistEntry = ({ entry, onEdit, onDelete, onShowDetails }: WatchlistEnt
           <span className="truncate">
             {year}
             {mediaType === 'movie' && runtime && ` • ${runtime}`}
+            {mediaType === 'tv' && tvInfo && ` • ${tvInfo}`}
             {genres ? ` • ${genres}` : ''}
           </span>
         </div>
