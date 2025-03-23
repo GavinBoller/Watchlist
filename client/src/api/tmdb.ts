@@ -116,7 +116,7 @@ export const getMediaType = (item: TMDBMovie): string => {
   return item.media_type || 'movie';
 };
 
-// Format for display with genres
+// Format for display with runtime, seasons/episodes info, and genres
 export const formatMovieDisplay = (item: TMDBMovie): string => {
   try {
     // Safely extract information with error handling
@@ -131,7 +131,21 @@ export const formatMovieDisplay = (item: TMDBMovie): string => {
       genres = getGenreNames(item.genre_ids, mediaType);
     }
     
-    return `${year}${genres ? ' • ' + genres : ''}${mediaType === 'tv' ? ' • TV Series' : ''}`;
+    // Add runtime for movies or seasons/episodes for TV shows
+    let additionalInfo = '';
+    if (mediaType === 'movie' && item.runtime) {
+      additionalInfo = ` • ${formatRuntime(item.runtime)}`;
+    } else if (mediaType === 'tv') {
+      if (item.number_of_seasons && item.number_of_episodes) {
+        const seasonText = item.number_of_seasons === 1 ? 'season' : 'seasons';
+        const episodeText = item.number_of_episodes === 1 ? 'episode' : 'episodes';
+        additionalInfo = ` • ${item.number_of_seasons} ${seasonText}, ${item.number_of_episodes} ${episodeText}`;
+      } else {
+        additionalInfo = ' • TV Series';
+      }
+    }
+    
+    return `${year}${additionalInfo}${genres ? ' • ' + genres : ''}`;
   } catch (error) {
     console.warn('Error formatting movie display info:', error, item);
     return item.release_date || item.first_air_date || '';

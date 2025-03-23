@@ -1,8 +1,9 @@
 import { TMDBMovie } from '@shared/schema';
-import { getImageUrl, getTitle, getMediaType, formatMovieDisplay, getIMDbUrl } from '@/api/tmdb';
+import { getImageUrl, getTitle, getMediaType, formatMovieDisplay, getIMDbUrl, formatRuntime, getMovieDetails } from '@/api/tmdb';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
-import { Star, Calendar, Tag, ExternalLink, Plus, X } from 'lucide-react';
+import { Star, Calendar, Tag, ExternalLink, Plus, X, Clock, Tv2, Film } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useState, useEffect } from 'react';
 
 interface DetailsModalProps {
   item: TMDBMovie | null;
@@ -20,6 +21,9 @@ export const DetailsModal = ({
   showAddToWatchlistButton = true 
 }: DetailsModalProps) => {
   const isMobile = useIsMobile();
+  const [runtime, setRuntime] = useState<string>('');
+  const [tvInfo, setTvInfo] = useState<string>('');
+  
   if (!item) return null;
 
   const title = getTitle(item);
@@ -30,6 +34,49 @@ export const DetailsModal = ({
   
   // Format vote average to one decimal place
   const voteAverage = item.vote_average ? item.vote_average.toFixed(1) : 'N/A';
+
+  // Fetch runtime for movies or TV show info when component mounts or item changes
+  useEffect(() => {
+    const fetchMediaDetails = async () => {
+      try {
+        if (mediaType === 'movie') {
+          // Check if we already have runtime data in the item object
+          if (item.runtime) {
+            setRuntime(formatRuntime(item.runtime));
+            return;
+          }
+          
+          // Otherwise fetch from the API
+          const details = await getMovieDetails(item.id, 'movie');
+          if (details && details.runtime) {
+            setRuntime(formatRuntime(details.runtime));
+          }
+        } else if (mediaType === 'tv') {
+          // Check if we already have TV show data in the item object
+          if (item.number_of_seasons && item.number_of_episodes) {
+            const seasonText = item.number_of_seasons === 1 ? 'season' : 'seasons';
+            const episodeText = item.number_of_episodes === 1 ? 'episode' : 'episodes';
+            setTvInfo(`${item.number_of_seasons} ${seasonText}, ${item.number_of_episodes} ${episodeText}`);
+            return;
+          }
+          
+          // Otherwise fetch from the API
+          const details = await getMovieDetails(item.id, 'tv');
+          if (details) {
+            const seasons = details.number_of_seasons || 0;
+            const episodes = details.number_of_episodes || 0;
+            const seasonText = seasons === 1 ? 'season' : 'seasons';
+            const episodeText = episodes === 1 ? 'episode' : 'episodes';
+            setTvInfo(`${seasons} ${seasonText}, ${episodes} ${episodeText}`);
+          }
+        }
+      } catch (error) {
+        console.error(`Error fetching ${mediaType} details:`, error);
+      }
+    };
+    
+    fetchMediaDetails();
+  }, [item.id, mediaType, item.runtime, item.number_of_seasons, item.number_of_episodes]);
 
   const handleAddToWatchlist = () => {
     onAddToWatchlist(item);
@@ -88,6 +135,24 @@ export const DetailsModal = ({
                 <Tag className="h-4 w-4 mr-1" />
                 <span className="capitalize">{mediaType}</span>
               </div>
+              
+              {/* Runtime or TV show info */}
+              {(runtime || tvInfo) && (
+                <div className="flex items-center text-sm text-gray-300">
+                  {mediaType === 'movie' && runtime && (
+                    <>
+                      <Clock className="h-4 w-4 mr-1 text-gray-400" />
+                      <span>{runtime}</span>
+                    </>
+                  )}
+                  {mediaType === 'tv' && tvInfo && (
+                    <>
+                      <Tv2 className="h-4 w-4 mr-1 text-gray-400" />
+                      <span>{tvInfo}</span>
+                    </>
+                  )}
+                </div>
+              )}
               
               {/* Overview section */}
               <div className="text-sm prose-sm prose-invert">
