@@ -111,7 +111,9 @@ export class SQLiteStorage implements IStorage {
         voteAverage TEXT,
         genres TEXT,
         runtime INTEGER,
-        mediaType TEXT
+        mediaType TEXT,
+        number_of_seasons INTEGER,
+        number_of_episodes INTEGER
       )
     `);
 
@@ -311,9 +313,10 @@ export class SQLiteStorage implements IStorage {
     const stmt = this.db.prepare(`
       INSERT INTO movies (
         tmdbId, title, overview, posterPath, backdropPath, 
-        releaseDate, voteAverage, genres, runtime, mediaType
+        releaseDate, voteAverage, genres, runtime, mediaType,
+        number_of_seasons, number_of_episodes
       ) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
@@ -326,7 +329,9 @@ export class SQLiteStorage implements IStorage {
       insertMovie.voteAverage || null,
       insertMovie.genres || null,
       insertMovie.runtime || null,
-      insertMovie.mediaType || 'movie'
+      insertMovie.mediaType || 'movie',
+      insertMovie.numberOfSeasons || null,
+      insertMovie.numberOfEpisodes || null
     );
     
     return {
@@ -340,7 +345,9 @@ export class SQLiteStorage implements IStorage {
       voteAverage: insertMovie.voteAverage || null,
       genres: insertMovie.genres || null,
       runtime: insertMovie.runtime || null,
-      mediaType: insertMovie.mediaType || 'movie'
+      mediaType: insertMovie.mediaType || 'movie',
+      numberOfSeasons: insertMovie.numberOfSeasons || null,
+      numberOfEpisodes: insertMovie.numberOfEpisodes || null
     };
   }
 
@@ -471,7 +478,7 @@ export class SQLiteStorage implements IStorage {
       SELECT 
         we.id, we.userId, we.movieId, we.platformId, we.watchedDate, we.notes, we.status, we.createdAt,
         m.id as movie_id, m.tmdbId, m.title, m.overview, m.posterPath, m.backdropPath, 
-        m.releaseDate, m.voteAverage, m.genres, m.runtime, m.mediaType,
+        m.releaseDate, m.voteAverage, m.genres, m.runtime, m.mediaType, m.number_of_seasons as numberOfSeasons, m.number_of_episodes as numberOfEpisodes,
         p.id as platform_id, p.name as platform_name, p.logoUrl as platform_logo, p.isDefault as platform_default,
         p.createdAt as platform_created
       FROM watchlist_entries we
@@ -516,7 +523,9 @@ export class SQLiteStorage implements IStorage {
           voteAverage: row.voteAverage,
           genres: row.genres,
           runtime: row.runtime || null,
-          mediaType: row.mediaType
+          mediaType: row.mediaType,
+          numberOfSeasons: row.numberOfSeasons || null,
+          numberOfEpisodes: row.numberOfEpisodes || null
         },
         platform: platform
       };
@@ -734,7 +743,9 @@ export class MemStorage implements IStorage {
       releaseDate: insertMovie.releaseDate || null,
       voteAverage: insertMovie.voteAverage || null,
       genres: insertMovie.genres || null,
-      runtime: insertMovie.runtime || null
+      runtime: insertMovie.runtime || null,
+      numberOfSeasons: insertMovie.numberOfSeasons || null,
+      numberOfEpisodes: insertMovie.numberOfEpisodes || null
     };
     this.movies.set(id, movie);
     return movie;
