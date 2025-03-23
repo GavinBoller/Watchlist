@@ -110,6 +110,7 @@ export class SQLiteStorage implements IStorage {
         releaseDate TEXT,
         voteAverage TEXT,
         genres TEXT,
+        runtime INTEGER,
         mediaType TEXT
       )
     `);
@@ -310,9 +311,9 @@ export class SQLiteStorage implements IStorage {
     const stmt = this.db.prepare(`
       INSERT INTO movies (
         tmdbId, title, overview, posterPath, backdropPath, 
-        releaseDate, voteAverage, genres, mediaType
+        releaseDate, voteAverage, genres, runtime, mediaType
       ) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
@@ -324,6 +325,7 @@ export class SQLiteStorage implements IStorage {
       insertMovie.releaseDate || null,
       insertMovie.voteAverage || null,
       insertMovie.genres || null,
+      insertMovie.runtime || null,
       insertMovie.mediaType || 'movie'
     );
     
@@ -337,6 +339,7 @@ export class SQLiteStorage implements IStorage {
       releaseDate: insertMovie.releaseDate || null,
       voteAverage: insertMovie.voteAverage || null,
       genres: insertMovie.genres || null,
+      runtime: insertMovie.runtime || null,
       mediaType: insertMovie.mediaType || 'movie'
     };
   }
@@ -468,7 +471,7 @@ export class SQLiteStorage implements IStorage {
       SELECT 
         we.id, we.userId, we.movieId, we.platformId, we.watchedDate, we.notes, we.status, we.createdAt,
         m.id as movie_id, m.tmdbId, m.title, m.overview, m.posterPath, m.backdropPath, 
-        m.releaseDate, m.voteAverage, m.genres, m.mediaType,
+        m.releaseDate, m.voteAverage, m.genres, m.runtime, m.mediaType,
         p.id as platform_id, p.name as platform_name, p.logoUrl as platform_logo, p.isDefault as platform_default,
         p.createdAt as platform_created
       FROM watchlist_entries we
@@ -512,6 +515,7 @@ export class SQLiteStorage implements IStorage {
           releaseDate: row.releaseDate,
           voteAverage: row.voteAverage,
           genres: row.genres,
+          runtime: row.runtime || null,
           mediaType: row.mediaType
         },
         platform: platform
@@ -729,7 +733,8 @@ export class MemStorage implements IStorage {
       backdropPath: insertMovie.backdropPath || null,
       releaseDate: insertMovie.releaseDate || null,
       voteAverage: insertMovie.voteAverage || null,
-      genres: insertMovie.genres || null
+      genres: insertMovie.genres || null,
+      runtime: insertMovie.runtime || null
     };
     this.movies.set(id, movie);
     return movie;
