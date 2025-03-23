@@ -51,6 +51,8 @@ export const movies = pgTable("movies", {
   voteAverage: text("vote_average"),
   genres: text("genres"),
   runtime: integer("runtime"), // Runtime in minutes
+  numberOfSeasons: integer("number_of_seasons"), // Number of seasons (for TV shows)
+  numberOfEpisodes: integer("number_of_episodes"), // Total episodes (for TV shows)
   mediaType: text("media_type").notNull().default("movie"), // "movie" or "tv"
 });
 
@@ -64,6 +66,8 @@ export const insertMovieSchema = createInsertSchema(movies).pick({
   voteAverage: true,
   genres: true,
   runtime: true,
+  numberOfSeasons: true,
+  numberOfEpisodes: true,
   mediaType: true,
 });
 
@@ -132,6 +136,8 @@ export interface TMDBMovie {
   genre_ids: number[];
   media_type?: string;  // 'movie' or 'tv'
   runtime?: number;     // Runtime in minutes (for movies only)
+  number_of_seasons?: number; // Number of seasons (for TV shows only)
+  number_of_episodes?: number; // Total episodes across all seasons (for TV shows only)
 }
 
 export interface TMDBSearchResponse {
