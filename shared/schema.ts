@@ -50,6 +50,7 @@ export const movies = pgTable("movies", {
   releaseDate: text("release_date"),
   voteAverage: text("vote_average"),
   genres: text("genres"),
+  runtime: integer("runtime"), // Runtime in minutes
   mediaType: text("media_type").notNull().default("movie"), // "movie" or "tv"
 });
 
@@ -62,6 +63,7 @@ export const insertMovieSchema = createInsertSchema(movies).pick({
   releaseDate: true,
   voteAverage: true,
   genres: true,
+  runtime: true,
   mediaType: true,
 });
 
