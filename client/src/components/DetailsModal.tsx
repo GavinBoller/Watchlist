@@ -24,19 +24,12 @@ export const DetailsModal = ({
   const [runtime, setRuntime] = useState<string>('');
   const [tvInfo, setTvInfo] = useState<string>('');
   
-  if (!item) return null;
-
-  const title = getTitle(item);
-  const mediaType = getMediaType(item);
-  const displayInfo = formatMovieDisplay(item);
-  const posterUrl = getImageUrl(item.poster_path, 'w200');
-  const backdropUrl = getImageUrl(item.backdrop_path, 'w500');
-  
-  // Format vote average to one decimal place
-  const voteAverage = item.vote_average ? item.vote_average.toFixed(1) : 'N/A';
-
-  // Fetch runtime for movies or TV show info when component mounts or item changes
+  // IMPORTANT: All hooks must be called before any conditional returns
   useEffect(() => {
+    // Don't do anything if there's no item
+    if (!item) return;
+    
+    const mediaType = getMediaType(item);
     const fetchMediaDetails = async () => {
       try {
         if (mediaType === 'movie') {
@@ -76,7 +69,25 @@ export const DetailsModal = ({
     };
     
     fetchMediaDetails();
-  }, [item.id, mediaType, item.runtime, item.number_of_seasons, item.number_of_episodes]);
+    
+    // Clean up function to reset state when item changes
+    return () => {
+      setRuntime('');
+      setTvInfo('');
+    };
+  }, [item]);
+  
+  // Return early if no item
+  if (!item) return null;
+
+  const title = getTitle(item);
+  const mediaType = getMediaType(item);
+  const displayInfo = formatMovieDisplay(item);
+  const posterUrl = getImageUrl(item.poster_path, 'w200');
+  const backdropUrl = getImageUrl(item.backdrop_path, 'w500');
+  
+  // Format vote average to one decimal place
+  const voteAverage = item.vote_average ? item.vote_average.toFixed(1) : 'N/A';
 
   const handleAddToWatchlist = () => {
     onAddToWatchlist(item);

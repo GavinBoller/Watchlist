@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { TMDBMovie } from '@shared/schema';
-import { getImageUrl, getTitle, getReleaseDate, getMediaType, formatMovieDisplay, getIMDbUrl } from '@/api/tmdb';
-import { Star, Info, ExternalLink, PlusCircle } from 'lucide-react';
+import { getImageUrl, getTitle, getReleaseDate, getMediaType, formatMovieDisplay, getIMDbUrl, formatRuntime, getMovieDetails } from '@/api/tmdb';
+import { Star, Info, ExternalLink, PlusCircle, Clock, Tv2 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MovieCardProps {
@@ -16,6 +16,8 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
   const isMobile = useIsMobile();
   const [imdbUrl, setImdbUrl] = useState('');
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
+  const [runtime, setRuntime] = useState<string>('');
+  const [tvInfo, setTvInfo] = useState<string>('');
   
   // Safe data extraction with error handling 
   let posterUrl, title, mediaType, displayInfo, voteAverage;
@@ -57,6 +59,49 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
     }
   }, [isMobile, movie.id]);
   
+  // Fetch runtime or TV show information when component mounts or movie changes
+  useEffect(() => {
+    const fetchMediaDetails = async () => {
+      try {
+        if (mediaType === 'movie') {
+          // Check if we already have runtime data in the movie object
+          if (movie.runtime) {
+            setRuntime(formatRuntime(movie.runtime));
+            return;
+          }
+          
+          // Otherwise fetch from the API
+          const details = await getMovieDetails(movie.id, 'movie');
+          if (details && details.runtime) {
+            setRuntime(formatRuntime(details.runtime));
+          }
+        } else if (mediaType === 'tv') {
+          // Check if we already have TV show data in the movie object
+          if (movie.number_of_seasons && movie.number_of_episodes) {
+            const seasonText = movie.number_of_seasons === 1 ? 'season' : 'seasons';
+            const episodeText = movie.number_of_episodes === 1 ? 'episode' : 'episodes';
+            setTvInfo(`${movie.number_of_seasons} ${seasonText}, ${movie.number_of_episodes} ${episodeText}`);
+            return;
+          }
+          
+          // Otherwise fetch from the API
+          const details = await getMovieDetails(movie.id, 'tv');
+          if (details) {
+            const seasons = details.number_of_seasons || 0;
+            const episodes = details.number_of_episodes || 0;
+            const seasonText = seasons === 1 ? 'season' : 'seasons';
+            const episodeText = episodes === 1 ? 'episode' : 'episodes';
+            setTvInfo(`${seasons} ${seasonText}, ${episodes} ${episodeText}`);
+          }
+        }
+      } catch (error) {
+        console.error(`Error fetching ${mediaType} details:`, error);
+      }
+    };
+    
+    fetchMediaDetails();
+  }, [movie.id, mediaType, movie.runtime, movie.number_of_seasons, movie.number_of_episodes]);
+
   // Fetch IMDb URL when component mounts or movie changes
   useEffect(() => {
     const fetchImdbUrl = async () => {
@@ -149,6 +194,23 @@ const MovieCard = ({ movie, onAddToWatchlist, onShowDetails }: MovieCardProps) =
       >
         <h3 className="font-bold text-sm sm:text-base md:text-lg">{title}</h3>
         <p className="text-xs sm:text-sm text-gray-300">{displayInfo}</p>
+        {/* Runtime or TV show info display */}
+        {(runtime || tvInfo) && (
+          <div className="flex items-center text-xs text-gray-400 mt-1">
+            {mediaType === 'movie' && runtime && (
+              <>
+                <Clock className="h-3 w-3 mr-1" />
+                <span>{runtime}</span>
+              </>
+            )}
+            {mediaType === 'tv' && tvInfo && (
+              <>
+                <Tv2 className="h-3 w-3 mr-1" />
+                <span>{tvInfo}</span>
+              </>
+            )}
+          </div>
+        )}
         <div className="flex items-center mt-1">
           <span className="text-[#F5C518] font-bold text-xs sm:text-sm">{voteAverage}</span>
           <div className="ml-1">
