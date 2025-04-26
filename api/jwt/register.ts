@@ -1,3 +1,4 @@
+// Redeploy after fixing vercel.json distDir
 // Redeploy after fixing vercel.json
 // Redeploy after updating package.json build script
 // Redeploy after moving vercel.json
