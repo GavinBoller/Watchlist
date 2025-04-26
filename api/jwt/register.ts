@@ -1,3 +1,4 @@
+// Redeploy after updating package.json build script
 // Redeploy after moving vercel.json
 // Force fresh deployment for syd1
 import { VercelRequest, VercelResponse } from '@vercel/node';
