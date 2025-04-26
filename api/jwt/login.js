@@ -1,10 +1,10 @@
+import jwt from 'jsonwebtoken'; // Moved to top
+import bcrypt from 'bcryptjs'; // Converted from require to import
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Method not allowed' });
     }
-  
-    const jwt = require('jsonwebtoken');
-    const bcrypt = require('bcryptjs');
   
     // Simple validation
     const { username, password } = req.body;
@@ -51,4 +51,4 @@ export default async function handler(req, res) {
       token,
       user: userResponse
     });
-  }
+}
