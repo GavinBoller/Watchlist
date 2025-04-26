@@ -1,10 +1,8 @@
-// Redeploy after fixing vercel.json distDir
-// Redeploy after fixing vercel.json
-// Redeploy after updating package.json build script
-// Redeploy after moving vercel.json
-// Force fresh deployment for syd1
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import { db } from '../db'; // Adjust path based on your project structure
+import { users } from '../schema'; // Adjust path based on your project structure
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Ensure the request is a POST
@@ -20,25 +18,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  // Mock user creation (we'll replace this with a database later)
-  const newUser = {
-    userId: 2, // Hardcoded for now (userId 1 is used in login.ts)
-    username,
-    displayName,
-    createdAt: new Date().toISOString(),
-  };
+  // Hash the password
+  const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Generate a JWT token
-  const secret = process.env.JWT_SECRET as string;
-  const token = jwt.sign(
-    { userId: newUser.userId, username: newUser.username },
-    secret,
-    { expiresIn: '1h' }
-  );
+  try {
+    // Save user to the database
+    const [newUser] = await db.insert(users).values({
+      username,
+      password: hashedPassword,
+      displayName,
+      createdAt: new Date().toISOString(),
+    }).returning();
 
-  // Return the new user and token
-  return res.status(201).json({
-    token,
-    user: newUser,
-  });
+    // Generate a JWT token
+    const secret = process.env.JWT_SECRET as string;
+    const token = jwt.sign(
+      { userId: newUser.userId, username: newUser.username },
+      secret,
+      { expiresIn: '1h' }
+    );
+
+    // Return the new user and token
+    return res.status(201).json({
+      token,
+      user: {
+        userId: newUser.userId,
+        username: newUser.username,
+        displayName: newUser.displayName,
+        createdAt: newUser.createdAt,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to register user', details: error.message });
+  }
 }
