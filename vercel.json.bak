@@ -20,7 +20,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html",
+      "dest": "/client/build/index.html",
       "headers": {
         "Cache-Control": "public, max-age=0, must-revalidate"
       }
