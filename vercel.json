@@ -2,14 +2,30 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/**/*.[tj]s",
+      "src": "api/test.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/jwt/register.ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/jwt/login.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "src": "/api/test",
+      "dest": "/api/test.js"
+    },
+    {
+      "src": "/api/jwt/register",
+      "dest": "/api/jwt/register.ts"
+    },
+    {
+      "src": "/api/jwt/login",
+      "dest": "/api/jwt/login.js"
     }
   ]
 }
