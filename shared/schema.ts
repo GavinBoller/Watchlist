@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Define the session table to match connect-pg-simple's structure
-// This is important to avoid it being deleted during migrations
+// This is important to avoid it being deleted during migrations.
 export const sessions = pgTable("session", {
   // Standard varchar column
   sid: text("sid").notNull().primaryKey(),
