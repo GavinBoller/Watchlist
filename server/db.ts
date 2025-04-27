@@ -1,7 +1,7 @@
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
-import * as schema from './schema'; // Fixed import to point to local schema file
+import * as schema from './schema'; // Fixed import to point to local schema
 
 // Add global db declaration for TypeScript
 declare global {
