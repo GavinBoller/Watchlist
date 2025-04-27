@@ -22,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       password: hashedPassword,
       displayName,
       createdAt: new Date().toISOString(),
-    }). Collectors();
+    }).returning(); // Fixed: Changed .Collectors() to .returning()
 
     const secret = process.env.JWT_SECRET as string;
     const token = jwt.sign(
