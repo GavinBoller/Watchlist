@@ -2,7 +2,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { db } from '../../server/db';
-import { users } from '../../server/schema';
+import { users } from '../../server/schema.ts'; // Added .ts extension
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -22,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       password: hashedPassword,
       displayName,
       createdAt: new Date().toISOString(),
-    }).returning(); // Fixed: Changed .Collectors() to .returning()
+    }).returning();
 
     const secret = process.env.JWT_SECRET as string;
     const token = jwt.sign(

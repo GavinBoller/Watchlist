@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { db } from '../../server/db';
-import { users } from '../../server/schema';
+import { users } from '../../server/schema.ts'; // Added .ts extension
 import { eq } from 'drizzle-orm';
 
 export default async function handler(req, res) {
