@@ -1,7 +1,7 @@
 import { pgTable, text, serial, integer, boolean, timestamp, primaryKey, foreignKey, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-
+// Ensure Git tracks this file
 // Define the session table to match connect-pg-simple's structure
 // This is important to avoid it being deleted during migrations.
 export const sessions = pgTable("session", {

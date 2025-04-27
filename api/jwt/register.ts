@@ -2,7 +2,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { db } from '../server/db';
-import { users } from '../shared/schema'; // Changed from ../server/schema
+import { users } from '../shared/schema';
 // Comment: Updated to point to shared/schema.ts
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
