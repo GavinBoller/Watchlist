@@ -1,7 +1,7 @@
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
-import * as schema from "@shared/schema";
+import * as schema from './schema'; // Fixed import to point to local schema
 
 // Add global db declaration for TypeScript
 declare global {
@@ -119,7 +119,7 @@ function createPool(
  */
 function setupConnectionHealthMonitoring(newPool: Pool): void {
   // Handle connection errors
-  newPool.on('error', (err) => {
+  newPool.on('error', (err: Error) => { // Added type annotation
     console.error('Unexpected error on idle database client', err);
     
     // If not already reconnecting, schedule a reconnection attempt
@@ -183,7 +183,7 @@ async function initializeDatabase(): Promise<boolean> {
     const newPool = createPool(isProd);
     
     // Setup basic error handling on the pool
-    newPool.on('error', (err) => {
+    newPool.on('error', (err: Error) => { // Added type annotation
       console.error('Database pool error:', err);
     });
 
@@ -204,8 +204,8 @@ async function initializeDatabase(): Promise<boolean> {
     // Once the connection is verified, update the global pool reference
     pool = newPool;
     
-    // Initialize Drizzle with the pool
-    db = drizzle({ client: pool, schema });
+    // Initialize Drizzle with the pool and schema
+    db = drizzle({ client: pool, schema }); // Added schema
     
     // Reset connection attempts on successful connection
     connectionAttempts = 0;
@@ -303,7 +303,7 @@ export async function ensureDatabaseReady(): Promise<boolean> {
             
             // If successful, replace the existing pool
             pool = emergencyPool;
-            db = drizzle({ client: pool, schema });
+            db = drizzle({ client: pool, schema }); // Added schema
             (global as any).db = db;
             
             console.log('[DB] Emergency recovery successful');
@@ -340,7 +340,7 @@ export async function ensureDatabaseReady(): Promise<boolean> {
         
         // If successful, use this pool
         pool = emergencyPool;
-        db = drizzle({ client: pool, schema });
+        db = drizzle({ client: pool, schema }); // Added schema
         (global as any).db = db;
         
         console.log('[DB] Emergency initialization successful');
@@ -363,7 +363,7 @@ export async function executeDirectSql<T = any>(
   sql: string, 
   params: any[] = [],
   errorMessage: string = 'Database operation failed'
-): Promise<{rows: T[], rowCount: number}> {
+): Promise<{rows: T[], rowCount: number | undefined}> { // Allow rowCount to be undefined
   if (!pool) {
     // Try to initialize database before failing
     try {
@@ -372,9 +372,8 @@ export async function executeDirectSql<T = any>(
       console.error('[DB] Emergency database initialization failed:', error);
     }
     
-    // If still no pool, throw error
+    // If still no pool, return empty result set
     if (!pool) {
-      // Return empty result set instead of throwing
       return {
         rows: [],
         rowCount: 0
@@ -388,7 +387,7 @@ export async function executeDirectSql<T = any>(
     const result = await client.query(sql, params);
     return {
       rows: result.rows as T[],
-      rowCount: result.rowCount
+      rowCount: result.rowCount ?? 0 // Fallback to 0 if rowCount is null
     };
   } catch (error) {
     console.error(`Direct SQL execution failed: ${errorMessage}`, error);

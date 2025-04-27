@@ -9,7 +9,10 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": "."
+    "baseUrl": ".",
+    "paths": {
+      "server/*": ["server/*"]
+    }
   },
   "include": ["api/**/*", "server/**/*"],
   "exclude": ["node_modules", "client"]

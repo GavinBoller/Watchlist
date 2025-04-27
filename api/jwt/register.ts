@@ -1,8 +1,8 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { db } from '../../server/db';
-import { users } from '../../server/schema.ts'; // Added .ts extension
+import { db } from 'server/db'; // Updated to use absolute path
+import { users } from 'server/schema'; // Updated to use absolute path
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
