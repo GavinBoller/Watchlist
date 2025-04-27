@@ -2,18 +2,18 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
-    "moduleResolution": "node16",
+    "moduleResolution": "Node",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "outDir": "dist",
-    "rootDir": ".",
     "baseUrl": ".",
     "paths": {
       "server/*": ["server/*"]
-    }
+    },
+    "outDir": "./dist",
+    "rootDir": "."
   },
-  "include": ["api/**/*", "server/**/*"],
-  "exclude": ["node_modules", "client"]
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "client/node_modules", "dist"]
 }
