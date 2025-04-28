@@ -5,7 +5,8 @@
       "src": "api/**/*.[tj]s",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["tsconfig.json", "server/**/*.ts", "shared/**/*.ts"]
+        "includeFiles": ["tsconfig.json", "server/**/*.ts", "shared/**/*.ts"],
+        "buildCommand": "tsc --noEmit && npm run build"
       }
     },
     {

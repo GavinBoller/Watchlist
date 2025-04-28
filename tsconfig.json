@@ -9,7 +9,8 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "server/*": ["server/*"]
+      "server/*": ["server/*"],
+      "shared/*": ["shared/*"]
     },
     "outDir": "./dist",
     "rootDir": "."
