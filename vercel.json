@@ -2,30 +2,31 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/test.js",
-      "use": "@vercel/node"
+      "src": "api/**/*.[tj]s",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["tsconfig.json", "server/**/*.ts", "shared/**/*.ts"]
+      }
     },
     {
-      "src": "api/jwt/register.ts",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/jwt/login.js",
-      "use": "@vercel/node"
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
     }
   ],
   "routes": [
     {
-      "src": "/api/test",
-      "dest": "/api/test.js"
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
     },
     {
-      "src": "/api/jwt/register",
-      "dest": "/api/jwt/register.ts"
-    },
-    {
-      "src": "/api/jwt/login",
-      "dest": "/api/jwt/login.js"
+      "src": "/(.*)",
+      "dest": "/client/build/index.html",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate"
+      }
     }
   ]
 }
