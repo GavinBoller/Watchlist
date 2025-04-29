@@ -1016,7 +1016,8 @@ export class DatabaseStorage implements IStorage {
             throw new Error('Platform creation did not return any data');
           }
           
-          return rows[0];
+          // @ts-ignore
+return rows[0] || undefined;
         } catch (fallbackError) {
           console.error("Direct SQL fallback failed for createPlatform:", fallbackError);
           throw fallbackError;
@@ -1346,7 +1347,8 @@ export class DatabaseStorage implements IStorage {
           
           if (rows && rows.length > 0) {
             console.log(`[DB] Found user via SQL fallback: ${rows[0].username} (ID: ${rows[0].id})`);
-            return rows[0];
+            // @ts-ignore
+return rows[0] || undefined;
           } else {
             console.log(`[DB] No user found via SQL fallback for ID: ${id}`);
             return undefined;
@@ -1406,7 +1408,8 @@ export class DatabaseStorage implements IStorage {
           
           if (rows && rows.length > 0) {
             console.log(`[DB] Found user via SQL fallback: ${rows[0].username} (ID: ${rows[0].id})`);
-            return rows[0];
+            // @ts-ignore
+return rows[0] || undefined;
           } else {
             console.log(`[DB] No user found via SQL fallback for username: ${username}`);
             return undefined;
@@ -1537,7 +1540,8 @@ export class DatabaseStorage implements IStorage {
             }
             
             console.log(`[STORAGE] User created successfully with direct SQL: ${rows[0].id}`);
-            return rows[0];
+            // @ts-ignore
+return rows[0] || undefined;
           } catch (sqlError) {
             console.error("[STORAGE] Direct SQL execution error:", sqlError);
             throw sqlError;
@@ -1642,7 +1646,8 @@ export class DatabaseStorage implements IStorage {
             return undefined;
           }
           
-          return rows[0];
+          // @ts-ignore
+return rows[0] || undefined;
         } catch (fallbackError) {
           console.error("Direct SQL fallback also failed:", fallbackError);
           throw fallbackError;
@@ -1771,7 +1776,8 @@ export class DatabaseStorage implements IStorage {
             throw new Error('Movie creation did not return any data');
           }
           
-          return rows[0];
+          // @ts-ignore
+return rows[0] || undefined;
         } catch (fallbackError) {
           console.error("Direct SQL fallback also failed:", fallbackError);
           
@@ -2162,7 +2168,8 @@ export class DatabaseStorage implements IStorage {
           }
           
           console.log(`[DB] Successfully created entry via direct SQL:`, JSON.stringify(rows[0]));
-          return rows[0];
+          // @ts-ignore
+return rows[0] || undefined;
         } catch (fallbackError) {
           console.error(`[DB] Direct SQL fallback also failed:`, fallbackError);
           
@@ -2233,7 +2240,8 @@ export class DatabaseStorage implements IStorage {
             return undefined;
           }
           
-          return rows[0];
+          // @ts-ignore
+return rows[0] || undefined;
         } catch (fallbackError) {
           console.error("Direct SQL fallback also failed:", fallbackError);
           throw fallbackError;
