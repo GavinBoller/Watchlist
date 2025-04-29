@@ -230,6 +230,7 @@ export class SQLiteStorage implements IStorage {
       password: insertUser.password,
       displayName: insertUser.displayName || null,
       createdAt: new Date()
+      environment: 'development'
     };
   }
 
