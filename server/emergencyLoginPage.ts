@@ -6,7 +6,7 @@
 
 import express, { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from './jwtAuth';
+import { JWT_SECRET } from './jwtAuth.js';
 
 const router = express.Router();
 

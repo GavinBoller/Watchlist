@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { User, UserResponse } from '@shared/schema';
+import { User, UserResponse } from '../shared/schema.js';
 
 // Secret key for signing JWT tokens
 // In production, we use the environment variable if available

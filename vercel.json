@@ -2,11 +2,11 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/**/*.[tj]s",
+      "src": "dist/api/**/*.[tj]s",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["tsconfig.json", "server/**/*.ts", "shared/**/*.ts"],
-        "buildCommand": "tsc --noEmit && npm run build"
+        "includeFiles": ["dist/**/*.js", "tsconfig.json", "server/**/*.ts", "shared/**/*.ts"],
+        "buildCommand": "npm run build:api && npm run build"
       }
     },
     {
@@ -20,7 +20,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "dest": "/dist/api/$1"
     },
     {
       "src": "/(.*)",

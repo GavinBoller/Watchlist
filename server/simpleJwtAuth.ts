@@ -1,8 +1,8 @@
 import jwt from 'jsonwebtoken';
 import { Router, Request, Response } from 'express';
-import { User, UserResponse } from '@shared/schema';
-import { storage } from './storage';
-import { JWT_SECRET, TOKEN_EXPIRATION, verifyToken, createUserResponse } from './jwtAuth';
+import { User, UserResponse } from '../shared/schema.js';
+import { storage } from './storage.js';
+import { JWT_SECRET, TOKEN_EXPIRATION, verifyToken, createUserResponse } from './jwtAuth.js';
 
 // Create router
 const router = Router();

@@ -4,8 +4,8 @@
  */
 
 import express, { Request, Response, NextFunction, Application } from 'express';
-import { storage } from './storage';
-import { User } from '@shared/schema';
+import { storage } from './storage.js';
+import { User } from '../shared/schema.js';
 import { Session } from 'express-session';
 
 // Extend express-session with our custom properties

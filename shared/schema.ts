@@ -1,154 +1,165 @@
-import { pgTable, text, serial, integer, boolean, timestamp, primaryKey, foreignKey, unique } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
-// Ensure Git tracks this file
-// Define the session table to match connect-pg-simple's structure
-// This is important to avoid it being deleted during migrations.
-export const sessions = pgTable("session", {
-  // Standard varchar column
-  sid: text("sid").notNull().primaryKey(),
-  // JSON data column
-  sess: text("sess").notNull(),
-  // Timestamp column
-  expire: timestamp("expire", { mode: 'date' }).notNull(),
+import { pgTable, serial, text, timestamp, integer, boolean, json, pgEnum } from 'drizzle-orm/pg-core';
+
+// User table and types
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  username: text('username').notNull().unique(),
+  password: text('password').notNull(),
+  displayName: text('display_name'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  environment: text('environment'),
 });
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  displayName: text("display_name"),
-  createdAt: timestamp("created_at").defaultNow(),
-  environment: text("environment").default("development"),
-});
-
-// For app use (includes password)
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-  displayName: true,
-  environment: true,
-});
-
-// For API response (excludes password)
-export const userResponseSchema = createInsertSchema(users)
-  .pick({
-    id: true,
-    username: true,
-    displayName: true,
-    createdAt: true,
-    environment: true,
-  });
-
-export const movies = pgTable("movies", {
-  id: serial("id").primaryKey(),
-  tmdbId: integer("tmdb_id").notNull(),
-  title: text("title").notNull(),
-  overview: text("overview"),
-  posterPath: text("poster_path"),
-  backdropPath: text("backdrop_path"),
-  releaseDate: text("release_date"),
-  voteAverage: text("vote_average"),
-  genres: text("genres"),
-  runtime: integer("runtime"), // Runtime in minutes
-  numberOfSeasons: integer("number_of_seasons"), // Number of seasons (for TV shows)
-  numberOfEpisodes: integer("number_of_episodes"), // Total episodes (for TV shows)
-  mediaType: text("media_type").notNull().default("movie"), // "movie" or "tv"
-});
-
-export const insertMovieSchema = createInsertSchema(movies).pick({
-  tmdbId: true,
-  title: true,
-  overview: true,
-  posterPath: true,
-  backdropPath: true,
-  releaseDate: true,
-  voteAverage: true,
-  genres: true,
-  runtime: true,
-  numberOfSeasons: true,
-  numberOfEpisodes: true,
-  mediaType: true,
-});
-
-export const platforms = pgTable("platforms", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  logoUrl: text("logo_url"),
-  isDefault: boolean("is_default").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertPlatformSchema = createInsertSchema(platforms).pick({
-  userId: true,
-  name: true,
-  logoUrl: true,
-  isDefault: true,
-});
-
-export const watchlistEntries = pgTable("watchlist_entries", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  movieId: integer("movie_id").notNull(),
-  platformId: integer("platform_id").references(() => platforms.id, { onDelete: "set null" }),
-  watchedDate: text("watched_date"), // Using text for SQLite compatibility
-  notes: text("notes"),
-  status: text("status").notNull().default("to_watch"), // Options: "to_watch", "watching", "watched"
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Create a modified schema for watchlist entry inserts that accepts strings for dates
-// This is necessary for SQLite compatibility
-export const insertWatchlistEntrySchema = z.object({
-  userId: z.number(),
-  movieId: z.number(),
-  platformId: z.number().nullable().optional(),
-  watchedDate: z.string().nullable(),
-  notes: z.string().nullable(),
-  status: z.enum(["to_watch", "watching", "watched"]).default("to_watch"),
-});
-
-export type User = typeof users.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type UserResponse = Omit<User, 'password'>;
-
-export type Movie = typeof movies.$inferSelect;
-export type InsertMovie = z.infer<typeof insertMovieSchema>;
-
-export type Platform = typeof platforms.$inferSelect;
-export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
-
-export type WatchlistEntry = typeof watchlistEntries.$inferSelect;
-export type InsertWatchlistEntry = z.infer<typeof insertWatchlistEntrySchema>;
-
-// TMDb API related types
-export interface TMDBMovie {
+export type User = {
   id: number;
-  title?: string;
-  name?: string;  // For TV shows
-  overview: string;
-  poster_path: string;
-  backdrop_path: string;
-  release_date?: string;
-  first_air_date?: string;  // For TV shows
-  vote_average: number;
-  genre_ids: number[];
-  media_type?: string;  // 'movie' or 'tv'
-  runtime?: number;     // Runtime in minutes (for movies only)
-  number_of_seasons?: number; // Number of seasons (for TV shows only)
-  number_of_episodes?: number; // Total episodes across all seasons (for TV shows only)
-}
+  username: string;
+  password?: string; // Made optional to resolve TS2741
+  displayName: string | null;
+  createdAt: Date | null;
+  environment: string | null;
+};
 
-export interface TMDBSearchResponse {
-  page: number;
-  results: TMDBMovie[];
-  total_results: number;
-  total_pages: number;
-}
+export type UserResponse = {
+  id: number;
+  username: string;
+  password?: string;
+  displayName: string | null;
+  createdAt: Date | null;
+  environment: string | null;
+};
 
-// Type for watchlist entry with movie details
-export interface WatchlistEntryWithMovie extends WatchlistEntry {
+export type InsertUser = {
+  username: string;
+  password: string;
+  displayName?: string | null;
+  environment?: string | null;
+};
+
+// Movie table and types
+export const movies = pgTable('movies', {
+  id: serial('id').primaryKey(),
+  tmdbId: integer('tmdb_id').notNull().unique(),
+  title: text('title').notNull(),
+  overview: text('overview'),
+  posterPath: text('poster_path'),
+  backdropPath: text('backdrop_path'),
+  releaseDate: text('release_date'),
+  voteAverage: integer('vote_average'),
+  genres: json('genres').$type<string[]>(),
+  runtime: integer('runtime'),
+  mediaType: text('media_type').notNull().$type<'movie' | 'tv'>(),
+  numberOfSeasons: integer('number_of_seasons'),
+  numberOfEpisodes: integer('number_of_episodes'),
+});
+
+export type Movie = {
+  id: number;
+  tmdbId: number;
+  title: string;
+  overview: string | null;
+  posterPath: string | null;
+  backdropPath: string | null;
+  releaseDate: string | null;
+  voteAverage: number | null;
+  genres: string[] | null;
+  runtime: number | null;
+  mediaType: 'movie' | 'tv';
+  numberOfSeasons: number | null;
+  numberOfEpisodes: number | null;
+};
+
+export type InsertMovie = {
+  tmdbId: number;
+  title: string;
+  overview?: string | null;
+  posterPath?: string | null;
+  backdropPath?: string | null;
+  releaseDate?: string | null;
+  voteAverage?: number | null;
+  genres?: string[] | null;
+  runtime?: number | null;
+  mediaType?: 'movie' | 'tv';
+  numberOfSeasons?: number | null;
+  numberOfEpisodes?: number | null;
+};
+
+// Platform table and types
+export const platforms = pgTable('platforms', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  name: text('name').notNull(),
+  logoUrl: text('logo_url'),
+  isDefault: boolean('is_default').notNull().default(false),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export type Platform = {
+  id: number;
+  userId: number;
+  name: string;
+  logoUrl: string | null;
+  isDefault: boolean;
+  createdAt: Date;
+};
+
+export type InsertPlatform = {
+  userId: number;
+  name: string;
+  logoUrl?: string | null;
+  isDefault?: boolean;
+};
+
+// Watchlist entries table and types
+export const watchlistStatusEnum = pgEnum('watchlist_status', ['to_watch', 'watching', 'watched']);
+
+export const watchlistEntries = pgTable('watchlist_entries', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  movieId: integer('movie_id').notNull().references(() => movies.id),
+  platformId: integer('platform_id').references(() => platforms.id),
+  status: watchlistStatusEnum('status').notNull().default('to_watch'),
+  watchedDate: timestamp('watched_date'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export type WatchlistEntry = {
+  id: number;
+  userId: number;
+  movieId: number;
+  platformId: number | null;
+  status: 'to_watch' | 'watching' | 'watched';
+  watchedDate: Date | null;
+  notes: string | null;
+  createdAt: Date;
+};
+
+export type InsertWatchlistEntry = {
+  userId: number;
+  movieId: number;
+  platformId?: number | null;
+  status?: 'to_watch' | 'watching' | 'watched';
+  watchedDate?: Date | null;
+  notes?: string | null;
+};
+
+export type WatchlistEntryWithMovie = WatchlistEntry & {
   movie: Movie;
   platform?: Platform | null;
-}
+};
+
+// Sessions table (for application session management)
+export const sessions = pgTable('sessions', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  sessionToken: text('session_token').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  expiresAt: timestamp('expires_at').notNull(),
+});
+
+// Session store table for connect-pg-simple
+export const sessionStore = pgTable('session_store', {
+  sid: text('sid').primaryKey(),
+  sess: json('sess').notNull(),
+  expire: timestamp('expire').notNull(),
+});
