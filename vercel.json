@@ -1,10 +1,12 @@
 {
   "version": 2,
-  "buildCommand": "npm run build:api && npm run build",
   "builds": [
     {
-      "src": "dist/server/index.js",
-      "use": "@vercel/node"
+      "src": "package.json",
+      "use": "@vercel/node",
+      "config": {
+        "buildCommand": "npm run build:api"
+      }
     },
     {
       "src": "client/package.json",
@@ -17,11 +19,11 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/dist/server/index.js"
+      "dest": "dist/server/index.js"
     },
     {
       "src": "/(.*)",
-      "dest": "/client/build/index.html",
+      "dest": "client/build/index.html",
       "headers": {
         "Cache-Control": "public, max-age=0, must-revalidate"
       }
