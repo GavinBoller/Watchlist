@@ -1,20 +1,23 @@
-import { Request, Response, Router } from 'express';
-import axios from 'axios';
-import { getDb } from './db.js';
-import { z } from 'zod';
-import { InsertMovie, InsertPlatform, InsertWatchlistEntry, Movie, Platform, UserResponse, WatchlistEntryWithMovie, users, movies } from '../shared/schema.js';
-import { isAuthenticated, hasWatchlistAccess } from './auth.js';
-import { isJwtAuthenticated } from './jwtMiddleware.js';
-import { storage } from './storage.js';
-import { like, eq } from 'drizzle-orm';
+const express = require('express');
+const axios = require('axios');
+const db = require('./db.js');
+const { z } = require('zod');
+const schema = require('./shared/schema.js');
+const auth = require('./auth.js');
+const jwtMiddleware = require('./jwtMiddleware.js');
+const storage = require('./storage.js');
+const { like, eq } = require('drizzle-orm');
 
-const router = Router();
+import { Request, Response } from 'express';
+import { UserResponse, InsertMovie, InsertPlatform, InsertWatchlistEntry } from './shared/types.js';
+
+const routesRouter = express.Router();
 
 // TMDB API configuration
 const TMDB_API_KEY = process.env.TMDB_API_KEY || 'your-tmdb-api-key';
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
-// Zod schemas for validation (moved from shared/schema.ts)
+// Zod schemas for validation
 const insertMovieSchema = z.object({
   tmdbId: z.number(),
   title: z.string(),
@@ -42,20 +45,19 @@ const insertWatchlistEntrySchema = z.object({
   movieId: z.number(),
   platformId: z.number().nullable().optional(),
   status: z.enum(['to_watch', 'watching', 'watched']).optional(),
-  watchedDate: z.string().nullable().optional().transform((val) => (val ? new Date(val) : null)),
+  watchedDate: z.string().nullable().optional().transform((val: string) => (val ? new Date(val) : null)),
   notes: z.string().nullable().optional(),
 });
 
 // Search movies via TMDB
-router.get('/search', isJwtAuthenticated, async (req: Request, res: Response) => {
-  const query = req.query.q as string;
+routesRouter.get('/search', jwtMiddleware.isJwtAuthenticated, async (req: Request, res: Response) => {
+  const query: string = req.query.q as string;
   if (!query) {
     return res.status(400).json({
       status: 'error',
       message: 'Search query is required',
     });
   }
-
   try {
     const response = await axios.get(`${TMDB_BASE_URL}/search/multi`, {
       params: {
@@ -86,29 +88,27 @@ router.get('/search', isJwtAuthenticated, async (req: Request, res: Response) =>
 });
 
 // Get user profile
-router.get('/profile/:userId', isJwtAuthenticated, async (req: Request, res: Response) => {
+routesRouter.get('/profile/:userId', jwtMiddleware.isJwtAuthenticated, async (req: Request, res: Response) => {
   const userId = parseInt(req.params.userId);
-  const user = req.user as UserResponse;
-
-  if (user.id !== userId) {
+  const user: UserResponse | undefined = req.user;
+  if (!user || user.id !== userId) {
     return res.status(403).json({
       status: 'error',
       message: 'Cannot access profile of other users',
     });
   }
-
   try {
-    const db = await getDb();
-    const [profile] = await db
+    const dbInstance = await db.getDb();
+    const [profile] = await dbInstance
       .select({
-        id: users.id,
-        username: users.username,
-        displayName: users.displayName,
-        createdAt: users.createdAt,
-        environment: users.environment,
+        id: schema.users.id,
+        username: schema.users.username,
+        displayName: schema.users.displayName,
+        createdAt: schema.users.createdAt,
+        environment: schema.users.environment,
       })
-      .from(users)
-      .where(eq(users.id, userId));
+      .from(schema.users)
+      .where(eq(schema.users.id, userId));
 
     if (!profile) {
       return res.status(404).json({
@@ -128,15 +128,14 @@ router.get('/profile/:userId', isJwtAuthenticated, async (req: Request, res: Res
 });
 
 // Get movie details
-router.get('/movie/:tmdbId', isJwtAuthenticated, async (req: Request, res: Response) => {
+routesRouter.get('/movie/:tmdbId', jwtMiddleware.isJwtAuthenticated, async (req: Request, res: Response) => {
   const tmdbId = parseInt(req.params.tmdbId);
-
   try {
-    const db = await getDb();
-    const [movie] = await db
+    const dbInstance = await db.getDb();
+    const [movie] = await dbInstance
       .select()
-      .from(movies)
-      .where(like(movies.tmdbId, `%${tmdbId}%`));
+      .from(schema.movies)
+      .where(like(schema.movies.tmdbId, `%${tmdbId}%`));
 
     if (movie) {
       return res.json(movie);
@@ -148,8 +147,7 @@ router.get('/movie/:tmdbId', isJwtAuthenticated, async (req: Request, res: Respo
       },
     });
 
-    const movieData: Movie = {
-      id: 0, // Will be set by DB
+    const movieData: InsertMovie = {
       tmdbId: response.data.id,
       title: response.data.title,
       overview: response.data.overview,
@@ -157,7 +155,7 @@ router.get('/movie/:tmdbId', isJwtAuthenticated, async (req: Request, res: Respo
       backdropPath: response.data.backdrop_path,
       releaseDate: response.data.release_date,
       voteAverage: response.data.vote_average,
-      genres: response.data.genres.map((g: any) => g.name),
+      genres: response.data.genres.map((g: { name: string }) => g.name),
       runtime: response.data.runtime,
       mediaType: 'movie',
       numberOfSeasons: null,
@@ -165,7 +163,7 @@ router.get('/movie/:tmdbId', isJwtAuthenticated, async (req: Request, res: Respo
     };
 
     const validatedMovie = insertMovieSchema.parse(movieData);
-    const createdMovie = await storage.createMovie(validatedMovie);
+    const createdMovie = await storage.storage.createMovie(validatedMovie);
 
     res.json(createdMovie);
   } catch (error) {
@@ -178,19 +176,17 @@ router.get('/movie/:tmdbId', isJwtAuthenticated, async (req: Request, res: Respo
 });
 
 // Get watchlist
-router.get('/watchlist/:userId', hasWatchlistAccess, async (req: Request, res: Response) => {
+routesRouter.get('/watchlist/:userId', auth.hasWatchlistAccess, async (req: Request, res: Response) => {
   const userId = parseInt(req.params.userId);
-  const user = req.user as UserResponse;
-
-  if (user.id !== userId) {
+  const user: UserResponse | undefined = req.user;
+  if (!user || user.id !== userId) {
     return res.status(403).json({
       status: 'error',
       message: 'Cannot access watchlist entries for other users',
     });
   }
-
   try {
-    const entries = await storage.getWatchlistEntries(userId);
+    const entries = await storage.storage.getWatchlistEntries(userId);
     res.json(entries);
   } catch (error) {
     console.error('[ROUTES] Watchlist fetch error:', error);
@@ -202,11 +198,16 @@ router.get('/watchlist/:userId', hasWatchlistAccess, async (req: Request, res: R
 });
 
 // Add to watchlist
-router.post('/watchlist', hasWatchlistAccess, async (req: Request, res: Response) => {
-  const user = req.user as UserResponse;
-
+routesRouter.post('/watchlist', auth.hasWatchlistAccess, async (req: Request, res: Response) => {
+  const user: UserResponse | undefined = req.user;
+  if (!user) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Authentication required',
+    });
+  }
   try {
-    const entryData = {
+    const entryData: InsertWatchlistEntry = {
       userId: user.id,
       movieId: req.body.movieId,
       platformId: req.body.platformId || null,
@@ -216,7 +217,7 @@ router.post('/watchlist', hasWatchlistAccess, async (req: Request, res: Response
     };
 
     const validatedEntry = insertWatchlistEntrySchema.parse(entryData);
-    const entry = await storage.createWatchlistEntry(validatedEntry);
+    const entry = await storage.storage.createWatchlistEntry(validatedEntry);
     res.status(201).json(entry);
   } catch (error) {
     console.error('[ROUTES] Watchlist entry creation error:', error);
@@ -228,12 +229,17 @@ router.post('/watchlist', hasWatchlistAccess, async (req: Request, res: Response
 });
 
 // Update watchlist entry
-router.put('/watchlist/:id', hasWatchlistAccess, async (req: Request, res: Response) => {
+routesRouter.put('/watchlist/:id', auth.hasWatchlistAccess, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id);
-  const user = req.user as UserResponse;
-
+  const user: UserResponse | undefined = req.user;
+  if (!user) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Authentication required',
+    });
+  }
   try {
-    const entry = await storage.getWatchlistEntry(id);
+    const entry = await storage.storage.getWatchlistEntry(id);
     if (!entry || entry.userId !== user.id) {
       return res.status(403).json({
         status: 'error',
@@ -241,7 +247,7 @@ router.put('/watchlist/:id', hasWatchlistAccess, async (req: Request, res: Respo
       });
     }
 
-    const updateData = {
+    const updateData: Partial<InsertWatchlistEntry> = {
       movieId: req.body.movieId || entry.movieId,
       platformId: req.body.platformId !== undefined ? req.body.platformId : entry.platformId,
       status: req.body.status || entry.status,
@@ -250,7 +256,7 @@ router.put('/watchlist/:id', hasWatchlistAccess, async (req: Request, res: Respo
     };
 
     const validatedUpdate = insertWatchlistEntrySchema.partial().parse(updateData);
-    const updatedEntry = await storage.updateWatchlistEntry(id, validatedUpdate);
+    const updatedEntry = await storage.storage.updateWatchlistEntry(id, validatedUpdate);
     res.json(updatedEntry);
   } catch (error) {
     console.error('[ROUTES] Watchlist entry update error:', error);
@@ -262,12 +268,17 @@ router.put('/watchlist/:id', hasWatchlistAccess, async (req: Request, res: Respo
 });
 
 // Delete watchlist entry
-router.delete('/watchlist/:id', hasWatchlistAccess, async (req: Request, res: Response) => {
+routesRouter.delete('/watchlist/:id', auth.hasWatchlistAccess, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id);
-  const user = req.user as UserResponse;
-
+  const user: UserResponse | undefined = req.user;
+  if (!user) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Authentication required',
+    });
+  }
   try {
-    const entry = await storage.getWatchlistEntry(id);
+    const entry = await storage.storage.getWatchlistEntry(id);
     if (!entry || entry.userId !== user.id) {
       return res.status(403).json({
         status: 'error',
@@ -275,7 +286,7 @@ router.delete('/watchlist/:id', hasWatchlistAccess, async (req: Request, res: Re
       });
     }
 
-    const deleted = await storage.deleteWatchlistEntry(id);
+    const deleted = await storage.storage.deleteWatchlistEntry(id);
     if (deleted) {
       res.status(204).send();
     } else {
@@ -294,19 +305,17 @@ router.delete('/watchlist/:id', hasWatchlistAccess, async (req: Request, res: Re
 });
 
 // Get platforms
-router.get('/platforms/:userId', hasWatchlistAccess, async (req: Request, res: Response) => {
+routesRouter.get('/platforms/:userId', auth.hasWatchlistAccess, async (req: Request, res: Response) => {
   const userId = parseInt(req.params.userId);
-  const user = req.user as UserResponse;
-
-  if (user.id !== userId) {
+  const user: UserResponse | undefined = req.user;
+  if (!user || user.id !== userId) {
     return res.status(403).json({
       status: 'error',
       message: 'Cannot access platforms for other users',
     });
   }
-
   try {
-    const platforms = await storage.getPlatforms(userId);
+    const platforms = await storage.storage.getPlatforms(userId);
     res.json(platforms);
   } catch (error) {
     console.error('[ROUTES] Platforms fetch error:', error);
@@ -318,11 +327,16 @@ router.get('/platforms/:userId', hasWatchlistAccess, async (req: Request, res: R
 });
 
 // Add platform
-router.post('/platform', hasWatchlistAccess, async (req: Request, res: Response) => {
-  const user = req.user as UserResponse;
-
+routesRouter.post('/platform', auth.hasWatchlistAccess, async (req: Request, res: Response) => {
+  const user: UserResponse | undefined = req.user;
+  if (!user) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Authentication required',
+    });
+  }
   try {
-    const platformData = {
+    const platformData: InsertPlatform = {
       userId: user.id,
       name: req.body.name,
       logoUrl: req.body.logoUrl || null,
@@ -330,7 +344,7 @@ router.post('/platform', hasWatchlistAccess, async (req: Request, res: Response)
     };
 
     const validatedPlatform = insertPlatformSchema.parse(platformData);
-    const platform = await storage.createPlatform(validatedPlatform);
+    const platform = await storage.storage.createPlatform(validatedPlatform);
     res.status(201).json(platform);
   } catch (error) {
     console.error('[ROUTES] Platform creation error:', error);
@@ -342,12 +356,17 @@ router.post('/platform', hasWatchlistAccess, async (req: Request, res: Response)
 });
 
 // Update platform
-router.put('/platform/:id', hasWatchlistAccess, async (req: Request, res: Response) => {
+routesRouter.put('/platform/:id', auth.hasWatchlistAccess, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id);
-  const user = req.user as UserResponse;
-
+  const user: UserResponse | undefined = req.user;
+  if (!user) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Authentication required',
+    });
+  }
   try {
-    const platform = await storage.getPlatform(id);
+    const platform = await storage.storage.getPlatform(id);
     if (!platform || platform.userId !== user.id) {
       return res.status(403).json({
         status: 'error',
@@ -355,14 +374,14 @@ router.put('/platform/:id', hasWatchlistAccess, async (req: Request, res: Respon
       });
     }
 
-    const updateData = {
+    const updateData: Partial<InsertPlatform> = {
       name: req.body.name || platform.name,
       logoUrl: req.body.logoUrl !== undefined ? req.body.logoUrl : platform.logoUrl,
       isDefault: req.body.isDefault !== undefined ? req.body.isDefault : platform.isDefault,
     };
 
     const validatedUpdate = insertPlatformSchema.partial().parse(updateData);
-    const updatedPlatform = await storage.updatePlatform(id, validatedUpdate);
+    const updatedPlatform = await storage.storage.updatePlatform(id, validatedUpdate);
     res.json(updatedPlatform);
   } catch (error) {
     console.error('[ROUTES] Platform update error:', error);
@@ -374,12 +393,17 @@ router.put('/platform/:id', hasWatchlistAccess, async (req: Request, res: Respon
 });
 
 // Delete platform
-router.delete('/platform/:id', hasWatchlistAccess, async (req: Request, res: Response) => {
+routesRouter.delete('/platform/:id', auth.hasWatchlistAccess, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id);
-  const user = req.user as UserResponse;
-
+  const user: UserResponse | undefined = req.user;
+  if (!user) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Authentication required',
+    });
+  }
   try {
-    const platform = await storage.getPlatform(id);
+    const platform = await storage.storage.getPlatform(id);
     if (!platform || platform.userId !== user.id) {
       return res.status(403).json({
         status: 'error',
@@ -387,7 +411,7 @@ router.delete('/platform/:id', hasWatchlistAccess, async (req: Request, res: Res
       });
     }
 
-    const deleted = await storage.deletePlatform(id);
+    const deleted = await storage.storage.deletePlatform(id);
     if (deleted) {
       res.status(204).send();
     } else {
@@ -405,4 +429,4 @@ router.delete('/platform/:id', hasWatchlistAccess, async (req: Request, res: Res
   }
 });
 
-export const routes = router;
+module.exports = routesRouter;

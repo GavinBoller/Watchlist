@@ -1,43 +1,23 @@
-import jwt from 'jsonwebtoken';
-import { Router, Request, Response } from 'express';
-import { User, UserResponse } from '../shared/schema.js';
-import { storage } from './storage.js';
-import { JWT_SECRET, TOKEN_EXPIRATION, verifyToken, createUserResponse } from './jwtAuth.js';
+const jwtSimpleLib = require('jsonwebtoken');
+const simpleJwtSchema = require('./shared/schema.js');
+const jwtAuth = require('./jwtAuth.js');
+import { UserResponse } from './shared/types.js';
 
-// Create router
-const router = Router();
-
-// Helper functions
-function extractTokenFromHeader(req: Request): string | null {
-  const authHeader = req.headers.authorization;
-  
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.substring(7);
+async function simpleJwtLogin(username: string, password: string) {
+  try {
+    const result = await jwtAuth.authenticateJWT(username, password);
+    if (!result) {
+      return null;
+    }
+    const { user } = result;
+    const token = jwtSimpleLib.sign({ id: user.id, username: user.username }, jwtAuth.JWT_SECRET, {
+      expiresIn: jwtAuth.TOKEN_EXPIRATION,
+    });
+    return { user: user as UserResponse, token };
+  } catch (err) {
+    console.error('[SIMPLE_JWT] Error:', err);
+    throw err;
   }
-  
-  return null;
 }
 
-// Routes - using the same JWT_SECRET as the main implementation for consistency
-router.get('/simple-jwt/user', (req: Request, res: Response) => {
-  try {
-    const token = extractTokenFromHeader(req);
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-    
-    const payload = verifyToken(token);
-    if (!payload) {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-    
-    return res.json(payload);
-  } catch (error) {
-    console.error('[SIMPLE-JWT] Error in /user endpoint:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Emergency token functionality has been removed for simplification
-
-export const simpleJwtRouter = router;
+module.exports = { simpleJwtLogin };

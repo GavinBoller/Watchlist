@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "dist/api/**/*.[tj]s",
+      "src": "dist/server/**/*.[tj]s",
       "use": "@vercel/node",
       "config": {
         "includeFiles": ["dist/**/*.js", "tsconfig.json", "server/**/*.ts", "shared/**/*.ts"],
@@ -20,7 +20,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/dist/api/$1"
+      "dest": "/dist/server/$1"
     },
     {
       "src": "/(.*)",

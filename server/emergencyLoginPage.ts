@@ -3,27 +3,28 @@
  * This provides a completely independent authentication mechanism
  * that doesn't rely on any database or complex logic
  */
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const jwtAuth = require('./jwtAuth.js');
 
-import express, { Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from './jwtAuth.js';
+import { Request, Response } from 'express';
 
-const router = express.Router();
+const emergencyLoginRouter = express.Router();
 
 // Generate a very simple token for emergency purposes
-function generateSimpleToken(username: string): string {
+function generateSimpleToken(username: string) {
   const user = {
-    id: -1,  // Use a negative ID to indicate this is an emergency login
+    id: -1, // Use a negative ID to indicate this is an emergency login
     username,
     displayName: username,
-    emergency: true
+    emergency: true,
   };
-  
-  return jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
+
+  return jwt.sign(user, jwtAuth.JWT_SECRET, { expiresIn: '24h' });
 }
 
 // Serve a simple emergency login page
-router.get('/emergency-login', (req: Request, res: Response) => {
+emergencyLoginRouter.get('/emergency-login', (req: Request, res: Response) => {
   const html = `
     <!DOCTYPE html>
     <html>
@@ -115,12 +116,12 @@ router.get('/emergency-login', (req: Request, res: Response) => {
             return;
           }
           
-          // Redirect to the app with emergency parameters
-          window.location.href = '/?emergencyLogin=true&user=' + encodeURIComponent(username) + '&directAuth=true';
+          // Redirect to emergency login endpoint
+          window.location.href = '/api/auth/emergency-login?emergencyLogin=true&user=' + encodeURIComponent(username) + '&directAuth=true';
         }
         
         function loginWithPreset(username) {
-          window.location.href = '/?emergencyLogin=true&user=' + encodeURIComponent(username) + '&directAuth=true';
+          window.location.href = '/api/auth/emergency-login?emergencyLogin=true&user=' + encodeURIComponent(username) + '&directAuth=true';
         }
         
         function loginWithDirectToken(username) {
@@ -139,7 +140,7 @@ router.get('/emergency-login', (req: Request, res: Response) => {
                 sessionStorage.setItem('emergency_timestamp', Date.now().toString());
                 
                 // Redirect with all params
-                window.location.href = '/?token=' + data.token + '&emergencyLogin=true&user=' + username + '&directAuth=true&fullToken=true';
+                window.location.href = '/api/auth/emergency-login?token=' + data.token + '&emergencyLogin=true&user=' + username + '&directAuth=true&fullToken=true';
               } else {
                 alert('Failed to get authentication token');
               }
@@ -153,30 +154,31 @@ router.get('/emergency-login', (req: Request, res: Response) => {
     </body>
     </html>
   `;
-  
+
   res.send(html);
 });
 
 // Emergency token generator - gives a token directly for a username
-// This is the simplest possible authentication mechanism
-router.get('/emergency/raw-token/:username', (req: Request, res: Response) => {
+emergencyLoginRouter.get('/emergency/raw-token/:username', (req: Request, res: Response) => {
   const { username } = req.params;
-  
+
   if (!username) {
     return res.status(400).json({ error: 'Username is required' });
   }
-  
+
   const token = generateSimpleToken(username);
-  
+
   res.json({
     token,
     user: {
       id: -1,
       username,
       displayName: username,
-      emergency: true
-    }
+      emergency: true,
+    },
   });
 });
 
-export const emergencyLoginRouter = router;
+module.exports = {
+  emergencyLoginRouter,
+};

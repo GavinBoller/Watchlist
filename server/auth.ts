@@ -1,21 +1,50 @@
-import passport from 'passport';
-import { Strategy as LocalStrategy } from 'passport-local';
-import bcrypt from 'bcryptjs';
-import { User, UserResponse } from '../shared/schema.js';
-import { IStorage, storage } from './storage.js';
-import { Request, Response, NextFunction } from 'express';
-import { Session } from 'express-session';
+const passport = require('passport');
+const { Strategy: LocalStrategy } = require('passport-local');
+const bcrypt = require('bcryptjs');
+const schema = require('./shared/schema.js');
+const storage = require('./storage.js');
 
-// Extend Request interface for session and user
+import { Request, Response, NextFunction } from 'express';
+import { User, UserResponse, Movie, Platform, WatchlistEntry, InsertMovie, InsertPlatform, InsertWatchlistEntry } from './shared/types.js';
+
+// Interfaces
+interface IStorage {
+  getUser(id: number): Promise<User | null>;
+  getUserByUsername(username: string): Promise<User | null>;
+  getAllUsers(): Promise<User[]>;
+  updateUser(id: number, updates: Partial<User>): Promise<void>;
+  createMovie(movie: InsertMovie): Promise<Movie>;
+  createPlatform(platform: InsertPlatform): Promise<Platform>;
+  createWatchlistEntry(entry: InsertWatchlistEntry): Promise<WatchlistEntry & { movie: Movie }>;
+  getWatchlistEntries(userId: number): Promise<(WatchlistEntry & { movie: Movie })[]>;
+  getWatchlistEntry(id: number): Promise<(WatchlistEntry & { movie: Movie }) | null>;
+  updateWatchlistEntry(id: number, updates: Partial<InsertWatchlistEntry>): Promise<WatchlistEntry & { movie: Movie }>;
+  deleteWatchlistEntry(id: number): Promise<boolean>;
+  getPlatforms(userId: number): Promise<Platform[]>;
+  getPlatform(id: number): Promise<Platform | null>;
+  updatePlatform(id: number, updates: Partial<InsertPlatform>): Promise<Platform>;
+  deletePlatform(id: number): Promise<boolean>;
+}
+
+// Extend Express Request interface
+declare global {
+  namespace Express {
+    interface Request {
+      user?: UserResponse;
+    }
+  }
+}
+
+// Extend session data
 declare module 'express-session' {
   interface SessionData {
     authenticated?: boolean;
     lastChecked?: number;
     createdAt?: number;
-    userData?: User;
+    userData?: UserResponse;
     preservedUserId?: number;
     preservedUsername?: string;
-    preservedDisplayName?: string;
+    preservedDisplayName?: string | null; // Updated to allow null
     userAuthenticated?: boolean;
     enhancedProtection?: boolean;
     autoLogoutPrevented?: boolean;
@@ -23,16 +52,15 @@ declare module 'express-session' {
   }
 }
 
-export function configurePassport() {
+function configurePassport() {
   passport.use(
-    new LocalStrategy(async (username, password, done) => {
+    new LocalStrategy(async (username: string, password: string, done: (error: any, user?: UserResponse | false, info?: { message: string }) => void) => {
       try {
-        const user = await storage.getUserByUsername(username);
+        const user = await storage.storage.getUserByUsername(username);
         if (!user) {
           return done(null, false, { message: 'Incorrect username.' });
         }
 
-        // Check if password is defined before comparing
         if (!user.password) {
           return done(null, false, { message: 'User password not found.' });
         }
@@ -42,35 +70,46 @@ export function configurePassport() {
           return done(null, false, { message: 'Incorrect password.' });
         }
 
-        return done(null, user);
+        const userResponse: UserResponse = {
+          id: user.id,
+          username: user.username,
+          displayName: user.displayName,
+          createdAt: user.createdAt,
+          environment: user.environment,
+        };
+
+        return done(null, userResponse);
       } catch (err) {
         return done(err);
       }
     })
   );
 
-  passport.serializeUser((user: any, done) => {
-    done(null, (user as User).id);
+  passport.serializeUser((user: UserResponse, done: (err: any, id: number) => void) => {
+    done(null, user.id);
   });
 
-  passport.deserializeUser(async (id: number, done) => {
+  passport.deserializeUser(async (id: number, done: (err: any, user?: UserResponse | false) => void) => {
     try {
-      const user = await storage.getUser(id);
+      const user = await storage.storage.getUser(id);
       if (!user) {
         return done(null, false);
       }
-      return done(null, user);
+      const userResponse: UserResponse = {
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        createdAt: user.createdAt,
+        environment: user.environment,
+      };
+      return done(null, userResponse);
     } catch (err) {
       return done(err);
     }
   });
 }
 
-interface IStorageExtended extends IStorage {
-  directSqlQuery?(query: string, params: any[]): Promise<any[]>;
-}
-
-export function isAuthenticated(req: Request, res: Response, next: NextFunction) {
+function isAuthenticated(req: Request, res: Response, next: NextFunction) {
   console.log(`[AUTH] Checking authentication for ${req.method} ${req.originalUrl}`);
   console.log(`[AUTH] Session ID: ${req.sessionID}, Authenticated: ${req.isAuthenticated()}`);
 
@@ -91,28 +130,24 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
       req.user = {
         id: req.session.userData.id,
         username: req.session.userData.username,
-        password: '', // Password not stored in session
-        displayName: req.session.userData.displayName || null,
-        createdAt: req.session.userData.createdAt ? new Date(req.session.userData.createdAt) : new Date(),
-        environment: req.session.userData.environment || null,
+        displayName: req.session.userData.displayName,
+        createdAt: req.session.userData.createdAt,
+        environment: req.session.userData.environment,
       };
     } else if (req.session.preservedUserId && req.session.preservedUsername) {
       console.log(`[AUTH] Found preserved user data in session for ${req.session.preservedUsername}`);
       req.user = {
         id: req.session.preservedUserId,
         username: req.session.preservedUsername,
-        password: '', // Password not stored in session
         displayName: req.session.preservedDisplayName || null,
         createdAt: new Date(),
         environment: null,
       };
-      console.log(
-        `[AUTH] Restored user from preserved data: ${req.session.preservedUsername} (ID: ${req.session.preservedUserId})`
-      );
+      console.log(`[AUTH] Restored user from preserved data: ${req.session.preservedUsername} (ID: ${req.session.preservedUserId})`);
     }
   }
 
-  let currentUser: UserResponse | undefined = req.user as UserResponse;
+  const currentUser: UserResponse | undefined = req.user;
 
   // Check for special users
   const specialUsers = process.env.SPECIAL_USERS
@@ -132,7 +167,7 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
     }
 
     console.log('[AUTH] No authenticated user, logging out');
-    req.logout((err) => {
+    req.logout((err: Error) => {
       if (err) {
         console.error('[AUTH] Error during logout:', err);
       }
@@ -152,7 +187,7 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
   if (req.session && currentUser) {
     req.session.authenticated = true;
     req.session.lastChecked = Date.now();
-    req.session.save((err) => {
+    req.session.save((err: Error) => {
       if (err) {
         console.error('[AUTH] Error saving session:', err);
       }
@@ -171,7 +206,7 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
       req.session.preservedTimestamp = Date.now();
       req.session.enhancedProtection = true;
       req.session.autoLogoutPrevented = true;
-      return req.session.save((err) => {
+      return req.session.save((err: Error) => {
         if (err) {
           console.error('[AUTH] Error saving enhanced session:', err);
           return res.status(500).json({ status: 'error', message: 'Session error' });
@@ -207,7 +242,7 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
   });
 }
 
-export function validateSession(req: Request, res: Response, next: NextFunction) {
+function validateSession(req: Request, res: Response, next: NextFunction) {
   console.log(`[VALIDATE_SESSION] Processing ${req.method} ${req.path}`);
   if (req.path === '/api/status/ping' || req.path.startsWith('/api/auth') || req.path.startsWith('/api/emergency')) {
     console.log(`[VALIDATE_SESSION] Allowing public endpoint: ${req.path}`);
@@ -221,20 +256,19 @@ export function validateSession(req: Request, res: Response, next: NextFunction)
   next();
 }
 
-export function hasWatchlistAccess(req: Request, res: Response, next: NextFunction) {
+function hasWatchlistAccess(req: Request, res: Response, next: NextFunction) {
   let requestUserId: number | undefined;
 
   if (req.params.userId) {
     requestUserId = parseInt(req.params.userId);
-  } else if (req.body && (req.body as any).userId) {
-    requestUserId = parseInt((req.body as any).userId);
-  } else if (req.query && (req.query as any).userId) {
-    requestUserId = parseInt((req.query as any).userId as string);
+  } else if (req.body && req.body.userId) {
+    requestUserId = parseInt(req.body.userId);
+  } else if (req.query && req.query.userId) {
+    requestUserId = parseInt(req.query.userId as string);
   }
 
-  if (req.method === 'POST' && req.originalUrl === '/api/watchlist' && !(req.body as any).userId && req.user) {
-    const authUser = req.user as UserResponse;
-    (req.body as any).userId = authUser.id;
+  if (req.method === 'POST' && req.originalUrl === '/api/watchlist' && !req.body.userId && req.user) {
+    req.body.userId = req.user.id;
   }
 
   if (req.session) {
@@ -248,13 +282,13 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
 
   if (req.user) {
     console.log('[AUTH] User data:', {
-      id: (req.user as any).id,
-      username: (req.user as any).username,
+      id: req.user.id,
+      username: req.user.username,
     });
   }
 
-  const preservedUserId = (req.session as any)?.preservedUserId;
-  const preservedUsername = (req.session as any)?.preservedUsername;
+  const preservedUserId = req.session?.preservedUserId;
+  const preservedUsername = req.session?.preservedUsername;
 
   if (req.originalUrl.includes('/watchlist')) {
     res.set({
@@ -268,24 +302,21 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
     let hasSpecialUserData = false;
 
     if (req.session) {
-      if ((req.session as any).userData && (req.session as any).userData.id && (req.session as any).userData.username) {
-        console.log(`[AUTH:WATCHLIST] Found userData in session for ${(req.session as any).userData.username}`);
-        const userData = (req.session as any).userData;
+      if (req.session.userData && req.session.userData.id && req.session.userData.username) {
+        console.log(`[AUTH:WATCHLIST] Found userData in session for ${req.session.userData.username}`);
         req.user = {
-          id: userData.id,
-          username: userData.username,
-          password: '', // Password not stored in session
-          displayName: userData.displayName || null,
-          createdAt: new Date(userData.createdAt),
-          environment: userData.environment || null,
+          id: req.session.userData.id,
+          username: req.session.userData.username,
+          displayName: req.session.userData.displayName,
+          createdAt: req.session.userData.createdAt,
+          environment: req.session.userData.environment,
         };
         hasSpecialUserData = true;
       } else if (preservedUserId && preservedUsername) {
         req.user = {
           id: preservedUserId,
           username: preservedUsername,
-          password: '', // Password not stored in session
-          displayName: (req.session as any).preservedDisplayName || preservedUsername,
+          displayName: req.session.preservedDisplayName || preservedUsername,
           createdAt: new Date(),
           environment: null,
         };
@@ -294,8 +325,8 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
     }
 
     if (requestUserId) {
-      const dbUser = storage.getUser(requestUserId);
-      dbUser.then((user) => {
+      const dbUser = storage.storage.getUser(requestUserId);
+      dbUser.then((user: User) => {
         if (!user) {
           return res.status(401).json({
             status: 'error',
@@ -311,14 +342,15 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
         };
         req.user = userWithoutPassword;
         if (req.session) {
-          (req.session as any).userData = userWithoutPassword;
-          (req.session as any).preservedUserId = user.id;
-          (req.session as any).preservedUsername = user.username;
+          req.session.userData = userWithoutPassword;
+          req.session.preservedUserId = user.id;
+          req.session.preservedUsername = user.username;
+          req.session.preservedDisplayName = user.displayName;
           req.session.authenticated = true;
           req.session.save();
         }
         next();
-      }).catch((err) => {
+      }).catch((err: Error) => {
         console.error('[AUTH] Error fetching user:', err);
         return res.status(500).json({
           status: 'error',
@@ -347,31 +379,31 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
     if ((isPassportAuthenticated || hasUserObjectAfterRecovery) && req.session) {
       req.session.authenticated = true;
       req.session.lastChecked = Date.now();
-      req.session.save((err) => {
+      req.session.save((err: Error) => {
         if (err) {
           console.error('[AUTH] Error saving session:', err);
         }
       });
     }
 
-    let currentUser = req.user as UserResponse;
+    const currentUser: UserResponse | undefined = req.user;
 
     if (req.method === 'POST' && req.originalUrl === '/api/watchlist') {
-      if (!(req.body as any).userId) {
+      if (!req.body.userId) {
         if (currentUser) {
-          (req.body as any).userId = currentUser.id;
+          req.body.userId = currentUser.id;
         }
       }
-      if ((req.body as any).userId && (req.body as any).userId !== currentUser.id) {
+      if (req.body.userId && currentUser && req.body.userId !== currentUser.id) {
         console.log(
-          `[AUTH] Warning: Body userId ${(req.body as any).userId} different from authenticated user ${currentUser.id}`
+          `[AUTH] Warning: Body userId ${req.body.userId} different from authenticated user ${currentUser.id}`
         );
         if (currentUser) {
-          (req.body as any).userId = currentUser.id;
+          req.body.userId = currentUser.id;
         }
       }
-      const bodyUserId = parseInt((req.body as any).userId as string, 10);
-      if (bodyUserId && bodyUserId !== currentUser.id) {
+      const bodyUserId = parseInt(req.body.userId, 10);
+      if (bodyUserId && currentUser && bodyUserId !== currentUser.id) {
         console.log(
           `[AUTH] Warning: Parsed body userId ${bodyUserId} different from authenticated user ${currentUser.id}`
         );
@@ -401,3 +433,10 @@ export function hasWatchlistAccess(req: Request, res: Response, next: NextFuncti
 
   next();
 }
+
+module.exports = {
+  configurePassport,
+  isAuthenticated,
+  validateSession,
+  hasWatchlistAccess,
+};

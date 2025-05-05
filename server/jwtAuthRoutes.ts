@@ -1,39 +1,29 @@
-import { Router, Request, Response } from "express";
-import { User, UserResponse } from "../shared/schema.js";
+const express = require('express');
+const jwtAuth = require('./jwtAuth.js');
 
-const router = Router();
+import { Request, Response } from 'express';
 
-// Mock user retrieval (replace with actual storage logic)
-const getUserById = async (id: number): Promise<User | null> => {
-  console.warn("[JWT] getUserById not implemented");
-  return null; // Placeholder
+type UserResponse = {
+  id: number;
+  username: string;
+  displayName: string | null;
+  createdAt: Date;
+  environment: string | null;
 };
 
-const createUserResponse = (user: User): UserResponse => ({
-  id: user.id, // Changed from userId to id
-  username: user.username,
-  displayName: user.displayName || user.username,
-  createdAt: user.createdAt,
-  environment: user.environment || "development"
-});
+const jwtAuthRoutesRouter = express.Router();
 
-// Example route
-router.get("/user/:id", async (req: Request, res: Response) => {
-  const userId = parseInt(req.params.id, 10);
-  if (isNaN(userId)) {
-    return res.status(400).json({ message: "Invalid user ID" });
-  }
-
+jwtAuthRoutesRouter.post('/jwt-login', async (req: Request, res: Response) => {
   try {
-    const user = await getUserById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    const { username, password } = req.body;
+    const result = await jwtAuth.authenticateJWT(username, password);
+    if (!result) {
+      return res.status(401).json({ status: 'error', message: 'Invalid credentials' });
     }
-    res.json(createUserResponse(user));
-  } catch (error) {
-    console.error("[JWT] Error fetching user:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(200).json({ user: result.user as UserResponse, token: result.token });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: 'Login failed' });
   }
 });
 
-export default router;
+module.exports = jwtAuthRoutesRouter;

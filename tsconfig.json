@@ -1,15 +1,16 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "outDir": "./dist",
+    "target": "ES2020",
+    "module": "commonjs",
+    "outDir": "./dist/server",
+    "rootDir": ".",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "allowImportingTsExtensions": true,
-    "noEmitOnError": true
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["es2020"],
+    "moduleResolution": "node"
   },
-  "include": ["server/**/*"],
+  "include": ["**/*.ts"],
   "exclude": ["node_modules"]
 }
