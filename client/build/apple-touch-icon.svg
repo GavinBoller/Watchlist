@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="118" fill="#141414" />
+  <g transform="scale(21.33)" stroke="#E50914" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <rect width="18" height="18" x="3" y="3" rx="2" />
+    <path d="M7 3v18" />
+    <path d="M17 3v18" />
+    <path d="M3 7h18" />
+    <path d="M3 17h18" />
+  </g>
+</svg>

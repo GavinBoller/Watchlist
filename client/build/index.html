@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#141414" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Watchlist" />
+    
+    <!-- iOS icon support -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+    <link rel="icon" type="image/svg+xml" href="/apple-touch-icon.svg" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+    
+    <title>Watchlist</title>
+    <script type="module" crossorigin src="/assets/index-D_wyXzPa.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-B-UZOsw-.css">
+  </head>
+  <body class="min-h-screen bg-[#141414] text-white">
+    <div id="root"></div>
+    
+    <!-- Inline SVG icon that iOS can use -->
+    <svg id="apple-touch-icon" style="display:none" width="512" height="512" viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="118" fill="#141414" />
+      <g transform="scale(21.33)" stroke="#E50914" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" fill="none">
+        <rect width="18" height="18" x="3" y="3" rx="2" />
+        <path d="M7 3v18" />
+        <path d="M17 3v18" />
+        <path d="M3 7h18" />
+        <path d="M3 17h18" />
+      </g>
+    </svg>
+    
+    <!-- Main app -->
+    
+    <!-- Dynamic icon generator -->
+    <script>
+      // Generate a data URL from the SVG for iOS
+      document.addEventListener('DOMContentLoaded', function() {
+        try {
+          const svgEl = document.getElementById('apple-touch-icon');
+          const svgData = new XMLSerializer().serializeToString(svgEl);
+          const imgSrc = 'data:image/svg+xml;base64,' + btoa(svgData);
+          
+          // Create link elements for different sizes
+          const sizes = ['', '192x192', '512x512'];
+          sizes.forEach(size => {
+            const link = document.createElement('link');
+            link.rel = 'apple-touch-icon';
+            if (size) link.sizes = size;
+            link.href = imgSrc;
+            document.head.appendChild(link);
+          });
+          
+          console.log('iOS icon generated successfully');
+        } catch (e) {
+          console.error('Error generating iOS icon:', e);
+        }
+      });
+    </script>
+  </body>
+</html>
