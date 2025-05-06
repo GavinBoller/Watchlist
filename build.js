@@ -30,4 +30,23 @@ fs.readdirSync(destDir, { recursive: true }).forEach(file => {
     console.log(file);
 });
 
+// Additional step: Copy files to project root as a fallback
+console.log('Copying frontend assets to project root as fallback...');
+const rootDestDir = __dirname;
+fs.readdirSync(sourceDir).forEach(file => {
+    const srcPath = path.join(sourceDir, file);
+    const destPath = path.join(rootDestDir, file);
+    if (fs.lstatSync(srcPath).isDirectory()) {
+        fs.cpSync(srcPath, destPath, { recursive: true });
+    } else {
+        fs.copyFileSync(srcPath, destPath);
+    }
+    console.log(`Copied ${srcPath} to ${destPath}`);
+});
+
+console.log('Listing files in project root:');
+fs.readdirSync(rootDestDir, { recursive: true }).forEach(file => {
+    console.log(file);
+});
+
 console.log('Build completed.');
