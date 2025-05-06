@@ -4,13 +4,14 @@
   "type": "commonjs",
   "license": "MIT",
   "scripts": {
-    "build": "cd client && npm run build",
-    "build:api": "tsc --project tsconfig.api.json",
-    "dev": "tsx server/index.ts",
-    "start": "NODE_ENV=production node dist/server/index.js",
-    "check": "tsc",
-    "build:server": "tsc --project server/tsconfig.json",
-    "db:push": "drizzle-kit push"
+  "build": "cd client && npm run build",
+  "build:api": "tsc --project tsconfig.api.json",
+  "dev": "tsx server/index.ts",
+  "start": "NODE_ENV=production node dist/server/index.js",
+  "check": "tsc",
+  "build:server": "tsc --project server/tsconfig.json",
+  "db:push": "drizzle-kit push",
+  "vercel-build": "node build.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
