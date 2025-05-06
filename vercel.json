@@ -14,11 +14,14 @@
     },
     {
       "src": "client/build/**/*",
-      "use": "@vercel/static"
+      "use": "@vercel/static",
+      "config": {
+        "outputDirectory": "client/build"
+      }
     }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "dist/server/index.js" },
-    { "src": "/(.*)", "dest": "client/build/index.html", "headers": { "Cache-Control": "public, max-age=0, must-revalidate" } }
+    { "src": "/(.*)", "dest": "/index.html", "headers": { "Cache-Control": "public, max-age=0, must-revalidate" } }
   ]
 }
