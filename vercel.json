@@ -13,13 +13,14 @@
       "use": "@vercel/node"
     },
     {
-      "src": ".vercel/output/**/*",
+      "src": ".vercel/output/static/**/*",
       "use": "@vercel/static"
     }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "dist/server/index.js" },
     { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "src": "/", "dest": "/index.html" },
     { 
       "src": "/(.*)", 
       "dest": "/index.html", 
