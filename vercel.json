@@ -13,7 +13,7 @@
       "use": "@vercel/node"
     },
     {
-      "src": ".vercel/output/static/**/*",
+      "src": ".vercel/output/static/(.*)",
       "use": "@vercel/static"
     }
   ],

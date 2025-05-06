@@ -8,10 +8,20 @@ execSync('npm run build:api', { stdio: 'inherit' });
 console.log('Running frontend build...');
 execSync('npm run build', { stdio: 'inherit' });
 
-console.log('Copying frontend assets to root...');
+console.log('Copying frontend assets to static output...');
 const sourceDir = path.join(__dirname, 'client', 'build');
 const destDir = path.join(__dirname, '.vercel', 'output', 'static');
 fs.mkdirSync(destDir, { recursive: true });
-fs.cpSync(sourceDir, destDir, { recursive: true });
+
+// Copy all files from client/build/ to .vercel/output/static/
+fs.readdirSync(sourceDir).forEach(file => {
+    const srcPath = path.join(sourceDir, file);
+    const destPath = path.join(destDir, file);
+    if (fs.lstatSync(srcPath).isDirectory()) {
+        fs.cpSync(srcPath, destPath, { recursive: true });
+    } else {
+        fs.copyFileSync(srcPath, destPath);
+    }
+});
 
 console.log('Build completed.');
