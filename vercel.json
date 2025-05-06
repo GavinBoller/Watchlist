@@ -2,31 +2,16 @@
   "version": 2,
   "builds": [
     {
-      "src": "package.json",
-      "use": "@vercel/node",
-      "config": {
-        "buildCommand": "npm run build:api"
-      }
+      "src": "dist/server/index.js",
+      "use": "@vercel/node"
     },
     {
-      "src": "client/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build"
-      }
+      "src": "client/build/index.html",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "dist/server/index.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "client/build/index.html",
-      "headers": {
-        "Cache-Control": "public, max-age=0, must-revalidate"
-      }
-    }
+    { "src": "/api/(.*)", "dest": "dist/server/index.js" },
+    { "src": "/(.*)", "dest": "client/build/index.html", "headers": { "Cache-Control": "public, max-age=0, must-revalidate" } }
   ]
 }
