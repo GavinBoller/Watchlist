@@ -13,11 +13,8 @@
       "use": "@vercel/node"
     },
     {
-      "src": "client/build/**/*",
-      "use": "@vercel/static",
-      "config": {
-        "outputDirectory": "client/build"
-      }
+      "src": ".vercel/output/static/**/*",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
