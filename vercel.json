@@ -14,7 +14,10 @@
     },
     {
       "src": ".vercel/output/static/**/*",
-      "use": "@vercel/static"
+      "use": "@vercel/static",
+      "config": {
+        "outputDirectory": ".vercel/output/static"
+      }
     }
   ],
   "routes": [
