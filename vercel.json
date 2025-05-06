@@ -13,12 +13,16 @@
       "use": "@vercel/node"
     },
     {
-      "src": ".vercel/output/static/(.*)",
+      "src": ".vercel/output/static/**/*",
       "use": "@vercel/static"
     }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "dist/server/index.js" },
-    { "src": "/(.*)", "dest": "/index.html", "headers": { "Cache-Control": "public, max-age=0, must-revalidate" } }
+    { 
+      "src": "/(.*)", 
+      "dest": ".vercel/output/static/index.html", 
+      "headers": { "Cache-Control": "public, max-age=0, must-revalidate" }
+    }
   ]
 }
