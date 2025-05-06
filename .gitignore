@@ -9,3 +9,4 @@ vite.config.ts.*
 *.rebak2
 *.log
 .vercel
+client/build/
