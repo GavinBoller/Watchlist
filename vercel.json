@@ -1,13 +1,7 @@
 {
   "version": 2,
+  "buildCommand": "node build.js",
   "builds": [
-    {
-      "src": "build.js",
-      "use": "@vercel/build",
-      "config": {
-        "buildCommand": "node build.js"
-      }
-    },
     {
       "src": "dist/server/index.js",
       "use": "@vercel/node"
