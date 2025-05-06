@@ -14,15 +14,18 @@
     },
     {
       "src": ".vercel/output/static/**/*",
-      "use": "@vercel/static"
+      "use": "@vercel/static",
+      "config": {
+        "outputDirectory": ".vercel/output/static"
+      }
     }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "dist/server/index.js" },
-    { "src": "/assets/(.*)", "dest": ".vercel/output/static/assets/$1" },
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
     { 
       "src": "/(.*)", 
-      "dest": ".vercel/output/static/index.html", 
+      "dest": "/index.html", 
       "headers": { "Cache-Control": "public, max-age=0, must-revalidate" }
     }
   ]
