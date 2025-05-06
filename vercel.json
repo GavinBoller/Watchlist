@@ -19,6 +19,7 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "dist/server/index.js" },
+    { "src": "/assets/(.*)", "dest": ".vercel/output/static/assets/$1" },
     { 
       "src": "/(.*)", 
       "dest": ".vercel/output/static/index.html", 

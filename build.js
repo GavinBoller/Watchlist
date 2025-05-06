@@ -22,6 +22,12 @@ fs.readdirSync(sourceDir).forEach(file => {
     } else {
         fs.copyFileSync(srcPath, destPath);
     }
+    console.log(`Copied ${srcPath} to ${destPath}`);
+});
+
+console.log('Listing files in .vercel/output/static:');
+fs.readdirSync(destDir, { recursive: true }).forEach(file => {
+    console.log(file);
 });
 
 console.log('Build completed.');
