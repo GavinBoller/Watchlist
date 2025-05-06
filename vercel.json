@@ -14,20 +14,11 @@
     },
     {
       "src": ".vercel/output/static/**/*",
-      "use": "@vercel/static",
-      "config": {
-        "outputDirectory": ".vercel/output/static"
-      }
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "dist/server/index.js" },
-    { "src": "/assets/(.*)", "dest": "/assets/$1" },
-    { "src": "/", "dest": "/index.html" },
-    { 
-      "src": "/(.*)", 
-      "dest": "/index.html", 
-      "headers": { "Cache-Control": "public, max-age=0, must-revalidate" }
-    }
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
