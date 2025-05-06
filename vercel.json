@@ -13,12 +13,11 @@
       "use": "@vercel/node"
     },
     {
-      "src": "client/build/index.html",
+      "src": "client/build/**/*",
       "use": "@vercel/static"
     }
   ],
   "routes": [
-    { "src": "/assets/(.*)", "dest": "client/build/assets/$1" },
     { "src": "/api/(.*)", "dest": "dist/server/index.js" },
     { "src": "/(.*)", "dest": "client/build/index.html", "headers": { "Cache-Control": "public, max-age=0, must-revalidate" } }
   ]
